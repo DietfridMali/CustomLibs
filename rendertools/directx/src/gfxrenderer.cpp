@@ -167,9 +167,14 @@ void GfxRenderer::SavePipelineCache(void)
 }
 
 
+// Like the Vulkan backend: the pipeline library and the key records are written after the precreation
+// at a level load, when there is something new in them (SavePipelineLibrary () checks), not only at
+// Cleanup () - which a run that is killed or crashes never reaches.
+
 void GfxRenderer::PrecreatePipelines(void (*progress)(int, int))
 {
 	PSO::PrecreatePSOs(progress);
+	SavePipelineCache();
 }
 
 

@@ -89,15 +89,34 @@ public:
 #endif
 	}
 
-	// pinned: a Vulkan notion (a block of device memory of its own, vulkan/include/gfxarray.hpp); a
-	// committed resource is already memory of its own here.
+	// pinned: for the buffers the shaders read for every pixel of every frame. In Vulkan a block of
+	// device memory of its own (vulkan/include/gfxarray.hpp); a committed resource is already memory of
+	// its own here, so what is left to ask for is RESIDENCY: the video memory manager may demote any
+	// resource to system memory when it sees fit, and the maximum residency priority tells it to take
+	// everything else first.
 	bool Create(int width, int height = 1, bool pinned = false)
 	{
-		(void)pinned;
+		bool ok;
 		if constexpr (isBuffer)
-			return CreateBuffer(width, height);
+			ok = CreateBuffer(width, height);
 		else
-			return CreateTexture(width, height);
+			ok = CreateTexture(width, height);
+		if (ok and pinned)
+			Pin();
+		return ok;
+	}
+
+	void Pin(void)
+	{
+		ID3D12Device* device = dx12Context.Device();
+		if (not (device and m_resource))
+			return;
+		ComPtr<ID3D12Device1> device1;
+		if (FAILED(device->QueryInterface(IID_PPV_ARGS(device1.GetAddressOf()))))
+			return;
+		ID3D12Pageable*				pageable = m_resource.Get();
+		D3D12_RESIDENCY_PRIORITY	priority = D3D12_RESIDENCY_PRIORITY_MAXIMUM;
+		device1->SetResidencyPriority(1, &pageable, &priority);
 	}
 
 	void Destroy(void)
@@ -633,6 +652,10 @@ private:
 		auto*			list = copyList ? copyList->GfxList() : nullptr;
 		if (not list)
 			return false;
+		// The transition into COPY_DEST is the barrier BEFORE the copy that the Vulkan backend spells
+		// out (GfxArray::CopyFromStaging ()): a transition waits for the reads that came before it in
+		// the queue, the frame still in flight included, so a buffer that is rewritten every frame -
+		// the light buffer - is not overwritten under the draws of the frame before.
 		SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
 		list->CopyBufferRegion(m_resource.Get(), 0, upload.Get(), 0, byteSize);
 		SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);

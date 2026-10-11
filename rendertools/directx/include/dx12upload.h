@@ -28,7 +28,10 @@ bool UploadSubresource(ID3D12Device*				device,
 noexcept;
 
 // =================================================================================================
-// High-level: open upload list, copy all subresources, flush — no list management by the caller.
+// High-level: copy all subresources and transition to the shader read state - no list management by
+// the caller. Inside a frame the copies go into the list that is recording and run with the frame,
+// in front of the draw that asked for the texture; outside a frame (setup, level load) on a temporary
+// list that is executed and waited for before the call returns. See BeginUpload () in dx12upload.cpp.
 
 // Upload faceCount subresources (1 for a plain 2D texture, 6 for a cubemap).
 bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces, int faceCount, int width,

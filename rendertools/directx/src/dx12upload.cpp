@@ -33,6 +33,63 @@ noexcept
 	return true;
 }
 
+// =================================================================================================
+// Where an upload's copies go - the counterpart of the Vulkan backend's BeginUpload ()/EndUpload ()
+// (vkupload.cpp), and the same rule GfxArray::OpenCopyList () goes by:
+//
+// Inside a frame the copies are recorded into the list that is recording (or the ordered copy list
+// while the draw buffers are suspended), where D3D12 allows a copy at any point - so the texture a
+// draw asks for in the middle of a frame is copied in front of that draw, in the frame's own list,
+// and nothing waits for the GPU. The upload buffers are tracked by GfxResourceHandler
+// (GetUploadResource ()) and go back once the frame is through. Vulkan takes a detached upload list
+// that runs ahead of the frame instead, because there a copy is not allowed inside a rendering scope.
+//
+// Outside a frame (setup, a level load before the level's first frame is open) the upload is what
+// every path here used to be whichever point of the frame it was called from: a temporary list of its
+// own, executed and waited for before the call returns.
+
+struct UploadCommands {
+	CommandList*	cl{ nullptr };
+	bool			close{ false }; // an ordered copy list of this upload's own: closed, executed with the frame
+	bool			flush{ false }; // a temporary list: executed and waited for
+};
+
+
+static bool BeginUpload(UploadCommands& upload, const char* name)
+noexcept
+{
+	upload = UploadCommands{};
+	if (commandListHandler.UsesOrderedCopyList()) {
+		if ((upload.cl = commandListHandler.OpenOrderedCopyList())) {
+			upload.close = true;
+			return true;
+		}
+	}
+	if (CommandList* current = commandListHandler.CurrentCmdList()) {
+		if (current->IsRecording()) {
+			upload.cl = current;
+			return true;
+		}
+	}
+	upload.cl = OpenUploadList(name);
+	upload.flush = true;
+	return upload.cl != nullptr;
+}
+
+
+// ok = false: the copies recorded so far are not worth waiting for - a temporary list is closed and
+// goes out with the next execution unwaited, as before.
+static bool EndUpload(UploadCommands& upload, bool ok)
+noexcept
+{
+	if (upload.flush)
+		FinishUploadList(upload.cl, ok);
+	else if (upload.close)
+		upload.cl->Close(false);
+	upload = UploadCommands{};
+	return ok;
+}
+
 
 void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource,
 						D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter)
@@ -123,22 +180,21 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
 					   int height, int channels)
 noexcept
 {
-	CommandList* cl = OpenUploadList("UploadTextureData");
-	if (not cl)
+	UploadCommands upload;
+	if (not BeginUpload(upload, "UploadTextureData"))
 		return false;
+	CommandList* cl = upload.cl;
 
 	ComPtr<ID3D12Resource> uploads[6];
 	if (faceCount > 6)
 		faceCount = 6;
 	for (int i = 0; i < faceCount; ++i) {
 		if (not UploadSubresource(device, cl->GfxList(), dstResource, UINT(i), faces[i], width, height, channels, uploads[i],
-								  /*addBarrier=*/false)) {
-			FinishUploadList(cl);
-			return false;
-		}
+								  /*addBarrier=*/false))
+			return EndUpload(upload, false);
 	}
 	SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	return FinishUploadList(cl, true);
+	return EndUpload(upload, true);
 }
 
 
@@ -189,9 +245,10 @@ bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource
 							   int channels, uint32_t mipLevels, eColorEncoding colorEncoding)
 noexcept
 {
-	CommandList* cl = OpenUploadList("UploadTextureDataWithMips");
-	if (not cl)
+	UploadCommands upload;
+	if (not BeginUpload(upload, "UploadTextureDataWithMips"))
 		return false;
+	CommandList* cl = upload.cl;
 
 	// One upload buffer kept alive per level until the list is flushed; CPU-side downsample
 	// buffers for levels 1..N-1 (level 0 uploads straight from the caller's pixels).
@@ -219,12 +276,10 @@ noexcept
 		prevH = curH;
 	}
 
-	if (not ok) {
-		FinishUploadList(cl);
-		return false;
-	}
+	if (not ok)
+		return EndUpload(upload, false);
 	SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	return FinishUploadList(cl, true);
+	return EndUpload(upload, true);
 }
 
 
@@ -287,13 +342,15 @@ noexcept
 	if ((layerCount < 1) or (mipCount < 1) or (channels < 1) or (firstLayer < 0))
 		return false;
 
-	CommandList* cl = OpenUploadList("UploadTextureArrayData");
-	if (not cl)
+	UploadCommands upload;
+	if (not BeginUpload(upload, "UploadTextureArrayData"))
 		return false;
+	CommandList* cl = upload.cl;
 
 	// A resource that has already been deployed is in PIXEL_SHADER_RESOURCE, not in the COPY_DEST it
 	// was created in - take it back before writing it, so that both the copy and the closing barrier
-	// below see the state they expect.
+	// below see the state they expect. The transition is also what keeps this copy from overwriting
+	// what the frame still in flight is drawing with: a transition barrier waits for the reads before it.
 	if (isRefresh)
 		SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 						   kShaderReadState, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -327,11 +384,10 @@ noexcept
 		if (isRefresh)
 			SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 							   D3D12_RESOURCE_STATE_COPY_DEST, kShaderReadState);
-		FinishUploadList(cl);
-		return false;
+		return EndUpload(upload, false);
 	}
 	SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	return FinishUploadList(cl, true);
+	return EndUpload(upload, true);
 }
 
 
@@ -346,9 +402,10 @@ noexcept
 	if (blockBytes == 0)
 		return false; // caller passed a non-block-compressed format
 
-	CommandList* cl = OpenUploadList("UploadCompressedData");
-	if (not cl)
+	UploadCommands upload;
+	if (not BeginUpload(upload, "UploadCompressedData"))
 		return false;
+	CommandList* cl = upload.cl;
 
 	if (isRefresh)
 		SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
@@ -384,11 +441,10 @@ noexcept
 		if (isRefresh)
 			SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 							   D3D12_RESOURCE_STATE_COPY_DEST, kShaderReadState);
-		FinishUploadList(cl);
-		return false;
+		return EndUpload(upload, false);
 	}
 	SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	return FinishUploadList(cl, true);
+	return EndUpload(upload, true);
 }
 
 // =================================================================================================
@@ -450,9 +506,10 @@ noexcept
 							srcRowBytes);
 	upload->Unmap(0, nullptr);
 
-	CommandList* cl = OpenUploadList("Upload3DTextureData");
-	if (not cl)
+	UploadCommands commands;
+	if (not BeginUpload(commands, "Upload3DTextureData"))
 		return nullptr;
+	CommandList* cl = commands.cl;
 
 	D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
 	srcLoc.pResource = upload.Get();
@@ -463,7 +520,7 @@ noexcept
 	dstLoc.SubresourceIndex = 0;
 	cl->GfxList()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
 	SubresourceBarrier(cl->GfxList(), resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	FinishUploadList(cl, true);
+	EndUpload(commands, true);
 #ifdef _DEBUG
 	if (not resource)
 		return nullptr;
@@ -602,9 +659,10 @@ noexcept
 	tex.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
 #endif
 
-	CommandList* cl = OpenUploadList("Upload3DTextureMips");
-	if (not cl)
+	UploadCommands commands;
+	if (not BeginUpload(commands, "Upload3DTextureMips"))
 		return false;
+	CommandList* cl = commands.cl;
 
 	// One upload buffer + CopyTextureRegion per mip level.
 	AutoArray<ComPtr<ID3D12Resource>> uploads;
@@ -631,17 +689,13 @@ noexcept
 		device->GetCopyableFootprints(&mipDesc, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
 
 		ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource("", size_t(uploadSize));
-		if (not upload) {
-			FinishUploadList(cl);
-			return false;
-		}
+		if (not upload)
+			return EndUpload(commands, false);
 
 		uint8_t*	mapped = nullptr;
 		D3D12_RANGE	mapRange{ 0, 0 };
-		if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) {
-			FinishUploadList(cl);
-			return false;
-		}
+		if (FAILED(upload->Map(0, &mapRange, (void**)&mapped)))
+			return EndUpload(commands, false);
 		UINT srcRowBytes = UINT(mipW) * stride;
 		UINT slicePitch = layout.Footprint.RowPitch * rowCount;
 		if (srcRowBytes == layout.Footprint.RowPitch)
@@ -668,7 +722,7 @@ noexcept
 
 	// Transition all subresources COPY_DEST -> PIXEL_SHADER_RESOURCE.
 	SubresourceBarrier(cl->GfxList(), tex.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-	FinishUploadList(cl, true);
+	EndUpload(commands, true);
 
 	if (not tex.AllocateHandle())
 		return false;
