@@ -474,7 +474,7 @@ noexcept
 static constexpr uint32_t	kGpuPassSlotSize = 256;
 static constexpr uint32_t	kGpuPassCycleMax = kGpuPassSlotSize / 2;
 static constexpr size_t		kGpuPassNameSize = 48;
-static constexpr uint32_t	kGpuMarkMax = 32;
+static constexpr uint32_t	kGpuMarkMax = 96;
 static constexpr size_t		kGpuMarkNameSize = 32;
 static constexpr uint32_t	kGpuPassQueries = 2 + kGpuMarkMax;
 
@@ -485,6 +485,8 @@ struct VkGpuPassRecord {
 	uint32_t			markCount;
 	uint32_t			marksDropped;
 	const Shader*		lastShader;
+	VkCommandBuffer		cb;
+	bool				markIsStage[kGpuMarkMax];
 	char				markNames[kGpuMarkMax][kGpuMarkNameSize];
 };
 
@@ -581,6 +583,7 @@ noexcept
 	pass.markCount = 0;
 	pass.marksDropped = 0;
 	pass.lastShader = nullptr;
+	pass.cb = cb;
 	snprintf(pass.name, sizeof(pass.name), "%s", name);
 	uint32_t query = VkGpuPassQuery(slotIndex, index);
 	vkCmdResetQueryPool(cb, vkGpuPassPool, query, kGpuPassQueries);
@@ -603,6 +606,7 @@ noexcept
 		return;
 	}
 	snprintf(pass->markNames[pass->markCount], kGpuMarkNameSize, "%s", static_cast<const char*>(shader->m_name));
+	pass->markIsStage[pass->markCount] = false;
 	vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, VkGpuPassQuery(slotIndex, index) + 2 + pass->markCount);
 	++pass->markCount;
 }
@@ -716,10 +720,10 @@ noexcept
 				continue;
 			double markMs = double(markEnd - mark[0]) * vkGpuPassPeriodMs;
 			if (markMs >= kStallDetailMinMs)
-				logHandler.Print("         shader %-28s %8.2f ms\n", pass.markNames[j], markMs);
+				logHandler.Print("         %s %-28s %8.2f ms\n", pass.markIsStage[j] ? "stage " : "shader", pass.markNames[j], markMs);
 		}
 		if (pass.marksDropped > 0)
-			logHandler.Print("         %u shader changes not recorded\n", pass.marksDropped);
+			logHandler.Print("         %u marks not recorded\n", pass.marksDropped);
 	}
 }
 
@@ -743,6 +747,37 @@ noexcept
 }
 
 #endif
+
+void GfxStageMark(const char* name)
+noexcept
+{
+#if VK_STALL_DIAG
+	if (vkGpuPassPool == VK_NULL_HANDLE)
+		return;
+	VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+	if (cb == VK_NULL_HANDLE)
+		return;
+	for (uint32_t slotIndex = 0; slotIndex < CommandQueue::FRAME_COUNT; ++slotIndex) {
+		VkGpuPassSlot& slot = vkGpuPassSlots[slotIndex];
+		for (uint32_t i = slot.count; i > 0; --i) {
+			uint32_t			index = (slot.first + i - 1) % kGpuPassSlotSize;
+			VkGpuPassRecord&	pass = slot.passes[index];
+			if ((pass.cb != cb) or pass.isEnded)
+				continue;
+			if (pass.markCount >= kGpuMarkMax) {
+				++pass.marksDropped;
+				return;
+			}
+			snprintf(pass.markNames[pass.markCount], kGpuMarkNameSize, "%s", name);
+			pass.markIsStage[pass.markCount] = true;
+			vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, VkGpuPassQuery(slotIndex, index) + 2 + pass.markCount);
+			++pass.markCount;
+			pass.lastShader = nullptr;
+			return;
+		}
+	}
+#endif
+}
 
 List<RenderStates> CommandList::m_renderStateStack;
 
