@@ -89,8 +89,11 @@ public:
 #endif
 	}
 
-	bool Create(int width, int height = 1)
+	// pinned: a Vulkan notion (a block of device memory of its own, vulkan/include/gfxarray.hpp); a
+	// committed resource is already memory of its own here.
+	bool Create(int width, int height = 1, bool pinned = false)
 	{
+		(void)pinned;
 		if constexpr (isBuffer)
 			return CreateBuffer(width, height);
 		else

@@ -232,6 +232,12 @@ void GfxRenderer::PrecreatePipelines(void (*progress)(int, int))
 		SavePipelineCache();
 }
 
+
+void GfxRenderer::ReserveMemory(void)
+{
+	vkContext.ReserveMemory();
+}
+
 // =================================================================================================
 // The current swap chain image, as DrawScreen () left it - so call this before the present. The copy
 // goes through a host visible readback buffer on a command list of its own that is submitted with the

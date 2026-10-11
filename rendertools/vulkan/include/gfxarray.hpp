@@ -9,6 +9,7 @@
 #include "array.hpp"
 #include "gfxtypes.h"
 #include "readtarget.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -147,7 +148,10 @@ public:
 		}
 	}
 
-	bool Create(int width, int height = 1)
+	// pinned: the buffer goes into the pinned pool (VKContext::PinnedPool ()), one block of device local
+	// memory that is never given back or grown, for the buffers the shaders read per pixel every frame.
+	// When that pool is full, the buffer takes the common memory instead, with a note in the log.
+	bool Create(int width, int height = 1, bool pinned = false)
 	{
 		Destroy();
 		m_width = uint32_t(width);
@@ -174,12 +178,25 @@ public:
 
 		VmaAllocationCreateInfo ai{};
 		ai.usage = VMA_MEMORY_USAGE_AUTO;
-		if (vmaCreateBuffer(allocator, &bi, &ai, &m_buffer, &m_allocation, nullptr) != VK_SUCCESS)
+		if (pinned)
+			ai.pool = vkContext.PinnedPool(); // VK_NULL_HANDLE when there is none: the common memory then
+		VkResult res = vmaCreateBuffer(allocator, &bi, &ai, &m_buffer, &m_allocation, nullptr);
+		if ((res != VK_SUCCESS) and (ai.pool != VK_NULL_HANDLE)) {
+			logHandler.Print("GfxArray::Create: the pinned pool has no room for %llu bytes (%d), taking common memory\n",
+							 static_cast<unsigned long long>(m_bufferSize), int(res));
+			ai.pool = VK_NULL_HANDLE;
+			res = vmaCreateBuffer(allocator, &bi, &ai, &m_buffer, &m_allocation, nullptr);
+		}
+		if (res != VK_SUCCESS) {
+			m_buffer = VK_NULL_HANDLE;
+			m_allocation = VK_NULL_HANDLE;
 			return false;
+		}
 
 		char detail[96];
-		snprintf(detail, sizeof(detail), "%d x %u bytes%s", size, unsigned(sizeof(DATA_T)),
-				 isInstanceBuffer ? ", instance stream" : isIndirectBuffer ? ", indirect" : "");
+		snprintf(detail, sizeof(detail), "%d x %u bytes%s%s", size, unsigned(sizeof(DATA_T)),
+				 isInstanceBuffer ? ", instance stream" : isIndirectBuffer ? ", indirect" : "",
+				 (ai.pool != VK_NULL_HANDLE) ? ", pinned" : "");
 		VkStallAllocation("gfx array", m_allocation, m_bufferSize, detail);
 		return true;
 	}
@@ -521,38 +538,49 @@ private:
 			}
 		}
 		if (frameCB != VK_NULL_HANDLE) {
-			vkCmdCopyBuffer(frameCB, staging, m_buffer, 1, &region);
-			VkPipelineStageFlags2 dstStage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+			VkPipelineStageFlags2 shaderStage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
 				VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 			if (vkContext.HasFeature(GfxFeature::Tessellation))
-				dstStage |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
+				shaderStage |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
 			if (vkContext.HasFeature(GfxFeature::GeometryShader))
-				dstStage |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
-			VkAccessFlags2 dstAccess = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+				shaderStage |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
+			VkAccessFlags2 shaderAccess = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
 			if constexpr (isInstanceBuffer) {
-				dstStage |= VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
-				dstAccess |= VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+				shaderStage |= VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+				shaderAccess |= VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
 			}
 			if constexpr (isIndirectBuffer) {
-				dstStage |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-				dstAccess |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+				shaderStage |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+				shaderAccess |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
 			}
-			VkBufferMemoryBarrier2 b{};
-			b.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-			b.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-			b.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-			b.dstStageMask = dstStage;
-			b.dstAccessMask = dstAccess;
-			b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			b.buffer = m_buffer;
-			b.offset = dstOffset;
-			b.size = bytes;
-			VkDependencyInfo dep{};
-			dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-			dep.bufferMemoryBarrierCount = 1;
-			dep.pBufferMemoryBarriers = &b;
-			Vk13Api::CmdPipelineBarrier2(frameCB, &dep);
+			auto BufferBarrier = [&](VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+									 VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+				VkBufferMemoryBarrier2 b{};
+				b.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+				b.srcStageMask = srcStage;
+				b.srcAccessMask = srcAccess;
+				b.dstStageMask = dstStage;
+				b.dstAccessMask = dstAccess;
+				b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				b.buffer = m_buffer;
+				b.offset = dstOffset;
+				b.size = bytes;
+				VkDependencyInfo dep{};
+				dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+				dep.bufferMemoryBarrierCount = 1;
+				dep.pBufferMemoryBarriers = &b;
+				Vk13Api::CmdPipelineBarrier2(frameCB, &dep);
+			};
+			// BEFORE the copy: whoever read the range last has to be through with it. Within this frame that
+			// is a pass before this upload; across frames it is the frame still in flight, whose shaders may
+			// be reading the buffer while this frame's copy is submitted behind them - a barrier's first scope
+			// covers everything submitted to the queue before it, so this is what keeps the copy from
+			// overwriting what the last frame is still drawing with (the light buffer is rewritten every frame).
+			BufferBarrier(shaderStage, shaderAccess, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
+			vkCmdCopyBuffer(frameCB, staging, m_buffer, 1, &region);
+			// AFTER it: the copy has to land before the shaders of this frame read it.
+			BufferBarrier(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, shaderStage, shaderAccess);
 			commandListHandler.ResumeRendering(scope);
 			if (copyList)
 				copyList->Close(false);

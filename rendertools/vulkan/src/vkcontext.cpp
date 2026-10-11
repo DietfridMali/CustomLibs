@@ -160,6 +160,11 @@ noexcept
 void VKContext::Destroy(void)
 noexcept
 {
+	if ((m_pinnedPool != VK_NULL_HANDLE) and (m_allocator != VK_NULL_HANDLE)) {
+		vmaDestroyPool(m_allocator, m_pinnedPool);
+		m_pinnedPool = VK_NULL_HANDLE;
+	}
+	m_pinnedPoolFailed = false;
 	if (m_allocator != VK_NULL_HANDLE) {
 		vmaDestroyAllocator(m_allocator);
 		m_allocator = VK_NULL_HANDLE;
@@ -897,6 +902,173 @@ noexcept
 		return false;
 	}
 	return true;
+}
+
+// =================================================================================================
+// The pinned pool and the reserve - see vkcontext.h.
+
+// The size of the pinned pool's one block. What goes in: the light buffer (a few hundred lights of 176
+// bytes), the segment light ranges and index lists (32 entries of 4 bytes per segment plus the path
+// records) and the level face buffer - some megabytes for the biggest levels there are.
+static constexpr VkDeviceSize kPinnedPoolBlockSize = VkDeviceSize(64) << 20;
+
+// VMA's own block size for a heap (VmaAllocator_T::CalcPreferredBlockSize (): an eighth of a heap of
+// up to 1 GB, the preferred large heap block size - 256 MB by default - above that).
+static constexpr VkDeviceSize kVmaSmallHeapMaxSize = VkDeviceSize(1024) << 20;
+static constexpr VkDeviceSize kVmaLargeHeapBlockSize = VkDeviceSize(256) << 20;
+
+
+VmaPool VKContext::PinnedPool(void)
+noexcept
+{
+	if ((m_pinnedPool != VK_NULL_HANDLE) or m_pinnedPoolFailed or (m_allocator == VK_NULL_HANDLE))
+		return m_pinnedPool;
+
+	// The memory type the common path would pick for such a buffer (GfxArray::Create ()).
+	VkBufferCreateInfo bufInfo{};
+	bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufInfo.size = 65536;
+	bufInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VmaAllocationCreateInfo allocInfo{};
+	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+
+	uint32_t	memoryType = 0;
+	VkResult	res = vmaFindMemoryTypeIndexForBufferInfo(m_allocator, &bufInfo, &allocInfo, &memoryType);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("VKContext::PinnedPool: no memory type for a device local storage buffer (%d)\n", int(res));
+		m_pinnedPoolFailed = true;
+		return VK_NULL_HANDLE;
+	}
+
+	VmaPoolCreateInfo poolInfo{};
+	poolInfo.memoryTypeIndex = memoryType;
+	poolInfo.blockSize = kPinnedPoolBlockSize;
+	poolInfo.minBlockCount = 1; // allocated with the pool ...
+	poolInfo.maxBlockCount = 1; // ... and never a second one: a full pool fails the allocation, see GfxArray::Create ()
+	res = vmaCreatePool(m_allocator, &poolInfo, &m_pinnedPool);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("VKContext::PinnedPool: vmaCreatePool failed (%d)\n", int(res));
+		m_pinnedPool = VK_NULL_HANDLE;
+		m_pinnedPoolFailed = true;
+		return VK_NULL_HANDLE;
+	}
+	logHandler.Print("Vulkan pinned memory pool: %llu MB, memory type %u\n", static_cast<unsigned long long>(kPinnedPoolBlockSize >> 20), memoryType);
+	return m_pinnedPool;
+}
+
+
+bool VKContext::ReserveMemory(void)
+noexcept
+{
+	if (m_allocator == VK_NULL_HANDLE)
+		return false;
+
+	PinnedPool();
+
+	// The memory types a frame allocates from, found the way the allocations themselves find them:
+	// device local buffers (GfxArray, the acceleration structures), device local images (textures, render
+	// targets), host visible buffers the GPU reads (the mesh data buffers, the constants ring) and the
+	// staging buffers the uploads go through.
+	uint32_t	memoryTypes[8];
+	uint32_t	memoryTypeCount = 0;
+	auto		noteType = [&memoryTypes, &memoryTypeCount](uint32_t type) {
+		   for (uint32_t i = 0; i < memoryTypeCount; ++i)
+			   if (memoryTypes[i] == type)
+				   return;
+		   if (memoryTypeCount < 8)
+			   memoryTypes[memoryTypeCount++] = type;
+	};
+
+	struct BufferProbe {
+		VkBufferUsageFlags			usage;
+		VmaAllocationCreateFlags	flags;
+	};
+	static const BufferProbe bufferProbes[] = {
+		{ VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0 },
+		{ VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		  VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT },
+		{ VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT },
+	};
+	for (const BufferProbe& probe : bufferProbes) {
+		VkBufferCreateInfo bufInfo{};
+		bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufInfo.size = 65536;
+		bufInfo.usage = probe.usage;
+		bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		VmaAllocationCreateInfo allocInfo{};
+		allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+		allocInfo.flags = probe.flags;
+		uint32_t type = 0;
+		if (vmaFindMemoryTypeIndexForBufferInfo(m_allocator, &bufInfo, &allocInfo, &type) == VK_SUCCESS)
+			noteType(type);
+	}
+	{
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+		imageInfo.extent = { 256, 256, 1 };
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VmaAllocationCreateInfo allocInfo{};
+		allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+		uint32_t type = 0;
+		if (vmaFindMemoryTypeIndexForImageInfo(m_allocator, &imageInfo, &allocInfo, &type) == VK_SUCCESS)
+			noteType(type);
+	}
+
+	VkPhysicalDeviceMemoryProperties memoryProps{};
+	vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memoryProps);
+
+	bool ok = true;
+
+	for (uint32_t i = 0; i < memoryTypeCount; ++i) {
+		const uint32_t type = memoryTypes[i];
+		if (type >= memoryProps.memoryTypeCount)
+			continue;
+		const VkDeviceSize	heapSize = memoryProps.memoryHeaps[memoryProps.memoryTypes[type].heapIndex].size;
+		const VkDeviceSize	blockSize = (heapSize <= kVmaSmallHeapMaxSize) ? (heapSize / 8) : kVmaLargeHeapBlockSize;
+		// Two allocations of just under half a block, taken and given back: VMA puts an allocation of
+		// more than half a block into dedicated memory of its own, which would not leave a block behind;
+		// two of just under half fill one block, and VMA keeps a block that has run empty (one per memory
+		// type). What is left is a block with that much room, from which the allocations of the level go.
+		const VkDeviceSize	probeSize = (blockSize / 2 > (VkDeviceSize(1) << 20)) ? (blockSize / 2 - (VkDeviceSize(1) << 20)) : 0;
+		if (probeSize == 0)
+			continue;
+
+		VkMemoryRequirements requirements{};
+		requirements.size = probeSize;
+		requirements.alignment = 256;
+		requirements.memoryTypeBits = 1u << type;
+		VmaAllocationCreateInfo allocInfo{};
+		allocInfo.usage = VMA_MEMORY_USAGE_UNKNOWN; // the type is named outright
+		allocInfo.memoryTypeBits = 1u << type;
+
+		VmaAllocation	probes[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+		uint32_t		nProbes = 0;
+		for (; nProbes < 2; ++nProbes) {
+			if (vmaAllocateMemory(m_allocator, &requirements, &allocInfo, &probes[nProbes], nullptr) != VK_SUCCESS)
+				break;
+		}
+		for (uint32_t j = 0; j < nProbes; ++j)
+			vmaFreeMemory(m_allocator, probes[j]);
+		if (nProbes < 2) {
+			logHandler.Print("VKContext::ReserveMemory: memory type %u (heap %u): only %u of 2 probes of %llu MB could be taken\n", type,
+							 memoryProps.memoryTypes[type].heapIndex, nProbes, static_cast<unsigned long long>(probeSize >> 20));
+			ok = false;
+		}
+		else
+			logHandler.Print("Vulkan memory reserve: type %u heap %u, a block of %llu MB with room\n", type,
+							 memoryProps.memoryTypes[type].heapIndex, static_cast<unsigned long long>(blockSize >> 20));
+	}
+	return ok;
 }
 
 // =================================================================================================

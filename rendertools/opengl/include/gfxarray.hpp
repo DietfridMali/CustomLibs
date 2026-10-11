@@ -49,8 +49,11 @@ public:
 	}
 
 
-	bool Create(int width, int height = 1)
+	// pinned: a Vulkan notion (a block of device memory of its own, vulkan/include/gfxarray.hpp); here
+	// the buffer object is where GL puts it.
+	bool Create(int width, int height = 1, bool pinned = false)
 	{
+		(void)pinned;
 		if (not IsAvailable())
 			return false;
 		if (not gfxStates.HaveFeatureLevel(GfxStates::SSBOFeatureLevel))

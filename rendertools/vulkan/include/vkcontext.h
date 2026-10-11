@@ -54,6 +54,8 @@ public:
 	uint32_t			m_graphicsFamily{ 0 };
 	uint32_t			m_presentFamily{ 0 };
 	VmaAllocator		m_allocator{ VK_NULL_HANDLE };
+	VmaPool				m_pinnedPool{ VK_NULL_HANDLE }; // see PinnedPool ()
+	bool				m_pinnedPoolFailed{ false };
 
 	VkPhysicalDeviceProperties	m_deviceProps{};
 	uint32_t					m_apiVersion{ VK_API_VERSION_1_3 };
@@ -168,6 +170,22 @@ public:
 	{
 		return m_hasMemoryBudget;
 	}
+
+	// One block of device local memory, allocated once and never given back or grown, for the buffers
+	// a frame's shaders read per pixel (GfxArray::Create () with pinned = true): whatever the driver does
+	// to the rest of the memory while the game runs - take blocks away, hand new ones out, rebuild page
+	// tables - this block is not part of it. VK_NULL_HANDLE if it could not be created; a caller then
+	// takes the common memory.
+	VmaPool PinnedPool(void)
+	noexcept;
+
+	// Sees to it that every memory type a frame allocates from has a block with room to spare, and that
+	// the pinned pool exists. Called at the end of a level load, after the level's own allocations: an
+	// allocation during play (a texture first used in the middle of the level, a staging buffer, a grown
+	// constants ring) is then carved out of a block the driver already knows, instead of making it hand
+	// out a new one in the middle of a frame.
+	bool ReserveMemory(void)
+	noexcept;
 
 	inline bool UsesCore13(void) const
 	noexcept

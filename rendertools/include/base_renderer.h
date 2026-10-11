@@ -605,6 +605,10 @@ public:
 
 	virtual void PrecreatePipelines(void (* /*progress*/)(int, int) = nullptr) {}
 
+	// Reserves GPU memory for the allocations that may still come during play, at the end of a level
+	// load (Vulkan: VKContext::ReserveMemory ()). Default no-op.
+	virtual void ReserveMemory(void) {}
+
 #include "gfxapitype.h"
 };
 
