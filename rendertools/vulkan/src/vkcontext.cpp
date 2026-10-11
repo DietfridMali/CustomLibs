@@ -603,7 +603,7 @@ noexcept
 		  chain = &feature.pNext;
 	};
 
-	const char* deviceExtensions[16] = {
+	const char* deviceExtensions[20] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	};
 	uint32_t deviceExtensionCount = 1;
@@ -751,6 +751,29 @@ noexcept
 			deviceExtensions[deviceExtensionCount++] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
 	}
 
+	// VK_KHR_global_priority: the graphics queue's scheduling priority against every other context on
+	// the GPU (request.queuePriority). The level goes into the queue create info; a driver that does
+	// not permit it refuses the whole device with VK_ERROR_NOT_PERMITTED_KHR (or, on some drivers, with
+	// VK_ERROR_INITIALIZATION_FAILED), and then the device is created again without the request.
+	VkDeviceQueueGlobalPriorityCreateInfoKHR globalPriority{};
+	globalPriority.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR;
+	globalPriority.globalPriority = (request.queuePriority >= 2) ? VK_QUEUE_GLOBAL_PRIORITY_REALTIME_KHR
+								  : VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR;
+	bool wantsPriority = false;
+	if (request.queuePriority > 0) {
+		AutoArray<VkExtensionProperties> extensions;
+		const bool hasKhr = QueryDeviceExtensions(m_physicalDevice, extensions) and
+			HasDeviceExtension(extensions, VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME);
+		const bool hasExt = (not hasKhr) and HasDeviceExtension(extensions, VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME);
+		if (hasKhr or hasExt) {
+			deviceExtensions[deviceExtensionCount++] = hasKhr ? VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME : VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME;
+			queueInfos[0].pNext = &globalPriority;
+			wantsPriority = true;
+		}
+		else
+			logHandler.Print("Vulkan graphics queue priority: default (the driver has no VK_KHR_global_priority)\n");
+	}
+
 	VkDeviceCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	info.pNext = featureChain;
@@ -761,10 +784,23 @@ noexcept
 	info.pEnabledFeatures = &features;
 
 	VkResult res = vkCreateDevice(m_physicalDevice, &info, nullptr, &m_device);
+	if ((res != VK_SUCCESS) and wantsPriority) {
+		logHandler.Print("Vulkan graphics queue priority: default (%s was not permitted, %d)\n",
+						 (request.queuePriority >= 2) ? "realtime" : "high", (int)res);
+		queueInfos[0].pNext = nullptr;
+		--deviceExtensionCount; // the global priority extension is the last one appended
+		info.enabledExtensionCount = deviceExtensionCount;
+		wantsPriority = false;
+		m_device = VK_NULL_HANDLE;
+		res = vkCreateDevice(m_physicalDevice, &info, nullptr, &m_device);
+	}
 	if (res != VK_SUCCESS) {
 		logHandler.Print("VKContext::CreateDevice: vkCreateDevice failed (%d)\n", (int)res);
 		return false;
 	}
+	m_queuePriority = wantsPriority ? ((request.queuePriority >= 2) ? 2 : 1) : 0;
+	if (wantsPriority)
+		logHandler.Print("Vulkan graphics queue priority: %s\n", (m_queuePriority == 2) ? "realtime" : "high");
 	if (not Vk13Api::Load(m_device, core13)) {
 		logHandler.Print("VKContext::CreateDevice: cannot load the dynamic rendering / synchronization2 entry points\n");
 		return false;
