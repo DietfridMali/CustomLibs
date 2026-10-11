@@ -261,18 +261,6 @@ public:
 		return shader ? *shader : nullptr;
 	}
 
-	// One shader outside the startup list: a permutation that is only known once the settings are
-	// (d2x-xl's lit level surface is compiled for the lighting it really runs with). Creates it the
-	// first time it is asked for and returns the shader, created now or earlier under that name;
-	// nullptr when it could not be built. The source is read here and need not outlive the call.
-	inline Shader* CreateShader(const ShaderSource& source) {
-		Shader* shader = GetShader(source.m_name);
-		if (shader)
-			return shader;
-		CreateShader(&source);
-		return GetShader(source.m_name);
-	}
-
 	inline ComputeShader* SetupComputeShader(String shaderId) {
 		ComputeShader** shader = m_computeShaders.Find(shaderId);
 		return shader ? *shader : nullptr;
