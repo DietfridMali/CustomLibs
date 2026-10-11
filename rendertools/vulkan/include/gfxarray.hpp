@@ -14,6 +14,11 @@
 #include <cstring>
 #include <type_traits>
 
+// commandlist.cpp - a log line per allocation with the memory type it landed in. Defined whether or not
+// the library was built with VK_STALL_DIAG (a no-op without), so this header needs no macro for it.
+extern void VkStallAllocation(const char* what, VmaAllocation allocation, VkDeviceSize bytes, const char* detail)
+noexcept;
+
 // =================================================================================================
 // Vulkan GfxArray — flat R32_UINT storage buffer (analogue of the DX12 UAV-style Texture2D used by
 // decalhandler::m_decalDepths). 2D indexing is folded into the shader as `y * width + x`.
@@ -172,6 +177,10 @@ public:
 		if (vmaCreateBuffer(allocator, &bi, &ai, &m_buffer, &m_allocation, nullptr) != VK_SUCCESS)
 			return false;
 
+		char detail[96];
+		snprintf(detail, sizeof(detail), "%d x %u bytes%s", size, unsigned(sizeof(DATA_T)),
+				 isInstanceBuffer ? ", instance stream" : isIndirectBuffer ? ", indirect" : "");
+		VkStallAllocation("gfx array", m_allocation, m_bufferSize, detail);
 		return true;
 	}
 
@@ -632,7 +641,10 @@ private:
 		ai.usage = VMA_MEMORY_USAGE_AUTO;
 		ai.flags = hostFlags;
 
-		return vmaCreateBuffer(allocator, &bi, &ai, &outBuffer, &outAlloc, nullptr) == VK_SUCCESS;
+		if (vmaCreateBuffer(allocator, &bi, &ai, &outBuffer, &outAlloc, nullptr) != VK_SUCCESS)
+			return false;
+		VkStallAllocation((usage & VK_BUFFER_USAGE_TRANSFER_DST_BIT) ? "gfx array readback" : "gfx array staging", outAlloc, bytes, nullptr);
+		return true;
 	}
 };
 

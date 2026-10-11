@@ -735,6 +735,17 @@ noexcept
 	features.pipelineStatisticsQuery = available.pipelineStatisticsQuery;
 #endif
 
+	// VK_EXT_memory_budget has no feature struct and changes nothing about rendering: it lets VMA report
+	// the driver's own usage and budget per heap (vmaGetHeapBudgets ()), which is what the stall
+	// diagnostics print next to a frame that took too long.
+	{
+		AutoArray<VkExtensionProperties> extensions;
+		m_hasMemoryBudget = QueryDeviceExtensions(m_physicalDevice, extensions) and
+			HasDeviceExtension(extensions, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+		if (m_hasMemoryBudget)
+			deviceExtensions[deviceExtensionCount++] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
+	}
+
 	VkDeviceCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	info.pNext = featureChain;
@@ -841,6 +852,26 @@ noexcept
 // CreateAllocator: VMA configuration with the device's API version (1.2 or 1.3) — VMA picks up the new APIs
 // (Maintenance5, host-image-copy, etc. when available).
 
+#if VK_STALL_DIAG
+extern void VkStallMemoryEvent(const char* what, VkDeviceSize bytes, uint32_t memoryType, const char* detail)
+noexcept;
+
+// VMA calls these for every VkDeviceMemory it gets from the driver and gives back - the blocks it
+// sub-allocates from and the dedicated allocations. A buffer or texture created inside a block costs
+// the driver nothing; these are the moments the driver does something.
+
+static void VKAPI_PTR VkStallDeviceMemoryAllocated(VmaAllocator, uint32_t memoryType, VkDeviceMemory, VkDeviceSize size, void*)
+{
+	VkStallMemoryEvent("DEVICE MEMORY ALLOCATED", size, memoryType, nullptr);
+}
+
+static void VKAPI_PTR VkStallDeviceMemoryFreed(VmaAllocator, uint32_t memoryType, VkDeviceMemory, VkDeviceSize size, void*)
+{
+	VkStallMemoryEvent("DEVICE MEMORY FREED", size, memoryType, nullptr);
+}
+#endif
+
+
 bool VKContext::CreateAllocator(void)
 noexcept
 {
@@ -851,6 +882,14 @@ noexcept
 	info.vulkanApiVersion = m_apiVersion;
 	if (m_hasRayTracing)
 		info.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+	if (m_hasMemoryBudget)
+		info.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+#if VK_STALL_DIAG
+	VmaDeviceMemoryCallbacks memoryCallbacks{};
+	memoryCallbacks.pfnAllocate = VkStallDeviceMemoryAllocated;
+	memoryCallbacks.pfnFree = VkStallDeviceMemoryFreed;
+	info.pDeviceMemoryCallbacks = &memoryCallbacks; // copied by vmaCreateAllocator ()
+#endif
 
 	VkResult res = vmaCreateAllocator(&info, &m_allocator);
 	if (res != VK_SUCCESS) {

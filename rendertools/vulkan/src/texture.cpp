@@ -31,6 +31,8 @@ extern double VkStallClock(void)
 noexcept;
 extern void VkStallNote(const char* what, double startMs, const char* detail)
 noexcept;
+extern void VkStallAllocation(const char* what, VmaAllocation allocation, VkDeviceSize bytes, const char* detail)
+noexcept;
 #endif
 
 // =================================================================================================
@@ -306,6 +308,11 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
 		logHandler.Print("Texture::CreateTextureResource: vmaCreateImage failed (%d)\n", (int)res);
 		return false;
 	}
+#if VK_STALL_DIAG
+	char detail[96];
+	snprintf(detail, sizeof(detail), "%d x %d, %d layers, %d mips, format %d", w, h, arraySize, mipLevels, int(format));
+	VkStallAllocation("texture", m_allocation, 0, detail);
+#endif
 
 	m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 	return true;

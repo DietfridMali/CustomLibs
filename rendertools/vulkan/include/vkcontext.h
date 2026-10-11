@@ -59,6 +59,7 @@ public:
 	uint32_t					m_apiVersion{ VK_API_VERSION_1_3 };
 	bool						m_hasPipelineLibrary{ false };
 	bool						m_hasRayTracing{ false };
+	bool						m_hasMemoryBudget{ false }; // VK_EXT_memory_budget: the driver's own view of the heaps
 	uint32_t					m_availableFeatures{ 0 };
 	uint32_t					m_features{ 0 };
 
@@ -160,6 +161,12 @@ public:
 	noexcept
 	{
 		return m_hasRayTracing;
+	}
+
+	inline bool HasMemoryBudget(void) const
+	noexcept
+	{
+		return m_hasMemoryBudget;
 	}
 
 	inline bool UsesCore13(void) const

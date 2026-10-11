@@ -16,6 +16,8 @@ extern double VkStallClock(void)
 noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail)
 noexcept;
+extern void VkStallAllocation(const char* what, VmaAllocation allocation, VkDeviceSize bytes, const char* detail)
+noexcept;
 #endif
 
 // =================================================================================================
@@ -134,6 +136,7 @@ noexcept
 	char detail[96];
 	snprintf(detail, sizeof(detail), "%d x %d, format %d, %d layers, usage 0x%X", w, h, int(format), arrayLayers, unsigned(usage));
 	VkStallEvent("render target image", stallStart, detail);
+	VkStallAllocation("render target", outAllocation, 0, detail);
 #endif
 	return true;
 }

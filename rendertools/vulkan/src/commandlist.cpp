@@ -102,6 +102,10 @@ noexcept
 }
 
 
+static void VkStallPrintHeaps(void)
+noexcept;
+
+
 static void VkStallEndFrame(uint64_t nextFrame)
 noexcept
 {
@@ -124,6 +128,7 @@ noexcept
 			for (const auto& e : vkStalls.entries)
 				logHandler.Print("    %-28s %5d x  total %8.2f ms  max %8.2f ms\n", e.what, e.count, e.totalMs, e.maxMs);
 			logHandler.Print("%s", vkStalls.details.c_str());
+			VkStallPrintHeaps();
 		}
 		else if (vkStalls.avgFrameMs == 0.0)
 			vkStalls.avgFrameMs = frameMs;
@@ -143,6 +148,7 @@ noexcept
 			}
 			sample += "\n";
 			logHandler.Print("%s", sample.c_str());
+			VkStallPrintHeaps();
 		}
 	}
 	vkStalls.stageMarks = 0;
@@ -184,7 +190,119 @@ noexcept;
 static void VkGpuPassDestroy(VkDevice device)
 noexcept;
 
+
+// The memory types and heaps of the device, by name - what the memory lines below say about where an
+// allocation went.
+
+static const VkPhysicalDeviceMemoryProperties& VkStallMemoryProperties(void)
+noexcept
+{
+	static VkPhysicalDeviceMemoryProperties	props{};
+	static bool								loaded = false;
+	if (not loaded and (vkContext.PhysicalDevice() != VK_NULL_HANDLE)) {
+		vkGetPhysicalDeviceMemoryProperties(vkContext.PhysicalDevice(), &props);
+		loaded = true;
+	}
+	return props;
+}
+
+
+static void VkStallMemoryFlagsText(VkMemoryPropertyFlags flags, char* text, size_t size)
+noexcept
+{
+	snprintf(text, size, "%s%s%s%s%s",
+			 (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "DEVICE_LOCAL" : "SYSTEM",
+			 (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ? "|HOST_VISIBLE" : "",
+			 (flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ? "|HOST_COHERENT" : "",
+			 (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) ? "|HOST_CACHED" : "",
+			 (flags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) ? "|LAZY" : "");
+}
+
+
+// What every heap holds right now, as the driver sees it (VK_EXT_memory_budget, where the device has
+// it) and as VMA counts it. Printed with every STALL and SAMPLE block: an allocation that moves between
+// heaps, or a heap whose usage jumps, shows up here next to the frame it happened in.
+
+static void VkStallPrintHeaps(void)
+noexcept
+{
+	VmaAllocator allocator = vkContext.Allocator();
+	if (allocator == VK_NULL_HANDLE)
+		return;
+	const VkPhysicalDeviceMemoryProperties&	props = VkStallMemoryProperties();
+	VmaBudget								budgets[VK_MAX_MEMORY_HEAPS]{};
+	vmaGetHeapBudgets(allocator, budgets);
+	for (uint32_t i = 0; i < props.memoryHeapCount; ++i) {
+		const VmaBudget& b = budgets[i];
+		logHandler.Print("    heap %u %s %llu MB: usage %llu MB of budget %llu MB, VMA blocks %llu MB in %u, allocations %llu MB in %u\n", i,
+						 (props.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) ? "DEVICE_LOCAL" : "SYSTEM",
+						 static_cast<unsigned long long>(props.memoryHeaps[i].size >> 20), static_cast<unsigned long long>(b.usage >> 20),
+						 static_cast<unsigned long long>(b.budget >> 20), static_cast<unsigned long long>(b.statistics.blockBytes >> 20),
+						 unsigned(b.statistics.blockCount), static_cast<unsigned long long>(b.statistics.allocationBytes >> 20),
+						 unsigned(b.statistics.allocationCount));
+	}
+}
+
 #endif
+
+// =================================================================================================
+// Where the memory goes. Defined whether or not VK_STALL_DIAG is on, so that the headers (gfxarray.hpp)
+// and the application can call them without knowing how the library was built; without the diagnostics
+// they do nothing.
+//
+// One line per VkDeviceMemory the driver hands out or takes back (the VMA callbacks, vkcontext.cpp),
+// and one per buffer, array, texture and render target image at creation, each with the memory type
+// and heap it landed in. What they are for: a shader that suddenly runs ten times slower on the same
+// data is reading memory that is slower than it was - and these lines say which allocations exist, in
+// which heap, and what the driver did to the heaps around the frame it happened in.
+
+uint64_t VkStallFrameNumber(void)
+noexcept
+{
+#if VK_STALL_DIAG
+	return vkStalls.frameNumber;
+#else
+	return 0;
+#endif
+}
+
+
+void VkStallMemoryEvent(const char* what, VkDeviceSize bytes, uint32_t memoryType, const char* detail)
+noexcept
+{
+#if VK_STALL_DIAG
+	const VkPhysicalDeviceMemoryProperties&	props = VkStallMemoryProperties();
+	uint32_t								heap = (memoryType < props.memoryTypeCount) ? props.memoryTypes[memoryType].heapIndex : 0;
+	char									flags[96];
+	VkStallMemoryFlagsText((memoryType < props.memoryTypeCount) ? props.memoryTypes[memoryType].propertyFlags : 0, flags, sizeof(flags));
+	logHandler.Print("frame %llu: memory %s %llu KB, type %u heap %u %s%s%s\n", static_cast<unsigned long long>(vkStalls.frameNumber), what,
+					 static_cast<unsigned long long>((bytes + 1023) >> 10), memoryType, heap, flags, detail ? "  " : "", detail ? detail : "");
+#else
+	(void)what;
+	(void)bytes;
+	(void)memoryType;
+	(void)detail;
+#endif
+}
+
+
+void VkStallAllocation(const char* what, VmaAllocation allocation, VkDeviceSize bytes, const char* detail)
+noexcept
+{
+#if VK_STALL_DIAG
+	VmaAllocator allocator = vkContext.Allocator();
+	if ((allocator == VK_NULL_HANDLE) or (allocation == VK_NULL_HANDLE))
+		return;
+	VmaAllocationInfo info{};
+	vmaGetAllocationInfo(allocator, allocation, &info);
+	VkStallMemoryEvent(what, bytes ? bytes : info.size, info.memoryType, detail);
+#else
+	(void)what;
+	(void)allocation;
+	(void)bytes;
+	(void)detail;
+#endif
+}
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL. Es gibt in dem Sinne keine verschachtelten Render-Tasks.
@@ -267,6 +385,10 @@ noexcept
 	++m_frameNumber;
 #if VK_STALL_DIAG
 	VkStallEndFrame(m_frameNumber);
+	// VMA refreshes what it knows of the driver's heap budgets when the frame index changes
+	// (VK_EXT_memory_budget), see VkStallPrintHeaps ().
+	if (vkContext.Allocator() != VK_NULL_HANDLE)
+		vmaSetCurrentFrameIndex(vkContext.Allocator(), uint32_t(m_frameNumber));
 	double stallStart = VkStallClock();
 #endif
 	// Wait until the GPU has finished using this frame slot.

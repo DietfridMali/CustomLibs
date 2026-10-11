@@ -24,6 +24,8 @@ extern void VkStallNote(const char* what, double startMs, const char* detail)
 noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail)
 noexcept;
+extern void VkStallAllocation(const char* what, VmaAllocation allocation, VkDeviceSize bytes, const char* detail)
+noexcept;
 
 static char vkOneShotOrigin[160] = "";
 
@@ -193,6 +195,9 @@ noexcept
 	}
 	outStaging.mapped = allocResult.pMappedData;
 	outStaging.size = byteSize;
+#if VK_STALL_DIAG
+	VkStallAllocation("upload staging", outStaging.allocation, byteSize, nullptr);
+#endif
 	return true;
 }
 
@@ -696,6 +701,13 @@ noexcept
 		logHandler.Print("Upload3DTextureData: vmaCreateImage failed (%d)\n", (int)res);
 		return false;
 	}
+#if VK_STALL_DIAG
+	{
+		char detail[96];
+		snprintf(detail, sizeof(detail), "%d x %d x %d, format %d", w, h, d, int(format));
+		VkStallAllocation("texture 3d", outAllocation, 0, detail);
+	}
+#endif
 	outTracker.Init(outImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	const VkDeviceSize	imageBytes = VkDeviceSize(w) * VkDeviceSize(h) * VkDeviceSize(d) * VkDeviceSize(pixelStride);
@@ -837,6 +849,13 @@ noexcept
 	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 	if (vmaCreateImage(allocator, &info, &allocInfo, &tex.m_image, &tex.m_allocation, nullptr) != VK_SUCCESS)
 		return false;
+#if VK_STALL_DIAG
+	{
+		char detail[96];
+		snprintf(detail, sizeof(detail), "%d x %d, format %d", width, height, int(vkFmt));
+		VkStallAllocation("texture 2d", tex.m_allocation, 0, detail);
+	}
+#endif
 
 	tex.m_layoutTracker.Init(tex.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -907,6 +926,13 @@ noexcept
 	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 	if (vmaCreateImage(allocator, &info, &allocInfo, &tex.m_image, &tex.m_allocation, nullptr) != VK_SUCCESS)
 		return false;
+#if VK_STALL_DIAG
+	{
+		char detail[96];
+		snprintf(detail, sizeof(detail), "%d x %d x %d, %u mips, format %d", width, height, depth, unsigned(mipLevels), int(vkFmt));
+		VkStallAllocation("texture 3d", tex.m_allocation, 0, detail);
+	}
+#endif
 
 	tex.m_layoutTracker.Init(tex.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 

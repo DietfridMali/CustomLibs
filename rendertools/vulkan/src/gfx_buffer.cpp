@@ -6,6 +6,10 @@
 #include <cstdio>
 #include <cstring>
 
+// commandlist.cpp - a log line per allocation with the memory type it landed in (VK_STALL_DIAG).
+extern void VkStallAllocation(const char* what, VmaAllocation allocation, VkDeviceSize bytes, const char* detail)
+noexcept;
+
 // =================================================================================================
 // GfxBuffer
 
@@ -41,6 +45,19 @@ noexcept
 	}
 	m_size = size;
 	m_mapped = (flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) ? allocResult.pMappedData : nullptr;
+#if VK_STALL_DIAG
+	char detail[128];
+	snprintf(detail, sizeof(detail), "usage%s%s%s%s%s%s%s%s",
+			 (usage & VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) ? " vertex" : "",
+			 (usage & VK_BUFFER_USAGE_INDEX_BUFFER_BIT) ? " index" : "",
+			 (usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) ? " uniform" : "",
+			 (usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? " storage" : "",
+			 (usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) ? " transfer-src" : "",
+			 (usage & VK_BUFFER_USAGE_TRANSFER_DST_BIT) ? " transfer-dst" : "",
+			 (flags & (VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT)) ? ", host access" : "",
+			 (flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) ? ", mapped" : "");
+	VkStallAllocation("buffer", m_allocation, size, detail);
+#endif
 	return true;
 }
 
