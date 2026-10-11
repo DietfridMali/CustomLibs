@@ -497,6 +497,7 @@ static constexpr size_t		kGpuPassNameSize = 48;
 static constexpr uint32_t	kGpuMarkMax = 96;
 static constexpr size_t		kGpuMarkNameSize = 32;
 static constexpr uint32_t	kGpuPassQueries = 2 + kGpuMarkMax;
+static constexpr uint32_t	kGpuDrawMax = 96;
 
 struct VkGpuPassRecord {
 	const CommandList*	list;
@@ -513,6 +514,10 @@ struct VkGpuPassRecord {
 	uint64_t			markPipelines[kGpuMarkMax];
 	uint32_t			markFrameHashes[kGpuMarkMax];
 	uint32_t			markShaderHashes[kGpuMarkMax];
+	uint32_t			drawCount;
+	uint32_t			drawsDropped;
+	bool				isDrawOpen;
+	uint8_t				drawMarks[kGpuDrawMax];
 };
 
 struct VkGpuPassSlot {
@@ -528,17 +533,26 @@ struct VkGpuPassSlot {
 };
 
 static VkQueryPool		vkGpuPassPool = VK_NULL_HANDLE;
+static VkQueryPool		vkGpuDrawPool = VK_NULL_HANDLE;
 static bool				vkGpuPassUnavailable = false;
 static double			vkGpuPassPeriodMs = 0.0;
 static VkGpuPassSlot	vkGpuPassSlots[CommandQueue::FRAME_COUNT];
 static double			vkGpuPassTimes[kGpuPassCycleMax];
 static uint64_t			vkGpuPassData[kGpuPassCycleMax][kGpuPassQueries * 2];
+static uint64_t			vkGpuDrawData[kGpuDrawMax * 2];
 
 
 static inline uint32_t VkGpuPassQuery(uint32_t slotIndex, uint32_t index)
 noexcept
 {
 	return (slotIndex * kGpuPassSlotSize + index) * kGpuPassQueries;
+}
+
+
+static inline uint32_t VkGpuDrawQuery(uint32_t slotIndex, uint32_t index)
+noexcept
+{
+	return (slotIndex * kGpuPassSlotSize + index) * kGpuDrawMax;
 }
 
 
@@ -586,6 +600,22 @@ noexcept
 		return false;
 	}
 	vkGpuPassPeriodMs = double(vkContext.DeviceProps().limits.timestampPeriod) * 1e-6;
+	VkPhysicalDeviceFeatures features{};
+	vkGetPhysicalDeviceFeatures(physicalDevice, &features);
+	if (not features.pipelineStatisticsQuery)
+		logHandler.Print("gpu pass timing: the device has no pipeline statistics, fragment counts are left out\n");
+	else {
+		VkQueryPoolCreateInfo drawInfo{};
+		drawInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+		drawInfo.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
+		drawInfo.queryCount = CommandQueue::FRAME_COUNT * kGpuPassSlotSize * kGpuDrawMax;
+		drawInfo.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+		res = vkCreateQueryPool(device, &drawInfo, nullptr, &vkGpuDrawPool);
+		if (res != VK_SUCCESS) {
+			logHandler.Print("gpu pass timing: vkCreateQueryPool for the fragment counts failed (%d)\n", int(res));
+			vkGpuDrawPool = VK_NULL_HANDLE;
+		}
+	}
 	return true;
 }
 
@@ -609,9 +639,14 @@ noexcept
 	pass.marksDropped = 0;
 	pass.lastShader = nullptr;
 	pass.cb = cb;
+	pass.drawCount = 0;
+	pass.drawsDropped = 0;
+	pass.isDrawOpen = false;
 	snprintf(pass.name, sizeof(pass.name), "%s", name);
 	uint32_t query = VkGpuPassQuery(slotIndex, index);
 	vkCmdResetQueryPool(cb, vkGpuPassPool, query, kGpuPassQueries);
+	if (vkGpuDrawPool != VK_NULL_HANDLE)
+		vkCmdResetQueryPool(cb, vkGpuDrawPool, VkGpuDrawQuery(slotIndex, index), kGpuDrawMax);
 	vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, query);
 }
 
@@ -680,6 +715,65 @@ noexcept
 }
 
 
+static VkGpuPassRecord* VkGpuPassFindOpen(VkCommandBuffer cb, uint32_t& slotIndex, uint32_t& index)
+noexcept
+{
+	for (slotIndex = 0; slotIndex < CommandQueue::FRAME_COUNT; ++slotIndex) {
+		VkGpuPassSlot& slot = vkGpuPassSlots[slotIndex];
+		for (uint32_t i = slot.count; i > 0; --i) {
+			index = (slot.first + i - 1) % kGpuPassSlotSize;
+			VkGpuPassRecord& pass = slot.passes[index];
+			if ((pass.cb == cb) and not pass.isEnded)
+				return &pass;
+		}
+	}
+	return nullptr;
+}
+
+
+void VkGpuPassBeginDraw(VkCommandBuffer cb)
+noexcept
+{
+	if ((vkGpuDrawPool == VK_NULL_HANDLE) or (cb == VK_NULL_HANDLE))
+		return;
+	uint32_t			slotIndex = 0;
+	uint32_t			index = 0;
+	VkGpuPassRecord*	pass = VkGpuPassFindOpen(cb, slotIndex, index);
+	if ((pass == nullptr) or (pass->markCount == 0) or pass->isDrawOpen)
+		return;
+	if (pass->drawCount >= kGpuDrawMax) {
+		++pass->drawsDropped;
+		return;
+	}
+	uint32_t mark = pass->markCount - 1;
+	for (uint32_t j = pass->markCount; j > 0; --j) {
+		if (pass->markIsStage[j - 1]) {
+			mark = j - 1;
+			break;
+		}
+	}
+	pass->drawMarks[pass->drawCount] = uint8_t(mark);
+	vkCmdBeginQuery(cb, vkGpuDrawPool, VkGpuDrawQuery(slotIndex, index) + pass->drawCount, 0);
+	pass->isDrawOpen = true;
+}
+
+
+void VkGpuPassEndDraw(VkCommandBuffer cb)
+noexcept
+{
+	if ((vkGpuDrawPool == VK_NULL_HANDLE) or (cb == VK_NULL_HANDLE))
+		return;
+	uint32_t			slotIndex = 0;
+	uint32_t			index = 0;
+	VkGpuPassRecord*	pass = VkGpuPassFindOpen(cb, slotIndex, index);
+	if ((pass == nullptr) or not pass->isDrawOpen)
+		return;
+	vkCmdEndQuery(cb, vkGpuDrawPool, VkGpuDrawQuery(slotIndex, index) + pass->drawCount);
+	++pass->drawCount;
+	pass->isDrawOpen = false;
+}
+
+
 static void VkGpuPassEnd(const CommandList* list, VkCommandBuffer cb, uint32_t slotIndex)
 noexcept
 {
@@ -736,14 +830,18 @@ noexcept
 }
 
 
-static const char* VkGpuPassDrawText(const VkGpuPassRecord& pass, uint32_t mark, char* text, size_t size)
+static const char* VkGpuPassDrawText(const VkGpuPassRecord& pass, uint32_t mark, const uint64_t* fragments, const bool* hasFragments,
+									 char* text, size_t size)
 noexcept
 {
 	text[0] = '\0';
-	if (pass.markDraws[mark] > 0)
-		snprintf(text, size, "  pipeline %012llX%s constants %08X/%08X draws %u", static_cast<unsigned long long>(pass.markPipelines[mark]),
-				 pass.markPipelineMixed[mark] ? " mixed" : "", pass.markFrameHashes[mark], pass.markShaderHashes[mark],
-				 pass.markDraws[mark]);
+	if (pass.markDraws[mark] == 0)
+		return text;
+	int length = snprintf(text, size, "  pipeline %012llX%s constants %08X/%08X draws %u",
+						  static_cast<unsigned long long>(pass.markPipelines[mark]), pass.markPipelineMixed[mark] ? " mixed" : "",
+						  pass.markFrameHashes[mark], pass.markShaderHashes[mark], pass.markDraws[mark]);
+	if (hasFragments[mark] and (length > 0) and (size_t(length) < size))
+		snprintf(text + length, size - size_t(length), " fragments %llu", static_cast<unsigned long long>(fragments[mark]));
 	return text;
 }
 
@@ -816,6 +914,22 @@ noexcept
 			continue;
 		const VkGpuPassRecord&	pass = slot.passes[(first + i) % kGpuPassSlotSize];
 		const uint64_t*			data = vkGpuPassData[i];
+		uint64_t				fragments[kGpuMarkMax]{};
+		bool					hasFragments[kGpuMarkMax]{};
+		if ((vkGpuDrawPool != VK_NULL_HANDLE) and (pass.drawCount > 0)) {
+			std::memset(vkGpuDrawData, 0, sizeof(vkGpuDrawData));
+			VkResult res = vkGetQueryPoolResults(device, vkGpuDrawPool, VkGpuDrawQuery(slotIndex, (first + i) % kGpuPassSlotSize),
+												 pass.drawCount, sizeof(vkGpuDrawData), vkGpuDrawData, 2 * sizeof(uint64_t),
+												 VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+			if ((res == VK_SUCCESS) or (res == VK_NOT_READY)) {
+				for (uint32_t j = 0; j < pass.drawCount; ++j) {
+					if (vkGpuDrawData[2 * j + 1] == 0)
+						continue;
+					fragments[pass.drawMarks[j]] += vkGpuDrawData[2 * j];
+					hasFragments[pass.drawMarks[j]] = true;
+				}
+			}
+		}
 		VkGpuPassLine("      %-28s %8.2f ms\n", pass.name, vkGpuPassTimes[i]);
 		uint64_t firstMark = data[2];
 		for (uint32_t j = 0; j < pass.markCount; ++j) {
@@ -847,19 +961,21 @@ noexcept
 			if (markEnd < mark[0])
 				continue;
 			double	markMs = double(markEnd - mark[0]) * vkGpuPassPeriodMs;
-			char	drawText[96];
+			char	drawText[128];
 			if (isStage) {
 				inStage = true;
 				if (isStall or (markMs >= minMs))
 					VkGpuPassLine("         stage %-29s %8.2f ms%s\n", pass.markNames[j], markMs,
-								  VkGpuPassDrawText(pass, j, drawText, sizeof(drawText)));
+								  VkGpuPassDrawText(pass, j, fragments, hasFragments, drawText, sizeof(drawText)));
 			}
 			else if (markMs >= minMs)
 				VkGpuPassLine("%s shader %-28s %8.2f ms%s\n", inStage ? "            " : "        ", pass.markNames[j], markMs,
-							  VkGpuPassDrawText(pass, j, drawText, sizeof(drawText)));
+							  VkGpuPassDrawText(pass, j, fragments, hasFragments, drawText, sizeof(drawText)));
 		}
 		if (pass.marksDropped > 0)
 			VkGpuPassLine("         %u marks not recorded\n", pass.marksDropped);
+		if (pass.drawsDropped > 0)
+			VkGpuPassLine("         %u draws without a fragment count\n", pass.drawsDropped);
 	}
 	VkGpuPassFlush();
 }
@@ -871,6 +987,9 @@ noexcept
 	if ((vkGpuPassPool != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
 		vkDestroyQueryPool(device, vkGpuPassPool, nullptr);
 	vkGpuPassPool = VK_NULL_HANDLE;
+	if ((vkGpuDrawPool != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
+		vkDestroyQueryPool(device, vkGpuDrawPool, nullptr);
+	vkGpuDrawPool = VK_NULL_HANDLE;
 	for (VkGpuPassSlot& slot : vkGpuPassSlots) {
 		slot.first = 0;
 		slot.count = 0;

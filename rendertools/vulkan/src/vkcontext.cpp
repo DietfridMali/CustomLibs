@@ -729,6 +729,11 @@ noexcept
 	features.depthClamp = enable(GfxFeature::DepthClamp);
 	features.multiDrawIndirect = enable(GfxFeature::MultiDrawIndirect);
 	features.drawIndirectFirstInstance = enable(GfxFeature::MultiDrawIndirect);
+#if VK_STALL_DIAG
+	VkPhysicalDeviceFeatures available{};
+	vkGetPhysicalDeviceFeatures(m_physicalDevice, &available);
+	features.pipelineStatisticsQuery = available.pipelineStatisticsQuery;
+#endif
 
 	VkDeviceCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

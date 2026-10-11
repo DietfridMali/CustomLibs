@@ -18,6 +18,13 @@
 extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader)
 noexcept;
 
+#if VK_STALL_DIAG
+extern void VkGpuPassBeginDraw(VkCommandBuffer cb)
+noexcept;
+extern void VkGpuPassEndDraw(VkCommandBuffer cb)
+noexcept;
+#endif
+
 // =================================================================================================
 // Vulkan GfxDataLayout implementation
 //
@@ -422,6 +429,9 @@ noexcept
 	}
 	//gfxStates.CheckError();
 	if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
+#if VK_STALL_DIAG
+		VkGpuPassBeginDraw(commandListHandler.CurrentGfxList());
+#endif
 		if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
 			uint32_t count = (indexCount > 0) ? uint32_t(indexCount) : uint32_t(m_indexBuffer.m_itemCount) - uint32_t(firstIndex);
 			if (count > 0) {
@@ -438,6 +448,9 @@ noexcept
 				gfxStates.CountDraw();
 			}
 		}
+#if VK_STALL_DIAG
+		VkGpuPassEndDraw(commandListHandler.CurrentGfxList());
+#endif
 	}
 	gfxStates.CheckError("GfxDataLayout::Render draw");
 	vkContext.SetValidationShader(nullptr);
@@ -472,10 +485,16 @@ noexcept
 		hasVariables = shader->UpdateVariables();
 	}
 	if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
+#if VK_STALL_DIAG
+		VkGpuPassBeginDraw(commandListHandler.CurrentGfxList());
+#endif
 		commandListHandler.DrawIndexedIndirect(commands.m_buffer,
 											   VkDeviceSize(firstCommand) * VkDeviceSize(sizeof(GfxDrawCommand)), commandCount,
 											   uint32_t(sizeof(GfxDrawCommand)));
 		gfxStates.CountDraw();
+#if VK_STALL_DIAG
+		VkGpuPassEndDraw(commandListHandler.CurrentGfxList());
+#endif
 	}
 	gfxStates.CheckError("GfxDataLayout::RenderIndirect draw");
 	vkContext.SetValidationShader(nullptr);
