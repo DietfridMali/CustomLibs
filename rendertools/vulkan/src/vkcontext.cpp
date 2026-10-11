@@ -755,6 +755,8 @@ noexcept
 	// the GPU (request.queuePriority). The level goes into the queue create info; a driver that does
 	// not permit it refuses the whole device with VK_ERROR_NOT_PERMITTED_KHR (or, on some drivers, with
 	// VK_ERROR_INITIALIZATION_FAILED), and then the device is created again without the request.
+	// Only on request (the default is 0): overlay layers between the loader and the driver (RTSS, the
+	// OBS graphics hook) have crashed in vkCreateDevice on the structure in the queue's pNext chain.
 	VkDeviceQueueGlobalPriorityCreateInfoKHR globalPriority{};
 	globalPriority.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR;
 	globalPriority.globalPriority = (request.queuePriority >= 2) ? VK_QUEUE_GLOBAL_PRIORITY_REALTIME_KHR
