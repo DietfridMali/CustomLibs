@@ -172,13 +172,6 @@ struct GfxFeatureRequest {
 	uint32_t optional{
 		GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary)
 	};
-	// The scheduling priority of the graphics queue against every other context on the GPU, the other
-	// processes' and the driver's own: 0 the default, 1 high, 2 realtime. Vulkan asks for it through
-	// VK_KHR_global_priority when the driver offers it and falls back to the default when the driver
-	// does not permit the level (realtime usually needs privileges); DirectX ignores it for now.
-	// Off by default: overlay layers (RTSS, the OBS graphics hook) crash inside vkCreateDevice when the
-	// priority structure is in the queue's pNext chain, and that cannot be caught.
-	int queuePriority{ 0 };
 
 	inline constexpr uint32_t Requested(void) const
 	noexcept

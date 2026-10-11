@@ -62,7 +62,6 @@ public:
 	bool						m_hasPipelineLibrary{ false };
 	bool						m_hasRayTracing{ false };
 	bool						m_hasMemoryBudget{ false }; // VK_EXT_memory_budget: the driver's own view of the heaps
-	int							m_queuePriority{ 0 }; // the global priority the graphics queue got: 0 default, 1 high, 2 realtime
 	uint32_t					m_availableFeatures{ 0 };
 	uint32_t					m_features{ 0 };
 
