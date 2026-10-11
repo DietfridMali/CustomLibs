@@ -6,6 +6,7 @@
 #include "gfxpixelformat_vk.h"
 #include "texture_mips.h"
 #include "resource_handler.h"
+#include "commandlist.h"
 #include "loghandler.h"
 
 #include <cstdarg>
@@ -267,6 +268,34 @@ noexcept
 }
 
 // =================================================================================================
+
+static VkCommandBuffer FrameUploadCmdBuffer(void)
+noexcept
+{
+	if (commandListHandler.CurrentGfxList() == VK_NULL_HANDLE)
+		return VK_NULL_HANDLE;
+	return commandListHandler.UploadCmdBuffer();
+}
+
+
+static void ReleaseStagingDeferred(VkStagingBuffer& staging)
+noexcept
+{
+	if (staging.buffer == VK_NULL_HANDLE)
+		return;
+	VmaAllocator	allocator = vkContext.Allocator();
+	VkBuffer		buffer = staging.buffer;
+	VmaAllocation	allocation = staging.allocation;
+	gfxResourceHandler.TrackCleanup([allocator, buffer, allocation]() {
+		vmaDestroyBuffer(allocator, buffer, allocation);
+	});
+	staging.buffer = VK_NULL_HANDLE;
+	staging.allocation = VK_NULL_HANDLE;
+	staging.mapped = nullptr;
+	staging.size = 0;
+}
+
+// =================================================================================================
 // UploadTextureData (high-level, multi-layer)
 
 bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
@@ -279,6 +308,24 @@ noexcept
 	if (faceCount > 6)
 		faceCount = 6;
 
+	VkStagingBuffer	stagings[6]{};
+	bool			success = true;
+	VkCommandBuffer	uploadCb = FrameUploadCmdBuffer();
+	if (uploadCb != VK_NULL_HANDLE) {
+		for (int i = 0; i < faceCount; ++i) {
+			if (not UploadSubresource(uploadCb, dstImage, tracker, uint32_t(i), faces[i], width, height, channels, stagings[i],
+									  /*addBarrier=*/false)) {
+				success = false;
+				break;
+			}
+		}
+		if (success)
+			tracker.ToShaderInput(uploadCb);
+		for (int i = 0; i < faceCount; ++i)
+			ReleaseStagingDeferred(stagings[i]);
+		return success;
+	}
+
 	OneShotCommandBuffer cmd{};
 #if VK_STALL_DIAG
 	VkOneShotOriginF("texture data, %d x %d, %d channels, %d faces", width, height, channels, faceCount);
@@ -286,8 +333,6 @@ noexcept
 	if (not BeginSingleTimeCommands(cmd))
 		return false;
 
-	VkStagingBuffer	stagings[6]{};
-	bool			success = true;
 	for (int i = 0; i < faceCount; ++i) {
 		if (not UploadSubresource(cmd.cb, dstImage, tracker, uint32_t(i), faces[i], width, height, channels, stagings[i],
 								  /*addBarrier=*/false)) {
