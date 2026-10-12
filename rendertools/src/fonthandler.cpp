@@ -170,6 +170,26 @@ bool FontHandler::Open(String fontFolder, String fontName, int fontSize)
 }
 
 
+bool FontHandler::OpenFromMemory(const void* data, size_t dataSize, String fontName, int fontSize)
+{
+	Destroy();
+	if (not (data and dataSize and InitTTF()))
+		return false;
+	SDL_RWops* rw = SDL_RWFromConstMem(data, int(dataSize));
+	if (not rw)
+		return false;
+	if (not (m_font = TTF_OpenFontRW(rw, 1, fontSize))) { // closes rw either way
+		logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*)fontName, TTF_GetError());
+		return false;
+	}
+	m_glyphs = "";
+	m_fontName = fontName;
+	m_fontSize = fontSize;
+	m_isAvailable = true;
+	return true;
+}
+
+
 bool FontHandler::SetShaping(bool rightToLeft, String script)
 {
 	if (not m_font)
