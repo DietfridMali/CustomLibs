@@ -46,6 +46,21 @@ public:
 		{}
 	};
 
+	// One glyph on its own, in pixels at the font's size - for a caller that builds an atlas of its own
+	// and does its own layout. The ink box is relative to the pen position on the baseline, y up (SDL_ttf's
+	// convention); the texture RenderGlyph () makes is TTF_FontHeight () high with the baseline Ascent ()
+	// rows from its top, and the pen position originX columns from its left edge.
+	struct GlyphMetrics {
+		int	minX{ 0 };
+		int	maxX{ 0 };
+		int	minY{ 0 };
+		int	maxY{ 0 };
+		int	advance{ 0 };
+		int	width{ 0 }; // of the texture
+		int	height{ 0 };
+		int	originX{ 0 };
+	};
+
 private:
 	TTF_Font*	m_font;
 	String		m_fontName;
@@ -153,6 +168,20 @@ public:
 	}
 
 	TextDimensions TextSize(String text);
+
+	// The single glyph interface - works on a font that was only opened (Open ()), no atlas needed.
+	bool HasGlyph(uint32_t codepoint);
+
+	bool GetGlyphMetrics(uint32_t codepoint, GlyphMetrics& metrics);
+
+	// The glyph in white on a transparent texture, metrics filled in. The caller owns the texture.
+	Texture* RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics);
+
+	int Ascent(void);
+
+	int Descent(void);
+
+	int LineHeight(void);
 
 private:
 	Shader* LoadShader(void);

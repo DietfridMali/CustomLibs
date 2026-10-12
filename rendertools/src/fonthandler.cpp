@@ -344,6 +344,69 @@ FontHandler::TextDimensions FontHandler::TextSize(String text)
 }
 
 
+bool FontHandler::HasGlyph(uint32_t codepoint)
+{
+	return m_font and (TTF_GlyphIsProvided32(m_font, Uint32(codepoint)) != 0);
+}
+
+
+bool FontHandler::GetGlyphMetrics(uint32_t codepoint, GlyphMetrics& metrics)
+{
+	metrics = GlyphMetrics();
+	if (not HasGlyph(codepoint))
+		return false;
+	if (TTF_GlyphMetrics32(m_font, Uint32(codepoint), &metrics.minX, &metrics.maxX, &metrics.minY, &metrics.maxY, &metrics.advance) != 0)
+		return false;
+	// SDL_ttf lays a single glyph out like a string of one: the surface reaches from the leftmost of pen
+	// position and ink to the rightmost of advance and ink, so ink left of the pen moves the pen inwards.
+	metrics.originX = std::max(0, -metrics.minX);
+	metrics.width = std::max(metrics.advance, metrics.maxX) + metrics.originX;
+	metrics.height = TTF_FontHeight(m_font);
+	return true;
+}
+
+
+Texture* FontHandler::RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics)
+{
+	if (not GetGlyphMetrics(codepoint, metrics))
+		return nullptr;
+	SDL_Surface* surface = TTF_RenderGlyph32_Blended(m_font, Uint32(codepoint), SDL_Color(255, 255, 255, 255));
+	if (surface == nullptr)
+		return nullptr;
+	// what the surface really is, in case SDL_ttf's layout differs from the estimate above
+	metrics.width = surface->w;
+	metrics.height = surface->h;
+	Texture* texture = new (std::nothrow) Texture();
+	if (texture == nullptr) {
+		SDL_FreeSurface(surface);
+		return nullptr;
+	}
+	if (not texture->CreateFromSurface(surface, { .isDisposable = true })) {
+		delete texture;
+		return nullptr;
+	}
+	return texture;
+}
+
+
+int FontHandler::Ascent(void)
+{
+	return m_font ? TTF_FontAscent(m_font) : 0;
+}
+
+
+int FontHandler::Descent(void)
+{
+	return m_font ? TTF_FontDescent(m_font) : 0;
+}
+
+
+int FontHandler::LineHeight(void)
+{
+	return m_font ? TTF_FontHeight(m_font) : 0;
+}
+
+
 void FontHandler::Destroy(void)
 {
 	m_atlas.Destroy();
