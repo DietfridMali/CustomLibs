@@ -655,7 +655,7 @@ static constexpr uint32_t	kGpuPassSlotSize = 256;
 static constexpr uint32_t	kGpuPassCycleMax = kGpuPassSlotSize / 2;
 static constexpr size_t		kGpuPassNameSize = 48;
 static constexpr uint32_t	kGpuMarkMax = 96;
-static constexpr size_t		kGpuMarkNameSize = 32;
+static constexpr size_t		kGpuMarkNameSize = 48;
 static constexpr uint32_t	kGpuPassQueries = 2 + kGpuMarkMax;
 static constexpr uint32_t	kGpuDrawMax = 96;
 
