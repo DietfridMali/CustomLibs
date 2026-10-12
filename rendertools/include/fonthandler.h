@@ -97,10 +97,6 @@ public:
 
 	bool Open(String fontFolder, String fontName, int fontSize);
 
-	// The same from a font file held in memory - one built into the program. The memory has to stay
-	// valid as long as the font is open.
-	bool OpenFromMemory(const void* data, size_t dataSize, String fontName, int fontSize);
-
 	bool SetShaping(bool rightToLeft, String script = "");
 
 	Texture* CreateTextTexture(const String& text);
