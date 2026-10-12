@@ -117,6 +117,64 @@ noexcept
 	}
 }
 
+
+static void Downsample2D_AlphaWeighted8(const uint8_t* src, int sw, int sh, uint8_t* dst, int dw, int dh)
+noexcept
+{
+	for (int yd = 0; yd < dh; ++yd) {
+		int ys0 = yd * 2;
+		int ys1 = std::min(ys0 + 1, sh - 1);
+		for (int xd = 0; xd < dw; ++xd) {
+			int				xs0 = xd * 2;
+			int				xs1 = std::min(xs0 + 1, sw - 1);
+			const uint8_t*	p00 = src + (size_t(ys0) * sw + xs0) * 4;
+			const uint8_t*	p01 = src + (size_t(ys0) * sw + xs1) * 4;
+			const uint8_t*	p10 = src + (size_t(ys1) * sw + xs0) * 4;
+			const uint8_t*	p11 = src + (size_t(ys1) * sw + xs1) * 4;
+			uint8_t*		o = dst + (size_t(yd) * dw + xd) * 4;
+			int				alpha = int(p00[3]) + int(p01[3]) + int(p10[3]) + int(p11[3]);
+			for (int c = 0; c < 3; ++c) {
+				if (alpha > 0)
+					o[c] = uint8_t((int(p00[c]) * int(p00[3]) + int(p01[c]) * int(p01[3]) + int(p10[c]) * int(p10[3]) +
+									int(p11[c]) * int(p11[3]) + alpha / 2) /
+								   alpha);
+				else
+					o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+			}
+			o[3] = uint8_t((alpha + 2) / 4);
+		}
+	}
+}
+
+
+void BuildAlphaMipChain2D(const uint8_t* src, int width, int height, int mipCount, AutoArray<uint8_t>& outChain)
+noexcept
+{
+	size_t	chainSize = 0;
+	int		w = width;
+	int		h = height;
+	for (int mip = 0; mip < mipCount; ++mip) {
+		chainSize += size_t(w) * size_t(h) * 4;
+		w = std::max(1, w / 2);
+		h = std::max(1, h / 2);
+	}
+	outChain.Resize(uint32_t(chainSize));
+
+	uint8_t* level = outChain.Data();
+	std::memcpy(level, src, size_t(width) * size_t(height) * 4);
+	w = width;
+	h = height;
+	for (int mip = 1; mip < mipCount; ++mip) {
+		int			nextW = std::max(1, w / 2);
+		int			nextH = std::max(1, h / 2);
+		uint8_t*	next = level + size_t(w) * size_t(h) * 4;
+		Downsample2D_AlphaWeighted8(level, w, h, next, nextW, nextH);
+		level = next;
+		w = nextW;
+		h = nextH;
+	}
+}
+
 // =================================================================================================
 
 int CalcMipLevels(int w, int h, int d)

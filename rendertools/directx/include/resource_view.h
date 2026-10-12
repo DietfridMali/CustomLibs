@@ -106,6 +106,8 @@ public:
 	// The whole stack of a texture ARRAY as one view, sampled by layer index (Texture2DArray in HLSL,
 	// sampler2DArray in GLSL). The RTVs address the slices one at a time, this reads all of them.
 	bool CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int layerCount);
+
+	bool CreateMipMapped(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int mipLevels);
 };
 
 

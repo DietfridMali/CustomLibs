@@ -529,7 +529,7 @@ void RenderTargetTexture::SetParams(bool forceUpdate)
 	m_hasParams = true;
 	m_sampling.minFilter = m_filtering;
 	m_sampling.magFilter = m_filtering;
-	m_sampling.mipMode = GfxMipMode::None;
+	m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
 	m_sampling.wrapU = GfxWrapMode::ClampToEdge;
 	m_sampling.wrapV = GfxWrapMode::ClampToEdge;
 	m_sampling.wrapW = GfxWrapMode::ClampToEdge;

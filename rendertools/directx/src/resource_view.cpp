@@ -105,6 +105,25 @@ bool SRV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 }
 
 
+bool SRV::CreateMipMapped(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int mipLevels)
+{
+	Handle() = descriptorHeaps.AllocSRV();
+	if (not IsValid())
+		return false;
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
+	srvd.Format = format;
+	srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvd.Texture2D.MostDetailedMip = 0;
+	srvd.Texture2D.MipLevels = UINT(mipLevels);
+	srvd.Texture2D.PlaneSlice = 0;
+	srvd.Texture2D.ResourceMinLODClamp = 0.0f;
+	dx12Context.Device()->CreateShaderResourceView(resource.Get(), &srvd, CPUHandle());
+	descriptorHeaps.m_srvHeap.Publish(GetIndex());
+	return true;
+}
+
+
 bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 {
 	Handle() = descriptorHeaps.AllocDSV();

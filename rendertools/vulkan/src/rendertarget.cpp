@@ -7,6 +7,7 @@
 #include "vkupload.h" // CreateReadbackBuffer / one-shot command buffer for ReadBuffer ()
 #include "resource_handler.h"
 #include "loghandler.h"
+#include "texture_mips.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -95,7 +96,7 @@ static VkImageAspectFlags AspectForType(BufferInfo::eBufferType type)
 
 static bool CreateRTImage(int w, int h, VkFormat format, VkImageUsageFlags usage,
 						  VkImage& outImage, VmaAllocation& outAllocation,
-						  int arrayLayers = 1, bool cubeCompatible = false)
+						  int arrayLayers = 1, bool cubeCompatible = false, int mipLevels = 1)
 noexcept
 {
 	VmaAllocator allocator = vkContext.Allocator();
@@ -109,7 +110,7 @@ noexcept
 	info.extent.width = uint32_t(w);
 	info.extent.height = uint32_t(h);
 	info.extent.depth = 1;
-	info.mipLevels = 1;
+	info.mipLevels = uint32_t(mipLevels);
 	// Six for a cube map, one for everything else. CUBE_COMPATIBLE is what allows a
 	// VK_IMAGE_VIEW_TYPE_CUBE view over those six layers later on.
 	info.arrayLayers = uint32_t(arrayLayers);
@@ -150,6 +151,7 @@ void BufferInfo::Init(void)
 	m_allocation = VK_NULL_HANDLE;
 	m_imageView = VK_NULL_HANDLE;
 	m_depthSampleView = VK_NULL_HANDLE;
+	m_mipView = VK_NULL_HANDLE;
 	for (int face = 0; face < 6; ++face)
 		m_cubeView[face] = VK_NULL_HANDLE;
 	m_layerView.Destroy();
@@ -196,6 +198,7 @@ void BufferInfo::Release(bool immediate)
 	if (immediate) {
 		commandListHandler.UnbindImage(m_imageView);
 		commandListHandler.UnbindImage(m_depthSampleView);
+		commandListHandler.UnbindImage(m_mipView);
 	}
 	// Defer GPU-resource teardown by one frame slot - in-flight command buffers may still
 	// reference the image/view. Same pattern as Texture::Destroy(). Safe in the
@@ -241,6 +244,13 @@ void BufferInfo::Release(bool immediate)
 		});
 		m_depthSampleView = VK_NULL_HANDLE;
 	}
+	if ((m_mipView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+		VkImageView view = m_mipView;
+		cleanup([device, view]() {
+			vkDestroyImageView(device, view, nullptr);
+		});
+		m_mipView = VK_NULL_HANDLE;
+	}
 	if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
 		VkImage			image = m_image;
 		VmaAllocation	alloc = m_allocation;
@@ -269,6 +279,7 @@ void RenderTarget::Init(void)
 	m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
 	m_arrayLayerCount = 0;
 	m_arrayLayer = 0;
+	m_mipLevels = 1;
 	m_extraBufferIndex = -1;
 	m_idBufferCount = 0;
 	m_idBufferIndex = -1;
@@ -320,6 +331,36 @@ bool RenderTarget::CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspec
 }
 
 
+bool RenderTarget::CreateMipView(BufferInfo& info, VkFormat viewFormat)
+{
+	VkDevice device = vkContext.Device();
+	if ((device == VK_NULL_HANDLE) or (info.m_image == VK_NULL_HANDLE))
+		return false;
+
+	VkImageViewCreateInfo vci{};
+	vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	vci.image = info.m_image;
+	vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	vci.format = viewFormat;
+	vci.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	vci.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	vci.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	vci.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	vci.subresourceRange.baseMipLevel = 0;
+	vci.subresourceRange.levelCount = uint32_t(m_mipLevels);
+	vci.subresourceRange.baseArrayLayer = 0;
+	vci.subresourceRange.layerCount = 1;
+
+	VkResult res = vkCreateImageView(device, &vci, nullptr, &info.m_mipView);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("RenderTarget::CreateMipView: vkCreateImageView failed (%d)\n", int(res));
+		return false;
+	}
+	return true;
+}
+
+
 void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 {
 	VkFormat fmt = m_hasStencil ? kDepthStencilFormat : kDepthFormat;
@@ -361,12 +402,15 @@ void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 		CreateArrayBuffer(info, w, h, fmt);
 		return;
 	}
+	int mipLevels = (info.m_type == BufferInfo::btColor) ? m_mipLevels : 1;
 	if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
-						  info.m_image, info.m_allocation))
+						  info.m_image, info.m_allocation, 1, false, mipLevels))
 		return;
 	info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	if (not CreateSRV(info, fmt, VK_IMAGE_ASPECT_COLOR_BIT))
+		return;
+	if ((mipLevels > 1) and not CreateMipView(info, fmt))
 		return;
 	// Initial layout transition (UNDEFINED -> SHADER_READ_ONLY / COLOR_ATTACHMENT) is performed
 	// on the first Activate via BufferInfo::SetState on the live VkCommandBuffer.
@@ -588,6 +632,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	// allocate, and SelectArrayLayer () bounds against it.
 	m_arrayLayerCount = params.arrayLayerCount;
 	m_arrayLayer = 0;
+	m_mipLevels = (m_arrayLayerCount > 0) ? 1 : std::clamp(params.mipLevels, 1, CalcMipLevels(width * scale, height * scale, 1));
 	// Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
 	// for stencil without depth still yields one combined buffer.
 	m_hasStencil = params.stencilBufferCount > 0;
@@ -596,8 +641,12 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 						depthBufferCount + params.cubeMapCount);
 	// One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
 	m_renderTextures.Resize(m_colorBufferCount);
-	for (int i = 0; i < m_renderTextures.Length(); i++)
+	for (int i = 0; i < m_renderTextures.Length(); i++) {
 		m_renderTextures[i].m_filtering = m_filtering;
+		m_renderTextures[i].m_useMipMaps = (m_mipLevels > 1);
+		if (m_renderTextures[i].m_hasParams)
+			m_renderTextures[i].SetParams(true);
+	}
 	// Compute ping-pong (>=2 compute buffers) qualifies for the pingPong flag as well.
 	m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
 	m_isScreenBuffer = params.isScreenBuffer;
@@ -877,6 +926,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
 	m_bufferInfo[bufferIndex].SetState(cb, usage, false);
 	commandListHandler.UnbindImage(m_bufferInfo[bufferIndex].m_imageView);
 	commandListHandler.UnbindImage(m_bufferInfo[bufferIndex].m_depthSampleView);
+	commandListHandler.UnbindImage(m_bufferInfo[bufferIndex].m_mipView);
 	return true;
 }
 
@@ -1446,7 +1496,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
 	texture->m_sampling.minFilter = filtering;
 	texture->m_sampling.magFilter = filtering;
 	texture->m_image = info.m_image;
-	texture->m_imageView = info.m_imageView;
+	texture->m_imageView = (info.m_mipView != VK_NULL_HANDLE) ? info.m_mipView : info.m_imageView;
 	texture->m_handle = info.m_srvIndex;
 	texture->Validate();
 	return texture->Bind(tmuIndex);
@@ -1481,7 +1531,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 	if (texture == nullptr)
 		texture = &m_externalTexture;
 	texture->m_image = info.m_image;
-	texture->m_imageView = info.m_imageView;
+	texture->m_imageView = (info.m_mipView != VK_NULL_HANDLE) ? info.m_mipView : info.m_imageView;
 	texture->m_handle = info.m_srvIndex;
 	texture->Validate();
 	return texture;
@@ -1707,14 +1757,22 @@ static size_t ColorFormatBytes(VkFormat format)
 }
 
 
-size_t RenderTarget::BufferSize(int bufferIndex)
+static int MipExtent(int extent, int mipLevel)
+{
+	return std::max(1, extent >> mipLevel);
+}
+
+
+size_t RenderTarget::BufferSize(int bufferIndex, int mipLevel)
 {
 	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return 0;
+	if ((mipLevel < 0) or (mipLevel >= m_mipLevels))
 		return 0;
 
 	size_t texelBytes = ColorFormatBytes(m_colorFormat);
 
-	return texelBytes ? size_t(GetWidth(true)) * size_t(GetHeight(true)) * texelBytes : 0;
+	return texelBytes ? size_t(MipExtent(GetWidth(true), mipLevel)) * size_t(MipExtent(GetHeight(true), mipLevel)) * texelBytes : 0;
 }
 
 
@@ -1835,7 +1893,7 @@ bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, i
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice)
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice, int mipLevel)
 {
 	if (not (data and m_isAvailable))
 		return false;
@@ -1847,7 +1905,7 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 	if (info.m_image == VK_NULL_HANDLE)
 		return false;
 
-	size_t needed = BufferSize(bufferIndex);
+	size_t needed = BufferSize(bufferIndex, mipLevel);
 
 	if ((needed == 0) or (dataSize < needed))
 		return false;
@@ -1882,11 +1940,11 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 	copy.bufferRowLength = 0; // tightly packed
 	copy.bufferImageHeight = 0;
 	copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	copy.imageSubresource.mipLevel = 0;
+	copy.imageSubresource.mipLevel = uint32_t(mipLevel);
 	copy.imageSubresource.baseArrayLayer = uint32_t(info.m_isArray ? arraySlice : 0);
 	copy.imageSubresource.layerCount = 1;
 	copy.imageOffset = { 0, 0, 0 };
-	copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
+	copy.imageExtent = { uint32_t(MipExtent(GetWidth(true), mipLevel)), uint32_t(MipExtent(GetHeight(true), mipLevel)), 1 };
 
 	vkCmdCopyBufferToImage(cb, staging.buffer, info.m_image,
 						   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);

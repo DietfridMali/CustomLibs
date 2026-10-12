@@ -40,4 +40,7 @@ void BuildMipChain2D(const uint8_t* src, int width, int height, int channels, in
 					 AutoArray<uint8_t>& outChain)
 noexcept;
 
+void BuildAlphaMipChain2D(const uint8_t* src, int width, int height, int mipCount, AutoArray<uint8_t>& outChain)
+noexcept;
+
 // =================================================================================================

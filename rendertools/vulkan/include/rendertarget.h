@@ -70,6 +70,7 @@ public:
 	// m_layerView[layer] is what gets attached (RenderTarget::SelectArrayLayer).
 	AutoArray<VkImageView>	m_layerView;
 	VkImageView				m_depthSampleView{ VK_NULL_HANDLE }; // depth-only sampling view (set for btDepth)
+	VkImageView				m_mipView{ VK_NULL_HANDLE };
 	ImageLayoutTracker		m_layoutTracker;
 	uint32_t				m_srvIndex{ UINT32_MAX }; // logical id for source-compat
 	eBufferType				m_type{ btColor };
@@ -135,6 +136,7 @@ public:
 		// (SelectArrayLayer); sampling reads the whole stack through a sampler2DArray. Everything else
 		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
 		int			arrayLayerCount{ 0 };
+		int			mipLevels{ 1 };
 		int			cubeMapCount{ 0 };
 		VkFormat	cubeMapFormat{ VK_FORMAT_R32_SFLOAT };
 		bool		hasMRTs{ false };
@@ -194,6 +196,7 @@ public:
 	// this target a texture array of that many layers, of which m_arrayLayer is the one attached.
 	int					m_arrayLayerCount{ 0 };
 	int					m_arrayLayer{ 0 }; // layer currently attached, see SelectArrayLayer
+	int					m_mipLevels{ 1 };
 	int					m_activeBufferIndex{ 0 };
 	int					m_lastDestination{ -1 };
 	bool				m_pingPong{ false };
@@ -374,10 +377,10 @@ public:
 	// The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
 	// dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
 	// Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
+	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0, int mipLevel = 0);
 
 	// Bytes one colour buffer occupies, at the target's scaled size and its colour format.
-	size_t BufferSize(int bufferIndex);
+	size_t BufferSize(int bufferIndex, int mipLevel = 0);
 
 	Texture* GetDepthAsTexture(void);
 
@@ -556,6 +559,12 @@ public:
 		return m_arrayLayerCount > 0;
 	}
 
+	inline int MipLevels(void)
+	noexcept
+	{
+		return m_mipLevels;
+	}
+
 	// What a colour attachment has to point at. For a plain buffer that is m_imageView; for a buffer
 	// made of layers - a cube map or a texture array - it is the view of the ONE layer selected, since
 	// an attachment addresses a single layer and the cube / array view over all of them is only good
@@ -614,6 +623,8 @@ private:
 	void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
 	bool CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspectFlags aspect);
+
+	bool CreateMipView(BufferInfo& info, VkFormat viewFormat);
 
 	void CreateColorBuffer(BufferInfo& info, int w, int h);
 

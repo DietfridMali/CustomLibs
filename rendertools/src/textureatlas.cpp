@@ -1,5 +1,8 @@
 
+#include <algorithm>
+
 #include "textureatlas.h"
+#include "texture_mips.h"
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 
@@ -30,11 +33,13 @@ TextureAtlas::TextureAtlas()
 	, m_cellScale(Vector2f::ONE)
 	, m_paddingOffset(Vector2f::ZERO)
 	, m_padding(0)
+	, m_mipLevels(1)
 {
 }
 
 // condition: all glyphs must fit into glyphWidth, glyphHeight - that's the grid they will be rendered into
-bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale, GfxFilterMode filtering, int padding)
+bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale, GfxFilterMode filtering, int padding,
+						  int mipLevels)
 {
 	if (m_atlas)
 		delete m_atlas;
@@ -42,6 +47,9 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 	if (not m_atlas)
 		return false;
 	m_glyphSize = glyphSize;
+	m_mipLevels = 1;
+	if (mipLevels > 1)
+		padding = std::max(padding, ((1 << (mipLevels - 1)) + scale - 1) / scale);
 	m_padding = padding;
 	int cellWidth = glyphSize.width + 2 * padding;
 	int cellHeight = glyphSize.height + 2 * padding;
@@ -49,12 +57,13 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 	m_size.SetRows(int(ceil(float(glyphCount) / float(m_size.GetCols()))));
 	int atlasWidth = m_size.GetCols() * cellWidth;
 	int atlasHeight = m_size.GetRows() * cellHeight;
-	if (not m_atlas->Create(atlasWidth, atlasHeight, scale, { .name = name })) {
+	if (not m_atlas->Create(atlasWidth, atlasHeight, scale, { .name = name, .mipLevels = mipLevels })) {
 		m_atlas->Destroy();
 		delete m_atlas;
 		m_atlas = nullptr;
 		return false;
 	}
+	m_mipLevels = m_atlas->MipLevels();
 	m_cellScale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
 	m_scale = Vector2f(float(glyphSize.width) / float(atlasWidth), float(glyphSize.height) / float(atlasHeight));
 	m_paddingOffset = Vector2f(float(padding) / float(atlasWidth), float(padding) / float(atlasHeight));
@@ -67,6 +76,43 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 	renderTexture->Validate();
 	renderTexture->SetParams(true);
 #endif
+	return true;
+}
+
+
+bool TextureAtlas::BuildMipMaps(void)
+{
+	if (not m_atlas or (m_mipLevels < 2) or m_atlas->IsEnabled())
+		return false;
+
+	int		width = m_atlas->GetWidth(true);
+	int		height = m_atlas->GetHeight(true);
+	size_t	levelSize = size_t(width) * size_t(height) * 4;
+
+	if (m_atlas->BufferSize(0) != levelSize)
+		return false;
+
+	AutoArray<uint8_t> texels;
+
+	texels.Resize(uint32_t(levelSize));
+	if (not m_atlas->ReadBuffer(0, texels.Data(), levelSize))
+		return false;
+
+	AutoArray<uint8_t> chain;
+
+	BuildAlphaMipChain2D(texels.Data(), width, height, m_mipLevels, chain);
+	texels.Destroy();
+
+	const uint8_t* level = chain.Data() + levelSize;
+
+	for (int mip = 1; mip < m_mipLevels; ++mip) {
+		width = std::max(1, width / 2);
+		height = std::max(1, height / 2);
+		levelSize = size_t(width) * size_t(height) * 4;
+		if (not m_atlas->WriteBuffer(0, level, levelSize, 0, mip))
+			return false;
+		level += levelSize;
+	}
 	return true;
 }
 

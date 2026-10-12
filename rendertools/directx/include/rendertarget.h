@@ -97,7 +97,7 @@ public:
 
 	void FreeRTV(void);
 
-	bool AllocSRV(void);
+	bool AllocSRV(int mipLevels = 1);
 
 	void FreeSRV(void);
 
@@ -193,6 +193,7 @@ public:
 		// (SelectArrayLayer); sampling reads the whole stack through a Texture2DArray. Everything else
 		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
 		int			arrayLayerCount{ 0 };
+		int			mipLevels{ 1 };
 		int			cubeMapCount{ 0 };
 		DXGI_FORMAT	cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
 		bool		hasMRTs{ false };
@@ -252,6 +253,7 @@ public:
 	// this target a texture array of that many layers, of which m_arrayLayer is the one selected.
 	int					m_arrayLayerCount{ 0 };
 	int					m_arrayLayer{ 0 }; // layer currently selected, see SelectArrayLayer
+	int					m_mipLevels{ 1 };
 	int					m_activeBufferIndex{ 0 };
 	int					m_lastDestination{ -1 };
 	bool				m_pingPong{ false };
@@ -440,10 +442,10 @@ public:
 	// The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
 	// dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
 	// Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
+	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0, int mipLevel = 0);
 
 	// Bytes one colour buffer occupies, at the target's scaled size and its colour format.
-	size_t BufferSize(int bufferIndex);
+	size_t BufferSize(int bufferIndex, int mipLevel = 0);
 
 	Texture* GetDepthAsTexture(void);
 
@@ -623,6 +625,12 @@ public:
 	noexcept
 	{
 		return m_arrayLayerCount > 0;
+	}
+
+	inline int MipLevels(void)
+	noexcept
+	{
+		return m_mipLevels;
 	}
 
 	inline int CubeMapIndex(int i = 0)

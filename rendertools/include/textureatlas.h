@@ -154,6 +154,7 @@ protected:
 	Vector2f	m_cellScale;
 	Vector2f	m_paddingOffset;
 	int			m_padding;
+	int			m_mipLevels;
 
 public:
 	TextureAtlas();
@@ -173,7 +174,15 @@ public:
 	}
 
 	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1, GfxFilterMode filtering = GfxFilterMode::Nearest,
-				int padding = 0);
+				int padding = 0, int mipLevels = 1);
+
+	bool BuildMipMaps(void);
+
+	inline int MipLevels(void)
+	noexcept
+	{
+		return m_mipLevels;
+	}
 
 	bool RenderColored(int glyphIndex, RGBAColor color = ColorData::White);
 

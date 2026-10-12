@@ -11,7 +11,9 @@
 #include "resource_handler.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
+#include "texture_mips.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -30,7 +32,7 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 
 static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, const char* name, int w, int h, DXGI_FORMAT fmt,
 											   D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal,
-											   D3D12_RESOURCE_FLAGS flags, int arraySize = 1)
+											   D3D12_RESOURCE_FLAGS flags, int arraySize = 1, int mipLevels = 1)
 noexcept
 {
 	D3D12_HEAP_PROPERTIES	hp{ D3D12_HEAP_TYPE_DEFAULT };
@@ -41,7 +43,7 @@ noexcept
 	// Six for a cube map, one for everything else. A cube map is a plain texture array as far as the
 	// resource is concerned; what makes it a cube is the SRV that reads it (SRV::CreateCube).
 	rd.DepthOrArraySize = UINT16(arraySize);
-	rd.MipLevels = 1;
+	rd.MipLevels = UINT16(mipLevels);
 	rd.Format = fmt;
 	rd.SampleDesc.Count = 1;
 	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
@@ -125,8 +127,10 @@ void BufferInfo::FreeRTV(void)
 }
 
 
-bool BufferInfo::AllocSRV(void)
+bool BufferInfo::AllocSRV(int mipLevels)
 {
+	if (mipLevels > 1)
+		return m_srv.CreateMipMapped(m_resource, ViewFormat(), mipLevels);
 	return m_srv.Create(m_resource, ViewFormat());
 }
 
@@ -238,6 +242,7 @@ void RenderTarget::Init(void)
 	m_computeBufferCount = 0;
 	m_arrayLayerCount = 0;
 	m_arrayLayer = 0;
+	m_mipLevels = 1;
 	m_activeBufferIndex = 0;
 	m_lastDestination = -1;
 	m_pingPong = false;
@@ -336,8 +341,10 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 	D3D12_CLEAR_VALUE cv{};
 	cv.Format = info.ViewFormat();
 	int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
+	int mipLevels = (info.m_type == BufferInfo::btColor) ? m_mipLevels : 1;
 	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h, cv.Format,
-									   D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), arraySize);
+									   D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), arraySize,
+									   mipLevels);
 	if (not info.m_resource)
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -350,7 +357,7 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 			return false;
 		}
 	}
-	else if (not (info.AllocSRV() and info.AllocRTV())) {
+	else if (not (info.AllocSRV(mipLevels) and info.AllocRTV())) {
 		logHandler.Print("RenderTarget '%s': color view creation failed\n", static_cast<const char*>(m_name));
 		return false;
 	}
@@ -504,6 +511,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	// allocate, and SelectArrayLayer () bounds against it.
 	m_arrayLayerCount = params.arrayLayerCount;
 	m_arrayLayer = 0;
+	m_mipLevels = (m_arrayLayerCount > 0) ? 1 : std::clamp(params.mipLevels, 1, CalcMipLevels(width * scale, height * scale, 1));
 	// Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
 	// for stencil without depth still yields one combined buffer.
 	m_hasStencil = params.stencilBufferCount > 0;
@@ -512,8 +520,12 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 						depthBufferCount + params.cubeMapCount);
 	// One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
 	m_renderTextures.Resize(m_colorBufferCount);
-	for (int i = 0; i < m_renderTextures.Length(); i++)
+	for (int i = 0; i < m_renderTextures.Length(); i++) {
 		m_renderTextures[i].m_filtering = m_filtering;
+		m_renderTextures[i].m_useMipMaps = (m_mipLevels > 1);
+		if (m_renderTextures[i].m_hasParams)
+			m_renderTextures[i].SetParams(true);
+	}
 	m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
 	m_isScreenBuffer = params.isScreenBuffer;
 
@@ -1331,9 +1343,11 @@ bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& col
 // caller's tightly packed buffer is not - hence the row by row copy at the end. GetCopyableFootprints
 // works out both pitches, so nothing here has to know the format's byte size.
 
-size_t RenderTarget::BufferSize(int bufferIndex)
+size_t RenderTarget::BufferSize(int bufferIndex, int mipLevel)
 {
 	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return 0;
+	if ((mipLevel < 0) or (mipLevel >= m_mipLevels))
 		return 0;
 
 	ID3D12Resource*	resource = m_bufferInfo[bufferIndex].m_resource.Get();
@@ -1346,7 +1360,7 @@ size_t RenderTarget::BufferSize(int bufferIndex)
 	UINT				rowCount = 0;
 	UINT64				rowSize = 0, totalSize = 0;
 
-	device->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, &rowCount, &rowSize, &totalSize);
+	device->GetCopyableFootprints(&desc, UINT(mipLevel), 1, 0, nullptr, &rowCount, &rowSize, &totalSize);
 	// What the CALLER's packed buffer needs - rowSize is the unpadded row, unlike totalSize.
 	return size_t(rowSize) * size_t(rowCount);
 }
@@ -1515,11 +1529,13 @@ bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, i
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice)
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice, int mipLevel)
 {
 	if (not (data and m_isAvailable))
 		return false;
 	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return false;
+	if ((mipLevel < 0) or (mipLevel >= m_mipLevels))
 		return false;
 
 	BufferInfo&		info = m_bufferInfo[bufferIndex];
@@ -1534,7 +1550,7 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 	UINT								rowCount = 0;
 	UINT64								rowSize = 0, totalSize = 0;
 
-	device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+	device->GetCopyableFootprints(&desc, UINT(mipLevel), 1, 0, &layout, &rowCount, &rowSize, &totalSize);
 	if (dataSize < size_t(rowSize) * size_t(rowCount))
 		return false;
 
@@ -1608,7 +1624,7 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 	srcLoc.PlacedFootprint = layout;
 	dstLoc.pResource = resource;
 	dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-	dstLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0); // one mip level, so the index IS the layer
+	dstLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : mipLevel);
 	if (ID3D12GraphicsCommandList* list = cl->GfxList())
 		list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
 	info.SetState(cl, stateBefore);

@@ -185,6 +185,7 @@ public:
 		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it, which
 		// is the point of putting it here rather than into a buffer type of its own.
 		int		arrayLayerCount{ 0 };
+		int		mipLevels{ 1 };
 		bool	hasMRTs{ false };
 		bool	isScreenBuffer{ false };
 		bool	storageImage{ false }; // Cross-API; honored only by Vulkan today.
@@ -304,7 +305,7 @@ public:
 	// The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
 	// dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
 	// Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
+	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0, int mipLevel = 0);
 
 	// Bytes one colour buffer occupies, at the target's scaled size and its colour format.
 	size_t BufferSize(int bufferIndex);
@@ -506,6 +507,12 @@ public:
 	noexcept
 	{
 		return m_arrayLayerCount > 0;
+	}
+
+	inline int MipLevels(void)
+	noexcept
+	{
+		return 1;
 	}
 
 	inline int ExtraBufferIndex(int i = 0)

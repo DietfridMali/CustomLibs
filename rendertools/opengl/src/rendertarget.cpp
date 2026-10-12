@@ -1327,11 +1327,13 @@ bool RenderTarget::ReadTexelsAs(int bufferIndex, int arraySlice, void* buffer, G
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice)
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice, int mipLevel)
 {
 	if (not (data and m_isAvailable))
 		return false;
 	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return false;
+	if (mipLevel != 0)
 		return false;
 	if (m_bufferInfo[bufferIndex].m_isArray and ((arraySlice < 0) or (arraySlice >= m_arrayLayerCount)))
 		return false;
