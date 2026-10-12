@@ -5,6 +5,7 @@
 #include "dx12context.h"
 #include "resource_handler.h"
 #include "shader_loading.h"
+#include "loghandler.h"
 #include <cstdio>
 #include <cstring>
 
@@ -124,8 +125,11 @@ noexcept
 bool GfxDataBuffer::Create(int slot, size_t dataSize)
 {
 	m_resource[slot] = gfxResourceHandler.AcquireUpload(dataSize);
-	if (not m_resource[slot])
+	if (not m_resource[slot]) {
+		logHandler.Print("GfxDataBuffer::Create: no upload buffer (size=%zu, type=%s/%d slot %d)\n", dataSize, m_type ? m_type : "?",
+						 m_id, slot);
 		return false;
+	}
 #if DBG_DIRECTX
 	char name[128];
 	snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] slot %d", m_type, m_id, slot);
@@ -211,8 +215,12 @@ noexcept
 	// Upload data
 	void*		mapped = nullptr;
 	D3D12_RANGE	range{ 0, 0 };
-	if (FAILED(resource->Map(0, &range, &mapped)))
+	HRESULT hr = resource->Map(0, &range, &mapped);
+	if (FAILED(hr)) {
+		logHandler.Print("GfxDataBuffer::Update: Map failed (size=%zu, type=%s/%d slot %d, hr=0x%08X)\n", dataSize,
+						 m_type ? m_type : "?", m_id, slot, unsigned(hr));
 		return false;
+	}
 	std::memcpy(mapped, data, dataSize);
 	resource->Unmap(0, nullptr);
 

@@ -9,6 +9,7 @@
 #include "rendertarget.h"
 #include "base_renderer.h"
 #include "commandlist.h"
+#include "loghandler.h"
 
 #include <cstdio>
 
@@ -434,8 +435,14 @@ bool GfxStates::CheckError(const char* operation)
 noexcept
 {
 #if DBG_DIRECTX
-	if (dx12Context.DrainMessages(false) > 0)
+	int errors = dx12Context.DrainMessages(false);
+	if (errors > 0) {
+		if (operation and *operation)
+			logHandler.Print("GfxStates::CheckError: %d Direct3D debug layer error(s) at '%s'\n", errors, operation);
+		else
+			logHandler.Print("GfxStates::CheckError: %d Direct3D debug layer error(s)\n", errors);
 		return false;
+	}
 #endif
 	return true;
 }

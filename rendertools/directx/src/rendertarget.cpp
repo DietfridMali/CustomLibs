@@ -10,6 +10,7 @@
 #include "sampler_cache.h"
 #include "resource_handler.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -27,7 +28,7 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 }
 
 
-static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt,
+static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, const char* name, int w, int h, DXGI_FORMAT fmt,
 											   D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal,
 											   D3D12_RESOURCE_FLAGS flags, int arraySize = 1)
 noexcept
@@ -47,7 +48,10 @@ noexcept
 	rd.Flags = flags;
 
 	ComPtr<ID3D12Resource> resource;
-	device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, initState, clearVal, IID_PPV_ARGS(&resource));
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, initState, clearVal, IID_PPV_ARGS(&resource));
+	if (FAILED(hr))
+		logHandler.Print("RenderTarget '%s': CreateCommittedResource failed (%dx%d, %d layers, DXGI_FORMAT=%u, hr=0x%08X)\n", name, w,
+						 h, arraySize, unsigned(fmt), unsigned(hr));
 	return resource;
 }
 
@@ -251,20 +255,27 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 	cv.Format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
 	cv.DepthStencil.Depth = 1.0f;
 	cv.DepthStencil.Stencil = 0;
-	info.m_resource = CreateRTResource(device, w, h, m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
+	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h,
+									   m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
 									   D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
 	if (not info.m_resource)
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-	if (not info.AllocDSV())
+	if (not info.AllocDSV()) {
+		logHandler.Print("RenderTarget '%s': depth view creation failed\n", static_cast<const char*>(m_name));
 		return false;
+	}
 	// Read-only DSV over the same depth resource: lets a pass bind the depth for compare-only testing
 	// while simultaneously sampling it as an SRV (soft particles). One extra descriptor, no extra memory.
-	if (not info.AllocReadOnlyDSV())
+	if (not info.AllocReadOnlyDSV()) {
+		logHandler.Print("RenderTarget '%s': read-only depth view creation failed\n", static_cast<const char*>(m_name));
 		return false;
-	if (not info.AllocSRV())
+	}
+	if (not info.AllocSRV()) {
+		logHandler.Print("RenderTarget '%s': depth-sample view creation failed\n", static_cast<const char*>(m_name));
 		return false;
+	}
 	return true;
 }
 
@@ -300,13 +311,15 @@ bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, i
 
 	cv.Format = info.ViewFormat();
 	// Square by definition, so the edge length is used for both dimensions, and six slices.
-	info.m_resource = CreateRTResource(device, edge, edge, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv,
-									   ResourceFlagsForType(info.m_type), 6);
+	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), edge, edge, cv.Format,
+									   D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), 6);
 	if (not info.m_resource)
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	if (not info.AllocCubeViews())
+	if (not info.AllocCubeViews()) {
+		logHandler.Print("RenderTarget '%s': cube view creation failed\n", static_cast<const char*>(m_name));
 		return false;
+	}
 
 	auto* list = m_cmdList->GfxList();
 
@@ -323,8 +336,8 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 	D3D12_CLEAR_VALUE cv{};
 	cv.Format = info.ViewFormat();
 	int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
-	info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv,
-									   ResourceFlagsForType(info.m_type), arraySize);
+	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h, cv.Format,
+									   D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), arraySize);
 	if (not info.m_resource)
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -332,11 +345,15 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 	// An array buffer takes its views here - one RTV per layer plus an array SRV - instead of the
 	// plain SRV (and the RTV that AllocRTV () makes for a single 2D resource) below.
 	if (info.m_isArray) {
-		if (not info.AllocArrayViews(m_arrayLayerCount))
+		if (not info.AllocArrayViews(m_arrayLayerCount)) {
+			logHandler.Print("RenderTarget '%s': array view creation failed\n", static_cast<const char*>(m_name));
 			return false;
+		}
 	}
-	else if (not (info.AllocSRV() and info.AllocRTV()))
+	else if (not (info.AllocSRV() and info.AllocRTV())) {
+		logHandler.Print("RenderTarget '%s': color view creation failed\n", static_cast<const char*>(m_name));
 		return false;
+	}
 
 	auto* list = m_cmdList->GfxList();
 	if (list)
@@ -351,19 +368,17 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
 	info.m_colorFormat = m_skyMapFormat;
-	info.m_resource =
-		CreateRTResource(device, w, h, m_skyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
+	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h, m_skyMapFormat, D3D12_RESOURCE_STATE_COMMON,
+									   nullptr, ResourceFlagsForType(info.m_type));
 	if (not info.m_resource)
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_COMMON;
-	if (not info.AllocSRV())
-		return false;
-	if (not info.AllocUAV())
-		return false;
 	// RTV for GfxStates::ClearSkyMaps via ClearRenderTargetView (cleaner than ClearUAV -
 	// the RTV-heap is non-shader-visible by design, no auxiliary heap quirks).
-	if (not info.AllocRTV())
+	if (not (info.AllocSRV() and info.AllocUAV() and info.AllocRTV())) {
+		logHandler.Print("RenderTarget '%s': compute buffer view creation failed\n", static_cast<const char*>(m_name));
 		return false;
+	}
 	return true;
 }
 
@@ -1380,9 +1395,13 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
 
 	ComPtr<ID3D12Resource> readback;
 
-	if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
-											   D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
+	HRESULT hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
+												 D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback));
+	if (FAILED(hr)) {
+		logHandler.Print("RenderTarget '%s': ReadBuffer: readback buffer creation failed (size=%llu, hr=0x%08X)\n",
+						 static_cast<const char*>(m_name), static_cast<unsigned long long>(totalSize), unsigned(hr));
 		return false;
+	}
 #if DBG_DIRECTX
 	{
 		char name[160];
@@ -1422,8 +1441,11 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
 	uint8_t*	source = nullptr;
 	D3D12_RANGE	readRange{ 0, size_t(totalSize) };
 
-	if (FAILED(readback->Map(0, &readRange, reinterpret_cast<void**>(&source))))
+	hr = readback->Map(0, &readRange, reinterpret_cast<void**>(&source));
+	if (FAILED(hr)) {
+		logHandler.Print("RenderTarget '%s': ReadBuffer: Map failed (hr=0x%08X)\n", static_cast<const char*>(m_name), unsigned(hr));
 		return false;
+	}
 
 	uint8_t* dest = static_cast<uint8_t*>(buffer);
 
@@ -1536,9 +1558,13 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 
 	ComPtr<ID3D12Resource> upload;
 
-	if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadDesc,
-											   D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+	HRESULT hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadDesc,
+												 D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload));
+	if (FAILED(hr)) {
+		logHandler.Print("RenderTarget '%s': WriteBuffer: upload buffer creation failed (size=%llu, hr=0x%08X)\n",
+						 static_cast<const char*>(m_name), static_cast<unsigned long long>(totalSize), unsigned(hr));
 		return false;
+	}
 #if DBG_DIRECTX
 	{
 		char name[160];
@@ -1550,8 +1576,11 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 	uint8_t*	dest = nullptr;
 	D3D12_RANGE	readRange{ 0, 0 }; // nothing is read back from this one
 
-	if (FAILED(upload->Map(0, &readRange, reinterpret_cast<void**>(&dest))))
+	hr = upload->Map(0, &readRange, reinterpret_cast<void**>(&dest));
+	if (FAILED(hr)) {
+		logHandler.Print("RenderTarget '%s': WriteBuffer: Map failed (hr=0x%08X)\n", static_cast<const char*>(m_name), unsigned(hr));
 		return false;
+	}
 
 	const uint8_t* source = static_cast<const uint8_t*>(data);
 

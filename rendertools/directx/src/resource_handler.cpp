@@ -3,6 +3,7 @@
 #include "commandlist.h"
 #include "descriptor_heap.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -74,9 +75,13 @@ noexcept
 	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	ComPtr<ID3D12Resource> resource;
-	if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr,
-											   IID_PPV_ARGS(&resource))))
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr,
+												 IID_PPV_ARGS(&resource));
+	if (FAILED(hr)) {
+		logHandler.Print("GfxResourceHandler::AcquireUpload: CreateCommittedResource failed (size=%zu, hr=0x%08X)\n", bucketSize,
+						 unsigned(hr));
 		return nullptr;
+	}
 	++m_uploadsCreated;
 	return resource;
 }
@@ -131,9 +136,13 @@ ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(const char* name, s
 	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	ComPtr<ID3D12Resource> resource;
-	if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr,
-											   IID_PPV_ARGS(&resource))))
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr,
+												 IID_PPV_ARGS(&resource));
+	if (FAILED(hr)) {
+		logHandler.Print("GfxResourceHandler::GetUploadResource: CreateCommittedResource failed (size=%zu, hr=0x%08X)\n", dataSize,
+						 unsigned(hr));
 		return nullptr;
+	}
 #if DBG_DIRECTX
 	if (name and name[0])
 		resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);

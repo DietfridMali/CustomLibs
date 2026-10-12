@@ -7,6 +7,7 @@
 #include "dx12context.h"
 #include "gfxpixelformat_dx.h"
 #include "texture_mips.h"
+#include "loghandler.h"
 
 #include <cstring>
 #include <algorithm>
@@ -142,8 +143,12 @@ noexcept
 
 	uint8_t*	destBuffer = nullptr;
 	D3D12_RANGE	mapRange{ 0, 0 };
-	if (FAILED(outUpload->Map(0, &mapRange, (void**)&destBuffer)))
+	HRESULT hr = outUpload->Map(0, &mapRange, (void**)&destBuffer);
+	if (FAILED(hr)) {
+		logHandler.Print("UploadSubresource: Map failed (%dx%d, subresource %u, hr=0x%08X)\n", width, height, unsigned(subresource),
+						 unsigned(hr));
 		return false;
+	}
 
 	UINT srcRowBytes = UINT(width) * UINT(channels);
 	if (layout.Footprint.RowPitch == srcRowBytes) {
@@ -312,8 +317,11 @@ noexcept
 
 	uint8_t*	destBuffer = nullptr;
 	D3D12_RANGE	mapRange{ 0, 0 };
-	if (FAILED(outUpload->Map(0, &mapRange, (void**)&destBuffer)))
+	HRESULT hr = outUpload->Map(0, &mapRange, (void**)&destBuffer);
+	if (FAILED(hr)) {
+		logHandler.Print("UploadSubresourceBlocks: Map failed (subresource %u, hr=0x%08X)\n", unsigned(subresource), unsigned(hr));
 		return false;
+	}
 
 	const UINT copyBytes = (srcRowBytes < UINT(rowSize)) ? srcRowBytes : UINT(rowSize);
 	for (UINT r = 0; r < rowCount; ++r)
@@ -466,9 +474,13 @@ noexcept
 	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
 	ComPtr<ID3D12Resource> resource;
-	if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-											   IID_PPV_ARGS(&resource))))
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+												 IID_PPV_ARGS(&resource));
+	if (FAILED(hr)) {
+		logHandler.Print("Upload3DTextureData: CreateCommittedResource failed (%dx%dx%d, DXGI_FORMAT=%u, hr=0x%08X)\n", w, h, d,
+						 unsigned(fmt), unsigned(hr));
 		return nullptr;
+	}
 #if DBG_DIRECTX
 	char name[128];
 	snprintf(name, sizeof(name), "Texture3D - resource[%d,%d]", w, h);
@@ -493,8 +505,11 @@ noexcept
 	const uint8_t*	src = static_cast<const uint8_t*>(data);
 	uint8_t*		mapped = nullptr;
 	D3D12_RANGE		mapRange{ 0, 0 };
-	if (FAILED(upload->Map(0, &mapRange, (void**)&mapped)))
+	hr = upload->Map(0, &mapRange, (void**)&mapped);
+	if (FAILED(hr)) {
+		logHandler.Print("Upload3DTextureData: Map failed (%dx%dx%d, hr=0x%08X)\n", w, h, d, unsigned(hr));
 		return nullptr;
+	}
 	UINT srcRowBytes = UINT(w) * pixelStride;
 	UINT slicePitch = layout.Footprint.RowPitch * rowCount;
 	if (srcRowBytes == layout.Footprint.RowPitch)
@@ -589,10 +604,14 @@ noexcept
 	rd.SampleDesc.Count = 1;
 	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-	if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
-											   D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-											   IID_PPV_ARGS(&tex.m_resource))))
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+												 D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+												 IID_PPV_ARGS(&tex.m_resource));
+	if (FAILED(hr)) {
+		logHandler.Print("Upload2DTexture: CreateCommittedResource failed (name='%s', %dx%d, DXGI_FORMAT=%u, hr=0x%08X)\n",
+						 static_cast<const char*>(tex.m_name), width, height, unsigned(dxgi), unsigned(hr));
 		return false;
+	}
 #if DBG_DIRECTX
 	char name[128];
 	snprintf(name, sizeof(name), "Texture2D[%s]", (const char*)tex.m_name);
@@ -650,10 +669,14 @@ noexcept
 	rd.SampleDesc.Count = 1;
 	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-	if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
-											   D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-											   IID_PPV_ARGS(&tex.m_resource))))
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+												 D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+												 IID_PPV_ARGS(&tex.m_resource));
+	if (FAILED(hr)) {
+		logHandler.Print("Upload3DTexture: CreateCommittedResource failed (name='%s', %dx%dx%d, DXGI_FORMAT=%u, hr=0x%08X)\n",
+						 static_cast<const char*>(tex.m_name), width, height, depth, unsigned(dxgi), unsigned(hr));
 		return false;
+	}
 #if DBG_DIRECTX
 	char name[128];
 	snprintf(name, sizeof(name), "Texture3D[%s]", (const char*)tex.m_name);
@@ -695,8 +718,12 @@ noexcept
 
 		uint8_t*	mapped = nullptr;
 		D3D12_RANGE	mapRange{ 0, 0 };
-		if (FAILED(upload->Map(0, &mapRange, (void**)&mapped)))
+		hr = upload->Map(0, &mapRange, (void**)&mapped);
+		if (FAILED(hr)) {
+			logHandler.Print("Upload3DTexture: Map failed (name='%s', mip level %u, hr=0x%08X)\n", static_cast<const char*>(tex.m_name),
+							 lv, unsigned(hr));
 			return EndUpload(commands, false);
+		}
 		UINT srcRowBytes = UINT(mipW) * stride;
 		UINT slicePitch = layout.Footprint.RowPitch * rowCount;
 		if (srcRowBytes == layout.Footprint.RowPitch)
