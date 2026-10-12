@@ -175,7 +175,7 @@ public:
 			return (i < Length()) ? i : -1;
 		if (ValidatedSize(static_cast<size_t>(i)) < 0)
 			return -1;
-		if (i >= Length())
+		if (static_cast<size_t>(i) >= m_arrayPtr->size())
 			m_arrayPtr->resize(static_cast<size_t>(i) + 1, m_defaultValue);
 		return i;
 	}
