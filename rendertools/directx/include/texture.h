@@ -5,6 +5,7 @@
 #include "dx12framework.h"
 #include "std_defines.h"
 #include "rendertypes.h"
+#include "bindless_textures.h"
 #include "texturesampling.h"
 #include "array.hpp"
 #include "string.hpp"
@@ -358,6 +359,18 @@ public:
 	bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
 
 	bool CreateSRV(void);
+
+	inline bool EnableBindless(void)
+	noexcept
+	{
+		return false;
+	}
+
+	inline uint32_t BindlessIndex(void) const
+	noexcept
+	{
+		return BindlessTextures::kInvalidIndex;
+	}
 
 	static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
 										int renderAreaHeight)

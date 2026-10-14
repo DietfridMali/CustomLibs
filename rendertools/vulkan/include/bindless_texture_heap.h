@@ -2,6 +2,7 @@
 
 #include "vkframework.h"
 #include "basesingleton.hpp"
+#include "bindless_textures.h"
 
 #include <cstdint>
 #include <vector>
@@ -12,24 +13,19 @@ class BindlessTextureHeap
 	: public BaseSingleton<BindlessTextureHeap> {
 public:
 	static constexpr uint32_t kMaxCapacity = 16384;
-	static constexpr uint32_t kInvalidIndex = UINT32_MAX;
+	static constexpr uint32_t kInvalidIndex = BindlessTextures::kInvalidIndex;
 	static constexpr uint32_t kSet = 1;
 	static constexpr uint32_t kBinding2D = 0;
 	static constexpr uint32_t kBinding2DArray = 1;
 	static constexpr uint32_t kBindingCube = 2;
 	static constexpr uint32_t kBindingSamplers = 3;
 	static constexpr uint32_t kBindingCount = 4;
-	static constexpr uint32_t kSpace2D = 3;
-	static constexpr uint32_t kSpace2DArray = 4;
-	static constexpr uint32_t kSpaceCube = 5;
-	static constexpr uint32_t kSpaceSamplers = 3;
+	static constexpr uint32_t kSpace2D = BindlessTextures::kSpace2D;
+	static constexpr uint32_t kSpace2DArray = BindlessTextures::kSpace2DArray;
+	static constexpr uint32_t kSpaceCube = BindlessTextures::kSpaceCube;
+	static constexpr uint32_t kSpaceSamplers = BindlessTextures::kSpaceSamplers;
 
-	static constexpr const char* kHlslDeclarations = R"(
-Texture2D		bindless2D [] : register(t0, space3);
-Texture2DArray	bindless2DArray [] : register(t0, space4);
-TextureCube		bindlessCube [] : register(t0, space5);
-SamplerState	bindlessSamplers [] : register(s0, space3);
-)";
+	static constexpr const char* kHlslDeclarations = BindlessTextures::kHlslDeclarations;
 
 	static inline bool s_isAlive{ false };
 

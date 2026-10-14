@@ -178,6 +178,7 @@
     <ClInclude Include="..\..\include\base_readtarget.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
     <ClInclude Include="..\..\include\rendertypes.h" />
+    <ClInclude Include="..\..\include\bindless_textures.h" />
     <ClInclude Include="..\include\gfxrenderer.h" />
     <ClInclude Include="..\..\include\rendermatrices.h" />
     <ClInclude Include="..\include\resource_chunkhandler.h" />

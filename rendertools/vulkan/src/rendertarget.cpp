@@ -865,7 +865,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 		// that asked for dbmReadOnly. The read-only layout lets the SAME image serve as the depth
 		// attachment AND a sampled texture in the same pass (WBOIT soft particles). An own depth buffer
 		// in dbmWrite stays writable.
-		bool readOnlyDepth = (m_depthSource != nullptr) or (m_depthMode == dbmReadOnly);
+		bool readOnlyDepth = ((m_depthSource != nullptr) and not m_depthSourceWritable) or (m_depthMode == dbmReadOnly);
 		depth.imageLayout = readOnlyDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
 										  : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		// force LOAD even when the activation clears, so the existing depth survives the pass.
@@ -1038,7 +1038,14 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 		else
 			AttachBuffer(m_depthBufferIndex);
 	}
-	else if ((m_depthSource != nullptr) and (m_depthSource->m_depthBufferIndex >= 0))
+	else if ((m_depthSource != nullptr) and (m_depthSource->m_depthBufferIndex >= 0)) {
+		BufferInfo& sourceDepth = m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex];
+
+		if (m_depthSourceWritable and (m_depthMode != dbmReadOnly)) {
+			sourceDepth.SetState(cb, BufferInfo::btDepth, false);
+			commandListHandler.UnbindImage(sourceDepth.m_imageView);
+			commandListHandler.UnbindImage(sourceDepth.m_depthSampleView);
+		}
 		// Shared depth (SetDepthSource): transition the foreign depth image into the read-only depth layout
 		// (DEPTH_STENCIL_READ_ONLY_OPTIMAL via asShaderRead) on OUR command buffer so it can be both tested
 		// against AND sampled in this pass (WBOIT soft particles). The barrier must run here, outside the
@@ -1046,7 +1053,9 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 		// (TransitionTo early-outs on the same layout), so no forbidden in-pass barrier is emitted.
 		// ToDepthReadOnly rather than ToShadowInput: the image stays BOUND as the depth attachment here,
 		// so the destination scopes have to cover the depth test too, not just the shader fetch.
-		m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].m_layoutTracker.ToDepthReadOnly(cb);
+		else
+			sourceDepth.m_layoutTracker.ToDepthReadOnly(cb);
+	}
 
 	// Reopen the pass we closed above, with the reconfigured attachment set and contents preserved.
 	if (wasRendering)

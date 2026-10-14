@@ -215,6 +215,7 @@ public:
 	RenderStates	m_renderStates{};
 	Viewport		m_viewport;
 	RenderTarget*	m_depthSource{ nullptr }; // foreign depth buffer to bind/test against instead of an own one (SetDepthSource)
+	bool			m_depthSourceWritable{ false };
 	Viewport*		m_viewportSave{ nullptr };
 	// How this target's colour buffer is sampled when it is read back as a texture. One that gets
 	// rescaled on the way out (post processing) wants LINEAR; one that is read texel for texel - a
@@ -342,10 +343,11 @@ public:
 	// activation clears) - all Clear*/GetDepth* paths stay own-buffer-based - and is meant to be
 	// tested against, not written (leave depth write off). Lets an overlay pass (e.g. the wet-splat
 	// decal buffer) hardware-depth-test against the scene. Pass nullptr to unshare.
-	inline void SetDepthSource(RenderTarget* source)
+	inline void SetDepthSource(RenderTarget* source, bool writable = false)
 	noexcept
 	{
 		m_depthSource = source;
+		m_depthSourceWritable = writable and (source != nullptr);
 	}
 
 	// Render helpers (same as OGL)

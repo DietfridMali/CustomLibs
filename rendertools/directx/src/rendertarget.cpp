@@ -769,14 +769,14 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 	RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
 	if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
 		BufferInfo& di = depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex];
-		if ((m_depthSource != nullptr) or (params.depthMode == dbmReadOnly)) {
+		if (((m_depthSource != nullptr) and not m_depthSourceWritable) or (params.depthMode == dbmReadOnly)) {
 			di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
 			pDSV = di.m_dsvReadOnly.CPUHandleAddress();
 		}
 		else {
 			di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			commandListHandler.UnbindImage(di.SRVIndex());
-			commandListHandler.UnbindImage(m_shadowTexture.m_handle);
+			commandListHandler.UnbindImage(depthOwner->m_shadowTexture.m_handle);
 		}
 	}
 

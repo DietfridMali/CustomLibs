@@ -162,6 +162,7 @@ public:
 	eDepthBufferMode	m_depthMode{ dbmWrite };
 	RGBAColor			m_clearColor;
 	RenderTarget*		m_depthSource{ nullptr }; // foreign depth buffer attached instead of an own one (SetDepthSource)
+	bool				m_depthSourceWritable{ false };
 
 	static GLint m_activeHandle;
 
@@ -285,7 +286,7 @@ public:
 	// which this target does not have; it is meant to be tested against, not written (leave depth
 	// write off). Lets an overlay pass (e.g. the wet-splat decal buffer) hardware-depth-test against
 	// the scene. Pass nullptr to detach again.
-	void SetDepthSource(RenderTarget* source);
+	void SetDepthSource(RenderTarget* source, bool writable = false);
 
 	Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 

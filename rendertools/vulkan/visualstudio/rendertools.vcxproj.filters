@@ -127,6 +127,9 @@
     <ClInclude Include="..\..\include\rendertypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\bindless_textures.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\shadowmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
