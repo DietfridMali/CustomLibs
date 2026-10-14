@@ -59,6 +59,7 @@ public:
 	static constexpr uint32_t	kBindingAccel = 66;
 	static constexpr uint32_t	kAccelSpace = 2;
 	bool						m_usesAccelStructure{ false };
+	bool						m_usesBindless{ false };
 
 	struct ImageBinding {
 		RenderTarget*	target{ nullptr };

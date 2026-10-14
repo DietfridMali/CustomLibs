@@ -471,6 +471,9 @@ noexcept
 	set(GfxFeature::UnusedAttachments, hasUnusedAttExt and featsUnusedAtt.dynamicRenderingUnusedAttachments);
 	set(GfxFeature::RayTracing, ((request.Requested() & GfxFeatureBit(GfxFeature::RayTracing)) != 0) and SupportsRayTracing(device));
 	set(GfxFeature::PipelineLibrary, SupportsPipelineLibrary(device));
+	set(GfxFeature::BindlessTextures, feats12.shaderSampledImageArrayNonUniformIndexing and feats12.runtimeDescriptorArray and
+		feats12.descriptorBindingPartiallyBound and feats12.descriptorBindingSampledImageUpdateAfterBind and
+		feats12.descriptorBindingUpdateUnusedWhilePending);
 	for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
 		if ((request.required & ~support.features) & GfxFeatureBit(GfxFeature(i)))
 			logHandler.Print("Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
@@ -677,6 +680,13 @@ noexcept
 	VkPhysicalDeviceVulkan12Features feats12{};
 	feats12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 	feats12.scalarBlockLayout = HasFeature(GfxFeature::ScalarBlockLayout) ? VK_TRUE : VK_FALSE;
+	if (HasFeature(GfxFeature::BindlessTextures)) {
+		feats12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+		feats12.runtimeDescriptorArray = VK_TRUE;
+		feats12.descriptorBindingPartiallyBound = VK_TRUE;
+		feats12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+		feats12.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
+	}
 #if USE_TRACY
 	feats12.hostQueryReset = VK_TRUE;
 #endif

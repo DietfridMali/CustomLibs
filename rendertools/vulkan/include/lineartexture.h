@@ -129,7 +129,7 @@ public:
 			return false;
 
 		m_isDeployed = true;
-		return true;
+		return RefreshBindless();
 	}
 
 

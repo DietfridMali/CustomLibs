@@ -236,6 +236,7 @@ public:
 	bool	m_samplerDeclared[kSamplerSlots]{};
 	bool	m_bindingDeclared[kBindingCount]{};
 	bool	m_usesAccelStructure{ false };
+	bool	m_usesBindless{ false };
 
 	// Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
 	std::vector<VkVertexInputAttributeDescription>	m_vsInputAttributes;

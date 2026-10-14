@@ -105,6 +105,7 @@ enum class GfxFeature : uint32_t {
 	RayTracing,
 	PipelineLibrary,
 	MultiDrawIndirect,
+	BindlessTextures,
 	Count
 };
 
@@ -154,6 +155,8 @@ noexcept
 			return "pipeline library";
 		case GfxFeature::MultiDrawIndirect:
 			return "indirect multi draw";
+		case GfxFeature::BindlessTextures:
+			return "bindless textures";
 		default:
 			return "unknown";
 	}
@@ -170,7 +173,8 @@ struct GfxFeatureRequest {
 		GfxFeatureBit(GfxFeature::MultiDrawIndirect)
 	};
 	uint32_t optional{
-		GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary)
+		GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary) |
+		GfxFeatureBit(GfxFeature::BindlessTextures)
 	};
 
 	inline constexpr uint32_t Requested(void) const

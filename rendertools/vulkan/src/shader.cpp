@@ -17,6 +17,7 @@
 #include "gfxstates.h"
 #include "commandlist.h"
 #include "descriptor_pool_handler.h"
+#include "bindless_texture_heap.h"
 #if OPTIMIZE_SHADER_LOADING
 #include "resource_handler.h"
 #endif
@@ -767,6 +768,12 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 			args.push_back(arg);
 		target = rayQueryTarget;
 	}
+	if (BindlessTextureHeap::DeclaresHeap(hlslCode)) {
+		uint32_t				bindArgCount = 0;
+		const wchar_t* const*	bindArgs = BindlessTextureHeap::BindArgs(bindArgCount);
+		for (uint32_t i = 0; i < bindArgCount; ++i)
+			args.push_back(bindArgs[i]);
+	}
 	String error;
 	if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target, args.data(), uint32_t(args.size()), spirvOut, error,
 											   shaderFolder,
@@ -839,10 +846,12 @@ noexcept
 		return false;
 	}
 
+	const VkDescriptorSetLayout setLayouts[2] = { m_setLayout, bindlessTextureHeap.SetLayout() };
+
 	VkPipelineLayoutCreateInfo plInfo{};
 	plInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	plInfo.setLayoutCount = 1;
-	plInfo.pSetLayouts = &m_setLayout;
+	plInfo.setLayoutCount = m_usesBindless ? 2 : 1;
+	plInfo.pSetLayouts = setLayouts;
 
 	res = vkCreatePipelineLayout(device, &plInfo, nullptr, &m_pipelineLayout);
 	if (res != VK_SUCCESS) {
@@ -1179,6 +1188,13 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 
 	m_usesAccelStructure = ReflectUsesAccelStructure(m_vsSpirv) or ReflectUsesAccelStructure(m_fsSpirv) or
 		ReflectUsesAccelStructure(m_gsSpirv) or ReflectUsesAccelStructure(m_hsSpirv) or ReflectUsesAccelStructure(m_dsSpirv);
+	m_usesBindless = BindlessTextureHeap::ReflectUsesHeap(m_vsSpirv) or BindlessTextureHeap::ReflectUsesHeap(m_fsSpirv) or
+		BindlessTextureHeap::ReflectUsesHeap(m_gsSpirv) or BindlessTextureHeap::ReflectUsesHeap(m_hsSpirv) or
+		BindlessTextureHeap::ReflectUsesHeap(m_dsSpirv);
+	if (m_usesBindless and not bindlessTextureHeap.IsAvailable()) {
+		logHandler.Print("Shader '%s': reads the texture heap, which this device does not have - not created\n", (const char*)m_name);
+		return false;
+	}
 
 	if (not CreatePipelineLayout())
 		return false;
@@ -1246,6 +1262,7 @@ noexcept
 	std::memset(m_bindingDeclared, 0, sizeof(m_bindingDeclared));
 #endif
 	m_usesAccelStructure = false;
+	m_usesBindless = false;
 
 	if (device != VK_NULL_HANDLE) {
 		if (m_pipelineLayout != VK_NULL_HANDLE) {
@@ -1324,6 +1341,7 @@ noexcept
 		std::memcpy(m_bindingDeclared, other.m_bindingDeclared, sizeof(m_bindingDeclared));
 #endif
 		m_usesAccelStructure = other.m_usesAccelStructure;
+		m_usesBindless = other.m_usesBindless;
 	}
 	return *this;
 }
@@ -1556,8 +1574,9 @@ noexcept
 		m_descriptorCleanupGeneration = cleanupGeneration;
 	}
 	gfxResourceHandler.NoteFrameAllocation();
+	const VkDescriptorSet sets[2] = { m_descriptorSet, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
-							0, 1, &m_descriptorSet,
+							0, m_usesBindless ? 2 : 1, sets,
 							kDynamicOffsetCount, m_dynamicOffsets);
 	return true;
 }
@@ -1736,8 +1755,9 @@ noexcept
 		vkUpdateDescriptorSets(vkContext.Device(), writeCount, writes, 0, nullptr);
 #if !OPTIMIZE_SHADER_LOADING
 
+	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
-							0, 1, &set,
+							0, m_usesBindless ? 2 : 1, sets,
 							kDynamicOffsetCount, m_dynamicOffsets);
 	return true;
 #endif

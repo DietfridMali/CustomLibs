@@ -16,6 +16,7 @@
 #include "shader_compiler.h"
 #include "pipeline_cache.h"
 #include "descriptor_pool_handler.h"
+#include "bindless_texture_heap.h"
 #include "cbv_allocator.h"
 #include "resource_handler.h"
 #include "gfxapitype.h"
@@ -58,6 +59,11 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 	if (not descriptorPoolHandler.Create(vkContext.Device())) {
 		logHandler.Print("Smiley-Battle: Cannot create Vulkan descriptor pools.\n");
 		return false;
+	}
+	if (vkContext.HasFeature(GfxFeature::BindlessTextures) and not bindlessTextureHeap.Create(vkContext.Device(), vkContext.PhysicalDevice())) {
+		logHandler.Print("Vulkan texture heap could not be created - bindless textures are off.\n");
+		vkContext.m_features &= ~GfxFeatureBit(GfxFeature::BindlessTextures);
+		m_gfxFeatures &= ~GfxFeatureBit(GfxFeature::BindlessTextures);
 	}
 	if (not cbvAllocator.Create()) {
 		logHandler.Print("Smiley-Battle: Cannot create Vulkan UBO ring allocator.\n");
@@ -204,6 +210,7 @@ noexcept
 	meshHandler.Destroy();
 	gfxResourceHandler.Cleanup(0);
 	gfxResourceHandler.Cleanup(1);
+	bindlessTextureHeap.Destroy();
 }
 
 

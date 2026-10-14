@@ -27,6 +27,7 @@ VULKAN_FILES := \
  acceleration_structure \
  base_displayhandler \
  base_shadercode \
+ bindless_texture_heap \
  cbv_allocator \
  commandlist \
  compute_shader \

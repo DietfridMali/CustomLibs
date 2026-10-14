@@ -39,7 +39,8 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 #if USE_TRACY
 	TracyGpuContext;
 #endif
-	uint32_t available = GfxAllFeatures() & ~(GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary));
+	uint32_t available = GfxAllFeatures() & ~(GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary) |
+											   GfxFeatureBit(GfxFeature::BindlessTextures));
 	if (not gfxStates.HasExtension("GL_EXT_texture_compression_s3tc"))
 		available &= ~GfxFeatureBit(GfxFeature::BlockCompression);
 	if (not (gfxStates.HasExtension("GL_EXT_texture_filter_anisotropic") or gfxStates.HasExtension("GL_ARB_texture_filter_anisotropic")))

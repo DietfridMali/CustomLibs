@@ -15,6 +15,7 @@
 #include "cbv_allocator.h"
 #include "commandlist.h"
 #include "descriptor_pool_handler.h"
+#include "bindless_texture_heap.h"
 #include "vkupload.h"
 #include "rendertarget.h"
 #include "gfxrenderer.h"
@@ -427,6 +428,12 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
 			args.push_back(arg);
 		target = "cs_6_5";
 	}
+	if (BindlessTextureHeap::DeclaresHeap(hlslCode)) {
+		uint32_t				bindArgCount = 0;
+		const wchar_t* const*	bindArgs = BindlessTextureHeap::BindArgs(bindArgCount);
+		for (uint32_t i = 0; i < bindArgCount; ++i)
+			args.push_back(bindArgs[i]);
+	}
 
 	String error;
 	if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target, args.data(), uint32_t(args.size()), spirvOut, error,
@@ -486,10 +493,12 @@ noexcept
 		return false;
 	}
 
+	const VkDescriptorSetLayout setLayouts[2] = { m_setLayout, bindlessTextureHeap.SetLayout() };
+
 	VkPipelineLayoutCreateInfo plInfo{};
 	plInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	plInfo.setLayoutCount = 1;
-	plInfo.pSetLayouts = &m_setLayout;
+	plInfo.setLayoutCount = m_usesBindless ? 2 : 1;
+	plInfo.pSetLayouts = setLayouts;
 
 	res = vkCreatePipelineLayout(device, &plInfo, nullptr, &m_pipelineLayout);
 	if (res != VK_SUCCESS) {
@@ -552,6 +561,13 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 	m_csModule = ShaderCompiler::CreateShaderModule(m_csSpirv);
 	if (m_csModule == VK_NULL_HANDLE) {
 		logHandler.Print("ComputeShader '%s': shader module could not be created\n", (const char*)m_name);
+		return false;
+	}
+
+	m_usesBindless = BindlessTextureHeap::ReflectUsesHeap(m_csSpirv);
+	if (m_usesBindless and not bindlessTextureHeap.IsAvailable()) {
+		logHandler.Print("ComputeShader '%s': reads the texture heap, which this device does not have - not created\n",
+						 static_cast<const char*>(m_name));
 		return false;
 	}
 
@@ -649,6 +665,7 @@ noexcept
 	m_b1Size = 0;
 	m_b1Dirty = true;
 	m_usesAccelStructure = false;
+	m_usesBindless = false;
 }
 
 
@@ -840,8 +857,9 @@ bool ComputeShader::Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t gr
 	if (writeCount > 0)
 		vkUpdateDescriptorSets(device, writeCount, writes, 0, nullptr);
 
+	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
-	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &set,
+	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, m_usesBindless ? 2 : 1, sets,
 							dynamicOffsetCount, dynamicOffsetCount ? dynamicOffsets : nullptr);
 	vkCmdDispatch(cb, groupCountX, groupCountY, groupCountZ);
 
@@ -1005,8 +1023,9 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 	if (not BeginSingleTimeCommands(once))
 		return false;
 
+	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
 	vkCmdBindPipeline(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
-	vkCmdBindDescriptorSets(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &set,
+	vkCmdBindDescriptorSets(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, m_usesBindless ? 2 : 1, sets,
 							dynamicOffsetCount, dynamicOffsetCount ? &dynamicOffset : nullptr);
 	vkCmdDispatch(once.cb, groupCountX, groupCountY, groupCountZ);
 

@@ -23,6 +23,7 @@
 #include "sampler_cache.h"
 #include "gfxstates.h"
 #include "resource_handler.h"
+#include "bindless_texture_heap.h"
 #include "texture_mips.h"
 #include "loghandler.h"
 
@@ -78,6 +79,7 @@ noexcept
 		textureLUT.Remove(m_name);
 		m_name = "";
 	}
+	ReleaseBindless();
 	if (m_isValid)
 		Destroy();
 }
@@ -119,6 +121,7 @@ noexcept
 		m_image = std::exchange(other.m_image, VkImage(VK_NULL_HANDLE));
 		m_imageView = std::exchange(other.m_imageView, VkImageView(VK_NULL_HANDLE));
 		m_allocation = std::exchange(other.m_allocation, VmaAllocation(VK_NULL_HANDLE));
+		m_bindlessIndex = std::exchange(other.m_bindlessIndex, UINT32_MAX);
 		m_layoutTracker = other.m_layoutTracker;
 		other.m_layoutTracker = ImageLayoutTracker{};
 		m_name = std::move(other.m_name);
@@ -148,6 +151,7 @@ bool Texture::Create(void)
 
 void Texture::Destroy(void)
 {
+	ReleaseBindless();
 	if (not m_isValid)
 		return;
 	m_isValid = false;
@@ -347,7 +351,64 @@ bool Texture::CreateSRV(void)
 		logHandler.Print("Texture::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
 		return false;
 	}
+	return RefreshBindless();
+}
+
+
+static VkImageViewType BindlessViewType(TextureType type)
+noexcept
+{
+	switch (type) {
+		case TextureType::Texture2D:
+			return VK_IMAGE_VIEW_TYPE_2D;
+		case TextureType::Texture2DArray:
+			return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		case TextureType::CubeMap:
+			return VK_IMAGE_VIEW_TYPE_CUBE;
+		default:
+			return VK_IMAGE_VIEW_TYPE_3D;
+	}
+}
+
+
+bool Texture::EnableBindless(void)
+{
+	if (m_bindlessIndex != UINT32_MAX)
+		return true;
+	if (not m_isValid or (m_imageView == VK_NULL_HANDLE) or not BindlessTextureHeap::s_isAlive)
+		return false;
+
+	const uint32_t index = bindlessTextureHeap.Allocate();
+	if (index == BindlessTextureHeap::kInvalidIndex)
+		return false;
+	if (not m_hasParams)
+		SetParams(false);
+	if (not bindlessTextureHeap.Write(index, BindlessViewType(m_type), m_imageView, m_sampleLayout, samplerCache.GetSampler(m_sampling))) {
+		bindlessTextureHeap.Free(index);
+		return false;
+	}
+	m_bindlessIndex = index;
 	return true;
+}
+
+
+bool Texture::RefreshBindless(void)
+{
+	if (m_bindlessIndex == UINT32_MAX)
+		return true;
+	ReleaseBindless();
+	return EnableBindless();
+}
+
+
+void Texture::ReleaseBindless(void)
+noexcept
+{
+	if (m_bindlessIndex == UINT32_MAX)
+		return;
+	if (BindlessTextureHeap::s_isAlive)
+		bindlessTextureHeap.Free(m_bindlessIndex);
+	m_bindlessIndex = UINT32_MAX;
 }
 
 
@@ -498,6 +559,7 @@ noexcept
 	m_sampling.wrapV = wrapV;
 	m_sampling.wrapW = wrapV;
 	m_hasParams = false; // SetParams () writes them on the next use
+	RefreshBindless();
 }
 
 

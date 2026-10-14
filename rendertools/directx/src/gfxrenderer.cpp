@@ -40,7 +40,7 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 		logHandler.Print("Cannot create DX12 device.\n");
 		return false;
 	}
-	uint32_t available = GfxAllFeatures();
+	uint32_t available = GfxAllFeatures() & ~GfxFeatureBit(GfxFeature::BindlessTextures);
 	if (not dx12Context.HasRayTracing())
 		available &= ~GfxFeatureBit(GfxFeature::RayTracing);
 	if (not ApplyFeatures(request, available))

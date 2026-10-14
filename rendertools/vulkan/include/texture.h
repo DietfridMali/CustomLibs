@@ -96,6 +96,7 @@ public:
 	ImageLayoutTracker	m_layoutTracker;
 	VkImageLayout		m_sampleLayout{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 	VkFormat			m_vkFormat{ VK_FORMAT_R8G8B8A8_UNORM }; // GPU format of m_image + its view
+	uint32_t			m_bindlessIndex{ UINT32_MAX };
 
 	String					m_name;
 	List<TextureBuffer*>	m_buffers;
@@ -364,6 +365,19 @@ public:
 	bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
 
 	bool CreateSRV(void);
+
+	bool EnableBindless(void);
+
+	bool RefreshBindless(void);
+
+	void ReleaseBindless(void)
+	noexcept;
+
+	inline uint32_t BindlessIndex(void) const
+	noexcept
+	{
+		return m_bindlessIndex;
+	}
 
 	static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
 										int renderAreaHeight)
