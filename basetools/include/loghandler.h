@@ -2,6 +2,7 @@
 
 #include <cstdarg>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <mutex>
 
@@ -17,6 +18,8 @@ public:
 	static constexpr size_t	kContextSize = 256;
 	static constexpr size_t	kPathSize = 1024;
 	static constexpr size_t	kBuildStampSize = 32;
+	static constexpr size_t	kNoteCount = 128;
+	static constexpr size_t	kNoteSize = 384;
 
 	LogHandler()
 	noexcept;
@@ -77,6 +80,12 @@ public:
 		return m_buildStamp;
 	}
 
+	void Note(const char* format, ...)
+	noexcept;
+
+	void PrintNotes(void)
+	noexcept;
+
 private:
 	std::mutex	m_mutex;
 	FILE*		m_file{ nullptr };
@@ -87,6 +96,8 @@ private:
 	char		m_context[kContextSize]{};
 	char		m_buildStamp[kBuildStampSize]{};
 	char		m_lines[2][kLineSize]{};
+	char		m_notes[kNoteCount][kNoteSize]{};
+	uint64_t	m_noteCount{ 0 };
 
 	void CloseFile(void)
 	noexcept;

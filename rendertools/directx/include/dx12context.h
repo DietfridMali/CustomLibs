@@ -50,6 +50,14 @@ public:
 	noexcept;
 #endif
 
+#if USE_AFTERMATH
+	void WaitForGpuCrashDump(void)
+	noexcept;
+
+	void LogShaderHash(const char* shaderName, const char* stage, const void* code, size_t codeSize)
+	noexcept;
+#endif
+
 	inline D3D_FEATURE_LEVEL FeatureLevel(void)
 	noexcept
 	{

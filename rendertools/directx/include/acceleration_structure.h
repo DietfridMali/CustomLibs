@@ -93,6 +93,14 @@ public:
 	bool BuildTopLevel(const AccelInstance* instances, uint32_t instanceCount, bool immediate = false)
 	noexcept;
 
+#if DBG_DIRECTX
+	static void DumpTopLevelBuilds(void)
+	noexcept;
+
+	static void MarkTraceDraw(void)
+	noexcept;
+#endif
+
 	bool Bind(void) const
 	noexcept;
 

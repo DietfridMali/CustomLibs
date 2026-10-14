@@ -33,6 +33,10 @@ noexcept
 #if DBG_DIRECTX
 	dx12Context.DumpDRED();
 #endif
+#if USE_AFTERMATH
+	dx12Context.WaitForGpuCrashDump();
+#endif
+	logHandler.PrintNotes();
 	// The window goes first - a message box behind a fullscreen window cannot be seen or answered.
 	if (SDL_Window* window = baseDisplayHandler.GetWindow())
 		SDL_HideWindow(window);

@@ -514,6 +514,19 @@ noexcept
 	if (frameBuffer != VK_NULL_HANDLE) {
 		CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
 
+		VkMemoryBarrier2 before{};
+		before.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+		before.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		before.srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+		before.dstStageMask = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+		before.dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+
+		VkDependencyInfo beforeDependency{};
+		beforeDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		beforeDependency.memoryBarrierCount = 1;
+		beforeDependency.pMemoryBarriers = &before;
+		Vk13Api::CmdPipelineBarrier2(frameBuffer, &beforeDependency);
+
 		pfnCmdBuildAccelerationStructures(frameBuffer, 1, &buildInfo, &pRange);
 
 		VkMemoryBarrier2 barrier{};

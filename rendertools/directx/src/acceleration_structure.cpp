@@ -16,6 +16,7 @@
 namespace {
 uint32_t	g_scratchAlignment{ D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT };
 bool		g_loaded{ false };
+bool		g_enhancedBarriers{ false };
 
 ComPtr<ID3D12Device5> RayTracingDevice(void)
 noexcept
@@ -73,13 +74,284 @@ noexcept
 	buffer.Reset();
 }
 
+#if DBG_DIRECTX
+void MarkInstanceBufferReleased(const ID3D12Resource* buffer)
+noexcept;
+#endif
+
 void ReleaseUpload(ComPtr<ID3D12Resource>& buffer)
 noexcept
 {
+#if DBG_DIRECTX
+	MarkInstanceBufferReleased(buffer.Get());
+#endif
 	if (buffer and not GfxResourceHandler::IsShuttingDown())
 		gfxResourceHandler.TrackUpload(buffer);
 	buffer.Reset();
 }
+
+#if DBG_DIRECTX
+constexpr uint32_t	kTopLevelRecordDescs = 32;
+constexpr uint64_t	kTopLevelBuildRecords = 8;
+constexpr int		kInstanceCheckLines = 32;
+
+struct TopLevelBuildRecord {
+	uint64_t						frameNumber{ 0 };
+	int								frameIndex{ 0 };
+	const AccelerationStructure*	structure{ nullptr };
+	uint32_t						slot{ 0 };
+	bool							immediate{ false };
+	char							listName[64]{};
+	uint32_t						instanceCount{ 0 };
+	uint32_t						written{ 0 };
+	uint32_t						capacity{ 0 };
+	UINT64							resultSize{ 0 };
+	UINT64							storageSize{ 0 };
+	UINT64							scratchNeeded{ 0 };
+	UINT64							scratchSize{ 0 };
+	D3D12_GPU_VIRTUAL_ADDRESS		storage{ 0 };
+	D3D12_GPU_VIRTUAL_ADDRESS		scratch{ 0 };
+	D3D12_GPU_VIRTUAL_ADDRESS		instances{ 0 };
+	ID3D12Resource*					instanceBuffer{ nullptr };
+	bool							released{ false };
+	uint32_t						descCount{ 0 };
+	D3D12_RAYTRACING_INSTANCE_DESC	descs[kTopLevelRecordDescs]{};
+	const CommandList*				list{ nullptr };
+	uint64_t						listExecution{ 0 };
+	uint32_t						markerSlot{ 0 };
+	uint32_t						buildMarker{ 0 };
+	uint32_t						drawsRecorded{ 0 };
+};
+
+constexpr uint32_t	kMarkerFields = 4;
+constexpr UINT64	kMarkerBytes = kTopLevelBuildRecords * kMarkerFields * sizeof(uint32_t);
+
+TopLevelBuildRecord		g_topLevelBuilds[kTopLevelBuildRecords];
+uint64_t				g_topLevelBuildCount{ 0 };
+int						g_instanceCheckLines{ 0 };
+ComPtr<ID3D12Resource>	g_markerBuffer;
+volatile uint32_t*		g_markers{ nullptr };
+int						g_markerState{ 0 };
+
+bool CreateMarkerBuffer(void)
+noexcept
+{
+	if (g_markerState != 0)
+		return g_markerState > 0;
+	g_markerState = -1;
+
+	ID3D12Device* device = dx12Context.Device();
+
+	if (not device)
+		return false;
+
+	D3D12_HEAP_PROPERTIES	hp{};
+	D3D12_RESOURCE_DESC		rd{};
+
+	hp.Type = D3D12_HEAP_TYPE_CUSTOM;
+	hp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+	hp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+	rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	rd.Width = kMarkerBytes;
+	rd.Height = 1;
+	rd.DepthOrArraySize = 1;
+	rd.MipLevels = 1;
+	rd.Format = DXGI_FORMAT_UNKNOWN;
+	rd.SampleDesc.Count = 1;
+	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+												 IID_PPV_ARGS(g_markerBuffer.ReleaseAndGetAddressOf()));
+
+	if (FAILED(hr)) {
+		logHandler.Print("AccelerationStructure: marker buffer could not be created (0x%08X)\n", unsigned(hr));
+		return false;
+	}
+
+	void* data = nullptr;
+
+	hr = g_markerBuffer->Map(0, nullptr, &data);
+	if (FAILED(hr) or not data) {
+		logHandler.Print("AccelerationStructure: marker buffer could not be mapped (0x%08X)\n", unsigned(hr));
+		g_markerBuffer.Reset();
+		return false;
+	}
+	std::memset(data, 0, size_t(kMarkerBytes));
+	g_markers = static_cast<uint32_t*>(data);
+	g_markerState = 1;
+	return true;
+}
+
+
+void WriteMarkers(ID3D12GraphicsCommandList* list, uint32_t markerSlot, const uint32_t* fields, const uint32_t* values,
+				  const D3D12_WRITEBUFFERIMMEDIATE_MODE* modes, UINT count)
+noexcept
+{
+	ComPtr<ID3D12GraphicsCommandList2> list2;
+
+	if (not list or FAILED(list->QueryInterface(IID_PPV_ARGS(list2.GetAddressOf()))))
+		return;
+
+	D3D12_WRITEBUFFERIMMEDIATE_PARAMETER	params[kMarkerFields];
+	D3D12_GPU_VIRTUAL_ADDRESS				base = g_markerBuffer->GetGPUVirtualAddress() + D3D12_GPU_VIRTUAL_ADDRESS(markerSlot) * kMarkerFields * sizeof(uint32_t);
+
+	for (UINT i = 0; i < count; ++i) {
+		params[i].Dest = base + D3D12_GPU_VIRTUAL_ADDRESS(fields[i]) * sizeof(uint32_t);
+		params[i].Value = values[i];
+	}
+	list2->WriteBufferImmediate(count, params, modes);
+}
+
+void MarkInstanceBufferReleased(const ID3D12Resource* buffer)
+noexcept
+{
+	if (not buffer)
+		return;
+	for (TopLevelBuildRecord& record : g_topLevelBuilds) {
+		if (record.instanceBuffer == buffer)
+			record.released = true;
+	}
+}
+
+
+bool ReadInstanceDescs(ID3D12Resource* buffer, uint32_t count, D3D12_RAYTRACING_INSTANCE_DESC* descs, HRESULT& hr)
+noexcept
+{
+	D3D12_RANGE	readRange{ 0, SIZE_T(count) * sizeof(D3D12_RAYTRACING_INSTANCE_DESC) };
+	D3D12_RANGE	writtenRange{ 0, 0 };
+	void*		data = nullptr;
+
+	hr = buffer->Map(0, &readRange, &data);
+	if (FAILED(hr) or not data)
+		return false;
+	std::memcpy(descs, data, readRange.End);
+	buffer->Unmap(0, &writtenRange);
+	return true;
+}
+
+
+uint32_t FirstChangedDesc(const TopLevelBuildRecord& record, const D3D12_RAYTRACING_INSTANCE_DESC* current)
+noexcept
+{
+	for (uint32_t i = 0; i < record.descCount; ++i) {
+		if (std::memcmp(&record.descs[i], &current[i], sizeof(D3D12_RAYTRACING_INSTANCE_DESC)) != 0)
+			return i;
+	}
+	return record.descCount;
+}
+
+
+void PrintChangedDesc(const char* where, uint64_t build, const TopLevelBuildRecord& record, uint32_t index,
+					  const D3D12_RAYTRACING_INSTANCE_DESC& now)
+noexcept
+{
+	const D3D12_RAYTRACING_INSTANCE_DESC& then = record.descs[index];
+
+	logHandler.Print("%s instance buffer of build %llu (frame %llu, slot %u, list %s) changed, desc %u of %u: "
+					 "recorded blas 0x%llX id %u mask 0x%02X flags %u at %g %g %g, "
+					 "now blas 0x%llX id %u mask 0x%02X flags %u at %g %g %g\n",
+					 where, static_cast<unsigned long long>(build), static_cast<unsigned long long>(record.frameNumber), record.slot,
+					 record.listName, index, record.descCount, static_cast<unsigned long long>(then.AccelerationStructure),
+					 unsigned(then.InstanceID), unsigned(then.InstanceMask), unsigned(then.Flags), then.Transform[0][3],
+					 then.Transform[1][3], then.Transform[2][3], static_cast<unsigned long long>(now.AccelerationStructure),
+					 unsigned(now.InstanceID), unsigned(now.InstanceMask), unsigned(now.Flags), now.Transform[0][3], now.Transform[1][3],
+					 now.Transform[2][3]);
+}
+
+
+void CheckInstanceBuffer(const AccelerationStructure& as, ID3D12Resource* buffer)
+noexcept
+{
+	uint64_t count = (g_topLevelBuildCount < kTopLevelBuildRecords) ? g_topLevelBuildCount : kTopLevelBuildRecords;
+
+	for (uint64_t i = g_topLevelBuildCount; i > g_topLevelBuildCount - count; --i) {
+		const TopLevelBuildRecord& record = g_topLevelBuilds[(i - 1) % kTopLevelBuildRecords];
+
+		if ((record.structure != &as) or (record.slot != as.m_slot) or (record.instanceBuffer != buffer) or record.released)
+			continue;
+
+		D3D12_RAYTRACING_INSTANCE_DESC	current[kTopLevelRecordDescs];
+		HRESULT							hr = S_OK;
+
+		if (not ReadInstanceDescs(buffer, record.descCount, current, hr)) {
+			if (g_instanceCheckLines < kInstanceCheckLines) {
+				++g_instanceCheckLines;
+				logHandler.Print("AccelerationStructure::BuildTopLevel: instance buffer of build %llu could not be mapped (0x%08X)\n",
+								 static_cast<unsigned long long>(i - 1), unsigned(hr));
+			}
+			return;
+		}
+
+		uint32_t index = FirstChangedDesc(record, current);
+
+		if ((index < record.descCount) and (g_instanceCheckLines < kInstanceCheckLines)) {
+			++g_instanceCheckLines;
+			PrintChangedDesc("AccelerationStructure::BuildTopLevel:", i - 1, record, index, current[index]);
+		}
+		return;
+	}
+}
+
+
+void RecordTopLevelBuild(const AccelerationStructure& as, const CommandList& cl, bool immediate, uint32_t instanceCount,
+						 const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC& buildDesc,
+						 const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO& sizes)
+noexcept
+{
+	TopLevelBuildRecord& record = g_topLevelBuilds[g_topLevelBuildCount % kTopLevelBuildRecords];
+
+	++g_topLevelBuildCount;
+	record.frameNumber = commandListHandler.FrameNumber();
+	record.frameIndex = commandListHandler.FrameIndex();
+	record.structure = &as;
+	record.slot = as.m_slot;
+	record.immediate = immediate;
+	std::snprintf(record.listName, sizeof(record.listName), "%s", static_cast<const char*>(cl.GetName()));
+	record.instanceCount = instanceCount;
+	record.written = buildDesc.Inputs.NumDescs;
+	record.capacity = as.m_instanceCapacity[as.m_slot];
+	record.resultSize = sizes.ResultDataMaxSizeInBytes;
+	record.storageSize = as.m_storageSize[as.m_slot];
+	record.scratchNeeded = sizes.ScratchDataSizeInBytes;
+	record.scratchSize = as.m_scratchSize[as.m_slot];
+	record.storage = buildDesc.DestAccelerationStructureData;
+	record.scratch = buildDesc.ScratchAccelerationStructureData;
+	record.instances = buildDesc.Inputs.InstanceDescs;
+	record.instanceBuffer = as.m_instances[as.m_slot].Get();
+	record.released = false;
+	record.descCount = (record.written < kTopLevelRecordDescs) ? record.written : kTopLevelRecordDescs;
+	logHandler.Note("tlas build %llu: frame %llu, structure %p, slot %u, list %s, %u instances, storage 0x%llX",
+					static_cast<unsigned long long>(g_topLevelBuildCount - 1), static_cast<unsigned long long>(record.frameNumber),
+					static_cast<const void*>(record.structure), record.slot, record.listName, record.written,
+					static_cast<unsigned long long>(record.storage));
+
+	HRESULT hr = S_OK;
+
+	if (not ReadInstanceDescs(record.instanceBuffer, record.descCount, record.descs, hr)) {
+		if (g_instanceCheckLines < kInstanceCheckLines) {
+			++g_instanceCheckLines;
+			logHandler.Print("AccelerationStructure::BuildTopLevel: instance buffer of build %llu could not be read back (0x%08X)\n",
+							 static_cast<unsigned long long>(g_topLevelBuildCount - 1), unsigned(hr));
+		}
+		record.descCount = 0;
+	}
+
+	record.list = &cl;
+	record.listExecution = cl.GetExecutionCounter();
+	record.markerSlot = uint32_t((g_topLevelBuildCount - 1) % kTopLevelBuildRecords);
+	record.buildMarker = uint32_t(g_topLevelBuildCount);
+	record.drawsRecorded = 0;
+	if (not CreateMarkerBuffer())
+		return;
+	for (uint32_t i = 0; i < kMarkerFields; ++i)
+		g_markers[record.markerSlot * kMarkerFields + i] = 0;
+
+	const uint32_t							field = 0;
+	const D3D12_WRITEBUFFERIMMEDIATE_MODE	mode = D3D12_WRITEBUFFERIMMEDIATE_MODE_MARKER_OUT;
+
+	WriteMarkers(cl.GfxList(), record.markerSlot, &field, &record.buildMarker, &mode, 1);
+}
+#endif
 }
 
 // =================================================================================================
@@ -99,6 +371,12 @@ noexcept
 	}
 
 	g_scratchAlignment = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT;
+
+	D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12{};
+
+	g_enhancedBarriers = SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12))) and
+		(options12.EnhancedBarriersSupported != FALSE);
+	logHandler.Print("RayTracingApi: enhanced barriers %s\n", g_enhancedBarriers ? "supported" : "not supported");
 	g_loaded = true;
 	return true;
 }
@@ -369,6 +647,10 @@ noexcept
 		m_instanceCapacity[m_slot] = instanceCount;
 	}
 
+#if DBG_DIRECTX
+	CheckInstanceBuffer(*this, instanceBuffer.Get());
+#endif
+
 	D3D12_RANGE	readRange{ 0, 0 };
 	void*		instanceData = nullptr;
 	if (FAILED(instanceBuffer->Map(0, &readRange, &instanceData)) or not instanceData) {
@@ -445,26 +727,55 @@ noexcept
 	buildDesc.DestAccelerationStructureData = m_storage[m_slot]->GetGPUVirtualAddress();
 	buildDesc.ScratchAccelerationStructureData = scratchAddress;
 
-	ID3D12GraphicsCommandList* frameList = immediate ? nullptr : commandListHandler.CurrentGfxList();
-	if (frameList) {
+	ID3D12GraphicsCommandList*			frameList = immediate ? nullptr : commandListHandler.CurrentGfxList();
+	ComPtr<ID3D12GraphicsCommandList7>	frameList7;
+
+	if (frameList and g_enhancedBarriers)
+		frameList->QueryInterface(IID_PPV_ARGS(frameList7.GetAddressOf()));
+	if (frameList7) {
 		ComPtr<ID3D12GraphicsCommandList4> list = RayTracingList(frameList);
 		if (not list)
 			return false;
+
+		D3D12_RESOURCE_BARRIER before{};
+		before.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		before.UAV.pResource = nullptr;
+		list->ResourceBarrier(1, &before);
 		list->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
 
-		D3D12_RESOURCE_BARRIER barrier{};
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-		barrier.UAV.pResource = m_storage[m_slot].Get();
-		list->ResourceBarrier(1, &barrier);
+		D3D12_BUFFER_BARRIER bufferBarrier{};
+		bufferBarrier.SyncBefore = D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE;
+		bufferBarrier.SyncAfter = D3D12_BARRIER_SYNC_ALL_SHADING;
+		bufferBarrier.AccessBefore = D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_WRITE;
+		bufferBarrier.AccessAfter = D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_READ;
+		bufferBarrier.pResource = m_storage[m_slot].Get();
+		bufferBarrier.Offset = 0;
+		bufferBarrier.Size = UINT64_MAX;
+
+		D3D12_BARRIER_GROUP barrierGroup{};
+		barrierGroup.Type = D3D12_BARRIER_TYPE_BUFFER;
+		barrierGroup.NumBarriers = 1;
+		barrierGroup.pBufferBarriers = &bufferBarrier;
+		frameList7->Barrier(1, &barrierGroup);
+#if DBG_DIRECTX
+		RecordTopLevelBuild(*this, *commandListHandler.CurrentCmdList(), false, instanceCount, buildDesc, sizes);
+#endif
 	}
 	else {
 		CommandList* cl = commandListHandler.CreateCmdList("AccelerationStructure::BuildTopLevel", true);
 		if (not (cl and cl->Open()))
 			return false;
 		ComPtr<ID3D12GraphicsCommandList4> list = RayTracingList(cl->GfxList());
-		if (list)
+		if (list) {
 			list->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
-		cl->Flush();
+#if DBG_DIRECTX
+			RecordTopLevelBuild(*this, *cl, true, instanceCount, buildDesc, sizes);
+#endif
+		}
+		if (frameList)
+			cl->Submit();
+		else
+			cl->Flush();
 		if (not list)
 			return false;
 	}
@@ -473,6 +784,94 @@ noexcept
 	m_primitives = written;
 	return true;
 }
+
+// =================================================================================================
+
+#if DBG_DIRECTX
+void AccelerationStructure::DumpTopLevelBuilds(void)
+noexcept
+{
+	uint64_t count = (g_topLevelBuildCount < kTopLevelBuildRecords) ? g_topLevelBuildCount : kTopLevelBuildRecords;
+
+	logHandler.Print("top level builds: %llu recorded, last %llu:\n", static_cast<unsigned long long>(g_topLevelBuildCount),
+					 static_cast<unsigned long long>(count));
+	for (uint64_t i = g_topLevelBuildCount - count; i < g_topLevelBuildCount; ++i) {
+		const TopLevelBuildRecord& record = g_topLevelBuilds[i % kTopLevelBuildRecords];
+		logHandler.Print("  build %llu: frame %llu, index %d, structure %p, slot %u, %s, list %s, instances %u written of %u, capacity %u, "
+						 "result %llu of %llu bytes, scratch %llu of %llu bytes, storage VA 0x%llX, scratch VA 0x%llX, instance VA 0x%llX\n",
+						 static_cast<unsigned long long>(i), static_cast<unsigned long long>(record.frameNumber), record.frameIndex,
+						 static_cast<const void*>(record.structure), record.slot, record.immediate ? "immediate" : "in frame",
+						 record.listName, record.written, record.instanceCount, record.capacity,
+						 static_cast<unsigned long long>(record.resultSize), static_cast<unsigned long long>(record.storageSize),
+						 static_cast<unsigned long long>(record.scratchNeeded), static_cast<unsigned long long>(record.scratchSize),
+						 static_cast<unsigned long long>(record.storage), static_cast<unsigned long long>(record.scratch),
+						 static_cast<unsigned long long>(record.instances));
+
+		char	blasList[kTopLevelRecordDescs * 32];
+		size_t	length = 0;
+
+		blasList[0] = '\0';
+		for (uint32_t j = 0; (j < record.descCount) and (length < sizeof(blasList)); ++j) {
+			int added = std::snprintf(blasList + length, sizeof(blasList) - length, " 0x%llX/%u",
+									  static_cast<unsigned long long>(record.descs[j].AccelerationStructure),
+									  unsigned(record.descs[j].InstanceID));
+			if (added < 0)
+				break;
+			length += size_t(added);
+		}
+		logHandler.Print("    recorded blas/id:%s\n", blasList);
+
+		if (g_markers) {
+			const volatile uint32_t* markers = g_markers + record.markerSlot * kMarkerFields;
+
+			logHandler.Print("    gpu markers: build %s (marker %u, expected %u), draws %u recorded, %u started, %u completed\n",
+							 (markers[0] == record.buildMarker) ? "completed" : "NOT completed", unsigned(markers[0]),
+							 unsigned(record.buildMarker), record.drawsRecorded, unsigned(markers[1]), unsigned(markers[2]));
+		}
+
+		if (record.released) {
+			logHandler.Print("    instance buffer released since\n");
+			continue;
+		}
+
+		D3D12_RAYTRACING_INSTANCE_DESC	current[kTopLevelRecordDescs];
+		HRESULT							hr = S_OK;
+
+		if (not ReadInstanceDescs(record.instanceBuffer, record.descCount, current, hr)) {
+			logHandler.Print("    instance buffer could not be mapped (0x%08X)\n", unsigned(hr));
+			continue;
+		}
+
+		uint32_t index = FirstChangedDesc(record, current);
+
+		if (index == record.descCount)
+			logHandler.Print("    instance buffer unchanged (%u descs compared)\n", record.descCount);
+		else
+			PrintChangedDesc("   ", i, record, index, current[index]);
+	}
+}
+
+
+void AccelerationStructure::MarkTraceDraw(void)
+noexcept
+{
+	if ((g_topLevelBuildCount == 0) or not g_markers)
+		return;
+
+	TopLevelBuildRecord&	record = g_topLevelBuilds[(g_topLevelBuildCount - 1) % kTopLevelBuildRecords];
+	CommandList*			cl = commandListHandler.CurrentCmdList();
+
+	if ((cl == nullptr) or (cl != record.list) or (cl->GetExecutionCounter() != record.listExecution))
+		return;
+	++record.drawsRecorded;
+
+	const uint32_t							fields[2] = { 1, 2 };
+	const uint32_t							values[2] = { record.drawsRecorded, record.drawsRecorded };
+	const D3D12_WRITEBUFFERIMMEDIATE_MODE	modes[2] = { D3D12_WRITEBUFFERIMMEDIATE_MODE_MARKER_IN, D3D12_WRITEBUFFERIMMEDIATE_MODE_MARKER_OUT };
+
+	WriteMarkers(cl->GfxList(), record.markerSlot, fields, values, modes, 2);
+}
+#endif
 
 // =================================================================================================
 

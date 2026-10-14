@@ -195,4 +195,41 @@ noexcept
 	m_context[0] = '\0';
 }
 
+
+void LogHandler::Note(const char* format, ...)
+noexcept
+{
+	std::lock_guard<std::mutex>	lock(m_mutex);
+	char*						note = m_notes[m_noteCount % kNoteCount];
+	va_list						args;
+	va_start(args, format);
+	vsnprintf(note, kNoteSize, format, args);
+	va_end(args);
+	const size_t length = strlen(note);
+	if ((length > 0) and (note[length - 1] == '\n'))
+		note[length - 1] = '\0';
+	++m_noteCount;
+}
+
+
+void LogHandler::PrintNotes(void)
+noexcept
+{
+	uint64_t noteCount = 0;
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		noteCount = m_noteCount;
+	}
+	const uint64_t first = (noteCount > kNoteCount) ? noteCount - kNoteCount : 0;
+	Print("notes: last %llu of %llu\n", static_cast<unsigned long long>(noteCount - first), static_cast<unsigned long long>(noteCount));
+	for (uint64_t i = first; i < noteCount; ++i) {
+		char note[kNoteSize];
+		{
+			std::lock_guard<std::mutex> lock(m_mutex);
+			memcpy(note, m_notes[i % kNoteCount], kNoteSize);
+		}
+		Print("  %llu: %s\n", static_cast<unsigned long long>(i), note);
+	}
+}
+
 // =================================================================================================

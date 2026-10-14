@@ -9,6 +9,9 @@
 #include "shader_loading.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
+#if DBG_DIRECTX
+#include "acceleration_structure.h"
+#endif
 
 #include <cassert>
 #include <algorithm>
@@ -463,6 +466,10 @@ noexcept
 					gfxStates.CountDraw();
 				}
 			}
+#if DBG_DIRECTX
+			if (shader and shader->m_usesAccelStructure)
+				AccelerationStructure::MarkTraceDraw();
+#endif
 		}
 	}
 	{

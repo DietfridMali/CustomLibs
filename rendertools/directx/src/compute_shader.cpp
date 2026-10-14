@@ -375,6 +375,9 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 	}
 	if (not Compile((const char*)csCode, "CSMain", shaderFolder))
 		return false;
+#if USE_AFTERMATH
+	dx12Context.LogShaderHash(static_cast<const char*>(m_name), "compute", m_csBytecode->GetBufferPointer(), m_csBytecode->GetBufferSize());
+#endif
 	m_bindings = bindings;
 	if (not CreateRootSignature(bindings))
 		return false;

@@ -135,6 +135,9 @@ public:
 	void Flush(void)
 	noexcept;
 
+	void Submit(void)
+	noexcept;
+
 	// Registers a callback to be invoked after this list's GPU work has completed.
 	// Use for resources that must outlive recording but can be freed after execution.
 	inline void AddResource(std::function<void()> fn) {

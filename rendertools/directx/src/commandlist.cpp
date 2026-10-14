@@ -343,6 +343,25 @@ noexcept
 }
 
 
+void CommandList::Submit(void)
+noexcept
+{
+	ZoneScoped;
+	if (m_isFlushed)
+		return;
+	m_isFlushed = true;
+	Close();
+
+	ID3D12CommandList* list = GfxList(true);
+
+	commandListHandler.GetQueue()->ExecuteCommandLists(1, &list);
+	HandleDeviceLost("CommandList::Submit");
+#if DBG_DIRECTX
+	CheckDeviceRemoved("Submit");
+#endif
+}
+
+
 void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
 {
 	if (not m_isRecording or not resource or (before == after))

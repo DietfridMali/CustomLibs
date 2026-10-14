@@ -1175,12 +1175,11 @@ void RenderTarget::ClearDepthBuffer(float clearValue)
 
 void RenderTarget::ClearStencilBuffer(int clearValue)
 {
-	// Gated on the stencil PLANE OF THE ACTIVE depth attachment - own, or a shared source's
-	// (SetDepthSource), which is the DSV that is bound. Without a stencil plane the clear would
-	// address a plane the DSV does not have.
-	RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
-	if (IsEnabled() and depthOwner->HaveStencilBuffer(true) and (m_depthMode != dbmReadOnly))
-		gfxStates.ClearStencilBuffer(depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
+	// Only the target's OWN stencil plane, and only while it is bound writable. A shared source
+	// (SetDepthSource) is bound through its read-only view with the resource in the read state
+	// (SelectDrawBuffers ()), and ClearDepthStencilView needs the writable view and DEPTH_WRITE.
+	if (IsEnabled() and (m_depthSource == nullptr) and HaveStencilBuffer(true) and (m_depthMode != dbmReadOnly))
+		gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
 

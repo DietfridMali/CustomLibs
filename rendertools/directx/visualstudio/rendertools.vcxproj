@@ -103,13 +103,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DBG_DIRECTX=0;USE_TRACY=0;DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;GLM_FORCE_DEPTH_ZERO_TO_ONE;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DBG_DIRECTX=1;USE_AFTERMATH=1;USE_TRACY=0;DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;GLM_FORCE_DEPTH_ZERO_TO_ONE;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir);$(ExternalLibs)NsightAftermath\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>

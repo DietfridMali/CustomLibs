@@ -600,6 +600,17 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 			return false;
 	}
 
+#if USE_AFTERMATH
+	const char*	stageNames[] = { "vertex", "pixel", "geometry", "hull", "domain" };
+	ID3DBlob*	stageBlobs[] = { m_vsBlob.Get(), m_psBlob.Get(), m_gsBlob.Get(), m_hsBlob.Get(), m_dsBlob.Get() };
+
+	for (size_t i = 0; i < std::size(stageBlobs); ++i) {
+		if (stageBlobs[i])
+			dx12Context.LogShaderHash(static_cast<const char*>(m_name), stageNames[i], stageBlobs[i]->GetBufferPointer(),
+									  stageBlobs[i]->GetBufferSize());
+	}
+#endif
+
 	BuildInputLayout();
 
 	UpdateStageFields(m_vsBlob.Get(), kStageVS);
