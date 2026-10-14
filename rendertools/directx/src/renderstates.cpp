@@ -77,6 +77,26 @@ noexcept
 }
 
 
+static D3D12_BLEND ToD3DAlphaBlend(GfxOperations::BlendFactor factor)
+noexcept
+{
+	static D3D12_BLEND lut[] = {
+		D3D12_BLEND_ZERO,
+		D3D12_BLEND_ONE,
+		D3D12_BLEND_SRC_ALPHA,
+		D3D12_BLEND_INV_SRC_ALPHA,
+		D3D12_BLEND_SRC_ALPHA,
+		D3D12_BLEND_INV_SRC_ALPHA,
+		D3D12_BLEND_DEST_ALPHA,
+		D3D12_BLEND_INV_DEST_ALPHA,
+		D3D12_BLEND_DEST_ALPHA,
+		D3D12_BLEND_INV_DEST_ALPHA,
+		D3D12_BLEND_ONE
+	};
+	return lut[int(factor)];
+}
+
+
 static D3D12_BLEND_OP ToD3DBlendOp(GfxOperations::BlendOp op)
 noexcept
 {
@@ -164,8 +184,8 @@ D3D12_BLEND_DESC RenderStates::SetBlendDesc(D3D12_BLEND_DESC& desc)
 			desc.RenderTarget[i].SrcBlend = ToD3DBlend(blendSrcRGB[i]);
 			desc.RenderTarget[i].DestBlend = ToD3DBlend(blendDstRGB[i]);
 			desc.RenderTarget[i].BlendOp = ToD3DBlendOp(blendOpRGB[i]);
-			desc.RenderTarget[i].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha[i]);
-			desc.RenderTarget[i].DestBlendAlpha = ToD3DBlend(blendDstAlpha[i]);
+			desc.RenderTarget[i].SrcBlendAlpha = ToD3DAlphaBlend(blendSrcAlpha[i]);
+			desc.RenderTarget[i].DestBlendAlpha = ToD3DAlphaBlend(blendDstAlpha[i]);
 			desc.RenderTarget[i].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha[i]);
 		}
 	}

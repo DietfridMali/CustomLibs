@@ -45,6 +45,7 @@ public:
 	size_t							m_stagedMax[CommandQueue::FRAME_COUNT]{};
 	DescriptorHandle				m_uavHandle;
 	DescriptorHandle				m_srvHandle;
+	DescriptorHandle				m_clearUavHandle;
 	ComPtr<ID3D12DescriptorHeap>	m_cpuHeap;
 	D3D12_CPU_DESCRIPTOR_HANDLE		m_cpuUavHandle{};
 	D3D12_RESOURCE_STATES			m_state{ D3D12_RESOURCE_STATE_COMMON };
@@ -132,11 +133,15 @@ public:
 				descriptorHeaps.FreeSRV(m_uavHandle);
 				if (m_srvHandle.IsValid())
 					descriptorHeaps.FreeSRV(m_srvHandle);
+				if (m_clearUavHandle.IsValid())
+					descriptorHeaps.FreeSRV(m_clearUavHandle);
 			}
 			else {
 				gfxResourceHandler.Track(m_uavHandle);
 				if (m_srvHandle.IsValid())
 					gfxResourceHandler.Track(m_srvHandle);
+				if (m_clearUavHandle.IsValid())
+					gfxResourceHandler.Track(m_clearUavHandle);
 				gfxResourceHandler.Track(m_resource);
 				for (auto& upload : m_upload) {
 					if (upload)
@@ -147,6 +152,7 @@ public:
 			}
 			m_uavHandle = {};
 			m_srvHandle = {};
+			m_clearUavHandle = {};
 			m_cpuHeap.Reset();
 			m_cpuUavHandle = {};
 			m_resource.Reset();
@@ -252,8 +258,9 @@ public:
 			return;
 		static_assert(sizeof(DATA_T) == sizeof(uint32_t),
 					  "GfxArray::Clear assumes 32-bit elements; widen the fill path for other sizes.");
-		UINT	clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
-		auto&	heap = descriptorHeaps.m_srvHeap;
+		UINT					clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
+		auto&					heap = descriptorHeaps.m_srvHeap;
+		const DescriptorHandle&	clearHandle = isBuffer ? m_clearUavHandle : m_uavHandle;
 		cl->BindDescriptorHeaps();
 		SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		{
@@ -262,7 +269,7 @@ public:
 			before.UAV.pResource = m_resource.Get();
 			list->ResourceBarrier(1, &before);
 		}
-		list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
+		list->ClearUnorderedAccessViewUint(heap.GpuHandle(clearHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
 		// ClearUnorderedAccessViewUint is not implicitly ordered against subsequent UAV
 		// accesses. Without a UAV barrier the clear can run concurrently with or after the
 		// following shader pass (e.g. the decal mask's InterlockedMin), corrupting the data.
@@ -559,7 +566,33 @@ private:
 			return false;
 		}
 		m_cpuUavHandle = m_cpuHeap->GetCPUDescriptorHandleForHeapStart();
-		device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_cpuUavHandle);
+		if constexpr (sizeof(DATA_T) == sizeof(uint32_t)) {
+			m_clearUavHandle = descriptorHeaps.AllocSRV();
+			if (not m_clearUavHandle.IsValid()) {
+				descriptorHeaps.FreeSRV(m_uavHandle);
+				descriptorHeaps.FreeSRV(m_srvHandle);
+				m_uavHandle = {};
+				m_srvHandle = {};
+				m_cpuHeap.Reset();
+				m_cpuUavHandle = {};
+				m_resource.Reset();
+				return false;
+			}
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC clearDesc{};
+			clearDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			clearDesc.Format = DXGI_FORMAT_R32_UINT;
+			clearDesc.Buffer.FirstElement = 0;
+			clearDesc.Buffer.NumElements = UINT(size);
+			clearDesc.Buffer.StructureByteStride = 0;
+			clearDesc.Buffer.CounterOffsetInBytes = 0;
+			clearDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+			device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &clearDesc, m_clearUavHandle.cpuHandle);
+			descriptorHeaps.m_srvHeap.Publish(m_clearUavHandle.index);
+			device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &clearDesc, m_cpuUavHandle);
+		}
+		else
+			device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_cpuUavHandle);
 		return true;
 	}
 

@@ -430,11 +430,12 @@ noexcept
 	Shader* shader = baseShaderHandler.ActiveShader();
 	// A draw whose constants could not be set up is not recorded: it would run with the constant
 	// buffers of whatever draw came before it.
+	bool hasPipeline = true;
 	bool hasVariables = true;
 	if (shader) {
 		if (CommandList* cl = commandListHandler.CurrentCmdList()) {
 			cl->SetTopology(shader, m_shape);
-			ResolveDrawPipeline(cl, shader);
+			hasPipeline = ResolveDrawPipeline(cl, shader);
 		}
 		ZoneScopedN("Shader::UpdateVariables");
 		hasVariables = shader->UpdateVariables();
@@ -442,7 +443,7 @@ noexcept
 
 	{
 		ZoneScopedN("Layout::DrawCall");
-		if (hasVariables and commandListHandler.CurrentGfxList()) {
+		if (hasPipeline and hasVariables and commandListHandler.CurrentGfxList()) {
 			commandListHandler.CurrentGfxList()->IASetPrimitiveTopology(
 				(shader and shader->IsTessellated()) ? ToD3DPatchTopology(m_shape) : ToD3DTopology(m_shape));
 			if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
@@ -490,16 +491,17 @@ noexcept
 		return;
 	ActivateTextures(textures);
 	Shader*	shader = baseShaderHandler.ActiveShader();
+	bool	hasPipeline = true;
 	bool	hasVariables = true;
 	if (shader) {
 		if (CommandList* cl = commandListHandler.CurrentCmdList()) {
 			cl->SetTopology(shader, m_shape);
-			ResolveDrawPipeline(cl, shader);
+			hasPipeline = ResolveDrawPipeline(cl, shader);
 		}
 		hasVariables = shader->UpdateVariables();
 	}
 	auto* list = commandListHandler.CurrentGfxList();
-	if (hasVariables and list) {
+	if (hasPipeline and hasVariables and list) {
 		ID3D12Resource* arguments = commands.IndirectArguments(list);
 		if (arguments) {
 			list->IASetPrimitiveTopology((shader and shader->IsTessellated()) ? ToD3DPatchTopology(m_shape) : ToD3DTopology(m_shape));
