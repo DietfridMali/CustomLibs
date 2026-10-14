@@ -611,10 +611,14 @@ struct DefaultResources {
 	DefaultImage	cube;
 	DefaultImage	volume;
 	VkImageView		views[5]{};
+	VkBuffer		buffer{ VK_NULL_HANDLE };
+	VmaAllocation	bufferAllocation{ VK_NULL_HANDLE };
 	bool			attempted{ false };
 };
 
 static DefaultResources defaultResources;
+
+static constexpr VkDeviceSize kDefaultBufferSize = 256;
 
 static const uint8_t defaultPixel[4] = { 255, 255, 255, 255 };
 
@@ -702,6 +706,27 @@ noexcept
 		r.views[Shader::dvCube] = CreateDefaultView(r.cube.image, VK_IMAGE_VIEW_TYPE_CUBE);
 	if (Upload3DTextureData(1, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, 4, defaultPixel, r.volume.image, r.volume.allocation, r.volume.tracker))
 		r.views[Shader::dv3D] = CreateDefaultView(r.volume.image, VK_IMAGE_VIEW_TYPE_3D);
+
+	VmaAllocator allocator = vkContext.Allocator();
+
+	if (allocator == VK_NULL_HANDLE)
+		return;
+
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = kDefaultBufferSize;
+	bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VmaAllocationCreateInfo allocInfo{};
+	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+
+	VkResult res = vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &r.buffer, &r.bufferAllocation, nullptr);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("Shader: default buffer creation failed (%d)\n", int(res));
+		r.buffer = VK_NULL_HANDLE;
+		r.bufferAllocation = VK_NULL_HANDLE;
+	}
 }
 
 
@@ -713,6 +738,15 @@ noexcept
 	if (not defaultResources.attempted)
 		CreateDefaultResources();
 	return defaultResources.views[viewType];
+}
+
+
+static VkBuffer DefaultBuffer(void)
+noexcept
+{
+	if (not defaultResources.attempted)
+		CreateDefaultResources();
+	return defaultResources.buffer;
 }
 
 
@@ -741,6 +775,13 @@ noexcept
 	DestroyDefaultImage(r.flat);
 	DestroyDefaultImage(r.cube);
 	DestroyDefaultImage(r.volume);
+
+	VmaAllocator allocator = vkContext.Allocator();
+
+	if ((allocator != VK_NULL_HANDLE) and (r.buffer != VK_NULL_HANDLE))
+		vmaDestroyBuffer(allocator, r.buffer, r.bufferAllocation);
+	r.buffer = VK_NULL_HANDLE;
+	r.bufferAllocation = VK_NULL_HANDLE;
 	r.attempted = false;
 }
 
@@ -1549,11 +1590,18 @@ noexcept
 		contents.storageBufferSizes[i] = commandListHandler.m_boundStorageBufferSize[i];
 	}
 	for (uint32_t i = 0; i < kSsboSlots; ++i) {
-		VkBuffer b = commandListHandler.m_boundReadOnlyBuffers[i];
-		if ((b == VK_NULL_HANDLE) or not m_bindingDeclared[kSsboBase + i])
+		if (not m_bindingDeclared[kSsboBase + i])
+			continue;
+		VkBuffer		b = commandListHandler.m_boundReadOnlyBuffers[i];
+		VkDeviceSize	size = commandListHandler.m_boundReadOnlyBufferSize[i];
+		if (b == VK_NULL_HANDLE) {
+			b = DefaultBuffer();
+			size = kDefaultBufferSize;
+		}
+		if (b == VK_NULL_HANDLE)
 			continue;
 		contents.readOnlyBuffers[i] = b;
-		contents.readOnlyBufferSizes[i] = commandListHandler.m_boundReadOnlyBufferSize[i];
+		contents.readOnlyBufferSizes[i] = size;
 	}
 	if (m_usesAccelStructure)
 		contents.accelStructure = accelStructure;
@@ -1715,12 +1763,17 @@ noexcept
 		ssboInfos[i].offset = 0;
 		ssboInfos[i].range = contents.readOnlyBufferSizes[i];
 #else
-		VkBuffer b = commandListHandler.m_boundReadOnlyBuffers[i];
+		VkBuffer		b = commandListHandler.m_boundReadOnlyBuffers[i];
+		VkDeviceSize	size = commandListHandler.m_boundReadOnlyBufferSize[i];
+		if ((b == VK_NULL_HANDLE) and m_bindingDeclared[kSsboBase + i]) {
+			b = DefaultBuffer();
+			size = kDefaultBufferSize;
+		}
 		if (b == VK_NULL_HANDLE)
 			continue;
 		ssboInfos[i].buffer = b;
 		ssboInfos[i].offset = 0;
-		ssboInfos[i].range = commandListHandler.m_boundReadOnlyBufferSize[i];
+		ssboInfos[i].range = size;
 #endif
 		VkWriteDescriptorSet& w = writes[writeCount++];
 		w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

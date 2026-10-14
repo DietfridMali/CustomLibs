@@ -195,11 +195,9 @@ void BufferInfo::Release(bool immediate)
 			gfxResourceHandler.TrackCleanup(std::move(callback));
 	};
 
-	if (immediate) {
-		commandListHandler.UnbindImage(m_imageView);
-		commandListHandler.UnbindImage(m_depthSampleView);
-		commandListHandler.UnbindImage(m_mipView);
-	}
+	commandListHandler.UnbindImage(m_imageView);
+	commandListHandler.UnbindImage(m_depthSampleView);
+	commandListHandler.UnbindImage(m_mipView);
 	// Defer GPU-resource teardown by one frame slot - in-flight command buffers may still
 	// reference the image/view. Same pattern as Texture::Destroy(). Safe in the
 	// app-shutdown path as long as gfxResourceHandler.Cleanup() processes both frame slots
