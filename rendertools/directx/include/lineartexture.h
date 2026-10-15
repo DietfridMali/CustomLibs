@@ -113,7 +113,7 @@ public:
 		descriptorHeaps.m_srvHeap.Publish(m_handle);
 
 		m_isDeployed = true;
-		return true;
+		return RefreshBindless();
 	}
 
 

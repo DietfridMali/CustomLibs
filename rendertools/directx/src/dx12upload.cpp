@@ -629,7 +629,7 @@ noexcept
 	tex.SetParams(false);
 	tex.m_isValid = true;
 	tex.m_isDeployed = true;
-	return true;
+	return tex.RefreshBindless();
 }
 
 

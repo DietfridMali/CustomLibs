@@ -107,6 +107,7 @@ public:
 	uint64_t							m_appliedTables[kTableCount]{};
 	uint32_t							m_appliedSamplers[kSamplerSlots]{};
 	D3D12_GPU_VIRTUAL_ADDRESS			m_appliedAccelStructure{ 0 };
+	uint64_t							m_appliedBindless{ 0 };
 	tracy::D3D12ZoneScope*				m_gpuZone{ nullptr }; // per-CL GPU profiling zone; spans Open()..Close() (USE_TRACY)
 
 	static List<RenderStates> m_renderStateStack;

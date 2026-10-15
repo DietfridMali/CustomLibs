@@ -84,6 +84,7 @@ public:
 	// (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
 	uint32_t m_handle{ UINT32_MAX };
 	uint32_t m_ownedHandle{ UINT32_MAX };
+	uint32_t m_bindlessIndex{ UINT32_MAX };
 
 	ComPtr<ID3D12Resource>	m_resource; // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
 	DXGI_FORMAT				m_dxgiFormat{ DXGI_FORMAT_R8G8B8A8_UNORM }; // GPU format of m_resource + its SRV
@@ -360,16 +361,17 @@ public:
 
 	bool CreateSRV(void);
 
-	inline bool EnableBindless(void)
-	noexcept
-	{
-		return false;
-	}
+	bool EnableBindless(void);
+
+	bool RefreshBindless(void);
+
+	void ReleaseBindless(void)
+	noexcept;
 
 	inline uint32_t BindlessIndex(void) const
 	noexcept
 	{
-		return BindlessTextures::kInvalidIndex;
+		return m_bindlessIndex;
 	}
 
 	static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,

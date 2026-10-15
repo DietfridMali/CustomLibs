@@ -23,7 +23,8 @@
 //    root CBV b1 per stage (VS, PS, GS, HS, DS), one SRV descriptor table t0..t15,
 //    one sampler descriptor table per slot s0..s15, one UAV descriptor table u0..u3,
 //    one SRV descriptor table t0..t23 space1 (read-only structured buffers),
-//    one root SRV t0 space2 (ray tracing acceleration structure).
+//    one root SRV t0 space2 (ray tracing acceleration structure),
+//    four descriptor tables t0 space3/4/5 and s0 space3 (bindless texture heap, when there is one).
 //  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
@@ -117,7 +118,9 @@ public:
 	static constexpr int kSsboSpace = 1;
 	static constexpr int kAccelBase = kSsboBase + 1;
 	static constexpr int kAccelSpace = 2;
-	static constexpr int kRootParamCount = kAccelBase + 1;
+	static constexpr int kBindlessBase = kAccelBase + 1;
+	static constexpr int kBindlessTables = 4;
+	static constexpr int kRootParamCount = kBindlessBase + kBindlessTables;
 
 	struct StageConstants {
 		uint32_t								size{ 0 };
@@ -147,6 +150,7 @@ public:
 	uint8_t		m_srvDefaults[kSrvSlots]{};
 	uint64_t	m_srvDefaultKey{ 0 };
 	bool		m_usesAccelStructure{ false };
+	bool		m_usesBindless{ false };
 
 	// Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
 	std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;

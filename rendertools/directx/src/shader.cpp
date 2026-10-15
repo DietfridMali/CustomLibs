@@ -23,6 +23,7 @@
 #include "base_displayhandler.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
+#include "bindless_texture_heap.h"
 #if OPTIMIZE_SHADER_LOADING
 #include "resource_handler.h"
 #endif
@@ -123,12 +124,22 @@ noexcept
 	}
 	return false;
 }
+
+bool ReflectUsesBindless(ID3DBlob* blob)
+noexcept
+{
+	Microsoft::WRL::ComPtr<ID3D12ShaderReflection> refl;
+	return ReflectShader(blob, refl) and BindlessTextureHeap::ReflectUsesHeap(refl.Get());
+}
+
+static_assert(Shader::kBindlessTables == int(BindlessTextureHeap::kTableCount),
+			  "the root signature holds one parameter per table of the bindless texture heap");
 }
 
 // =================================================================================================
 // DX12 Shader implementation
 //
-// Root signature layout (fixed for all shaders, see Shader::kSrvBase .. kAccelBase):
+// Root signature layout (fixed for all shaders, see Shader::kSrvBase .. kBindlessBase):
 //   Param 0:      Root CBV    — b0 FrameConstants                           (all stages)
 //   Param 1..5:   Root CBV    — b1 ShaderConstants, one per stage           (VS, PS, GS, HS, DS)
 //   Param 6:      Desc table  — t0..t23 SRVs                                (all stages)
@@ -136,6 +147,7 @@ noexcept
 //   Param 31:     Desc table  — u0..u3 UAVs                                 (all stages)
 //   Param 32:     Desc table  — t0..t23 space1 read-only structured buffers (all stages)
 //   Param 33:     Root SRV    — t0 space2 ray tracing acceleration structure (all stages)
+//   Param 34..37: Desc tables - t0 space3/4/5, s0 space3 bindless texture heap (all stages, only with the heap)
 //
 // PSO cache: keyed by RenderStates bitmask; created on first Enable() for that state.
 
@@ -406,6 +418,9 @@ noexcept
 	ssboRange.RegisterSpace = UINT(kSsboSpace);
 	ssboRange.OffsetInDescriptorsFromTableStart = 0;
 
+	D3D12_DESCRIPTOR_RANGE bindlessRanges[kBindlessTables]{};
+	BindlessTextureHeap::DescriptorRanges(bindlessRanges);
+
 	D3D12_ROOT_PARAMETER params[kRootParamCount]{};
 
 	// Root CBV b0 — FrameConstants (visible to all stages)
@@ -470,11 +485,18 @@ noexcept
 	params[kAccelBase].Descriptor.RegisterSpace = UINT(kAccelSpace);
 	params[kAccelBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+	for (int i = 0; i < kBindlessTables; ++i) {
+		params[kBindlessBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[kBindlessBase + i].DescriptorTable.NumDescriptorRanges = 1;
+		params[kBindlessBase + i].DescriptorTable.pDescriptorRanges = &bindlessRanges[i];
+		params[kBindlessBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	}
+
 	// Samplers are no longer baked into the root signature — each Texture carries
 	// its own TextureSampling, resolved through SamplerCache and bound at draw
 	// time via the per-slot sampler tables defined above.
 	D3D12_ROOT_SIGNATURE_DESC rsd{};
-	rsd.NumParameters = kRootParamCount;
+	rsd.NumParameters = bindlessTextureHeap.IsAvailable() ? kRootParamCount : kBindlessBase;
 	rsd.pParameters = params;
 	rsd.NumStaticSamplers = 0;
 	rsd.pStaticSamplers = nullptr;
@@ -634,6 +656,13 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 	m_usesAccelStructure = ReflectUsesAccelStructure(m_vsBlob.Get()) or ReflectUsesAccelStructure(m_psBlob.Get()) or
 		ReflectUsesAccelStructure(m_gsBlob.Get()) or ReflectUsesAccelStructure(m_hsBlob.Get()) or
 		ReflectUsesAccelStructure(m_dsBlob.Get());
+	m_usesBindless = ReflectUsesBindless(m_vsBlob.Get()) or ReflectUsesBindless(m_psBlob.Get()) or ReflectUsesBindless(m_gsBlob.Get()) or
+		ReflectUsesBindless(m_hsBlob.Get()) or ReflectUsesBindless(m_dsBlob.Get());
+	if (m_usesBindless and not bindlessTextureHeap.IsAvailable()) {
+		logHandler.Print("Shader '%s': reads the texture heap, which this device does not have - not created\n", (const char*)m_name);
+		Destroy();
+		return false;
+	}
 
 	if (not CreateRootSignature())
 		return false;
@@ -740,6 +769,7 @@ noexcept
 	std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
 	m_srvDefaultKey = 0;
 	m_usesAccelStructure = false;
+	m_usesBindless = false;
 	m_rootSignature.Reset();
 	m_rootSignatureBlob.Reset();
 	m_vsBlob.Reset();
@@ -789,6 +819,7 @@ noexcept
 			m_srvDefaults[i] = other.m_srvDefaults[i];
 		m_srvDefaultKey = other.m_srvDefaultKey;
 		m_usesAccelStructure = other.m_usesAccelStructure;
+		m_usesBindless = other.m_usesBindless;
 	}
 	return *this;
 }

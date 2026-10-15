@@ -37,15 +37,15 @@ public:
 	noexcept;
 
 
+	static D3D12_SAMPLER_DESC ToD3D12Desc(const TextureSampling& s)
+	noexcept;
+
+
 private:
 	SamplerMap m_cache;
 
 
 	static int Compare(void* context, const TextureSampling& a, const TextureSampling& b);
-
-
-	static D3D12_SAMPLER_DESC ToD3D12Desc(const TextureSampling& s)
-	noexcept;
 };
 
 #define samplerCache SamplerCache::Instance()

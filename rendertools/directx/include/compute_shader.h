@@ -77,7 +77,9 @@ public:
 	static constexpr uint32_t	kReadOnlySlots = 24;
 	static constexpr uint32_t	kReadOnlySpace = 1;
 	int32_t						m_readOnlyRootIndex[kReadOnlySlots];
+	int32_t						m_bindlessRootIndex{ -1 };
 	bool						m_usesAccelStructure{ false };
+	bool						m_usesBindless{ false };
 
 	struct ImageBinding {
 		RenderTarget*	target{ nullptr };

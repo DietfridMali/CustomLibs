@@ -71,16 +71,27 @@ noexcept
 }
 
 
-void DescriptorHeap::Publish(uint32_t index)
+void DescriptorHeap::Publish(uint32_t index, uint32_t count)
 noexcept
 {
-	if (not m_mirror or (index >= m_capacity))
+	if (not m_mirror or (count == 0) or (index >= m_capacity) or (count > m_capacity - index))
 		return;
 	ID3D12Device* device = dx12Context.Device();
 	if (not device)
 		return;
-	device->CopyDescriptorsSimple(1, HeapCpuHandle(index), CpuHandle(index), m_type);
+	device->CopyDescriptorsSimple(count, HeapCpuHandle(index), CpuHandle(index), m_type);
 	commandListHandler.InvalidateTables();
+}
+
+
+uint32_t DescriptorHeap::Reserve(uint32_t count)
+noexcept
+{
+	if ((count == 0) or (count > m_capacity - m_count))
+		return UINT32_MAX;
+	const uint32_t first = m_count;
+	m_count += count;
+	return first;
 }
 
 

@@ -67,10 +67,13 @@ public:
 				bool mirrored = false, uint32_t extraDescriptors = 0)
 	noexcept;
 
-	void Publish(uint32_t index)
+	void Publish(uint32_t index, uint32_t count = 1)
 	noexcept;
 
 	bool Grow(ID3D12Device* device, uint32_t extraDescriptors)
+	noexcept;
+
+	uint32_t Reserve(uint32_t count)
 	noexcept;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE HeapCpuHandle(uint32_t index) const
@@ -132,7 +135,9 @@ class DescriptorHeapHandler
 public:
 	static constexpr uint32_t RTV_CAPACITY = 1024;
 	static constexpr uint32_t DSV_CAPACITY = 128;
-	static constexpr uint32_t SRV_CAPACITY = 16384; // CBV/SRV/UAV, GPU-visible
+	static constexpr uint32_t BINDLESS_CAPACITY = 1024;
+	static constexpr uint32_t BINDLESS_SRV_TYPES = 3;
+	static constexpr uint32_t SRV_CAPACITY = 16384 + BINDLESS_SRV_TYPES * BINDLESS_CAPACITY; // CBV/SRV/UAV, GPU-visible
 	static constexpr uint32_t SAMPLER_CAPACITY = 2048;
 	static constexpr uint32_t TABLE_FRAME_SLOTS = 2;
 	static constexpr uint32_t TABLE_CAPACITY = 65536;

@@ -17,6 +17,7 @@
 #include "tracy_wrapper.h"
 #include "resource_handler.h"
 #include "renderstates.h"
+#include "bindless_texture_heap.h"
 #include "gfxrenderer.h"
 #include "loghandler.h"
 
@@ -40,7 +41,9 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 		logHandler.Print("Cannot create DX12 device.\n");
 		return false;
 	}
-	uint32_t available = GfxAllFeatures() & ~GfxFeatureBit(GfxFeature::BindlessTextures);
+	uint32_t available = GfxAllFeatures();
+	if (not dx12Context.HasBindlessTextures())
+		available &= ~GfxFeatureBit(GfxFeature::BindlessTextures);
 	if (not dx12Context.HasRayTracing())
 		available &= ~GfxFeatureBit(GfxFeature::RayTracing);
 	if (not ApplyFeatures(request, available))
@@ -53,6 +56,10 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 	if (not DescriptorHeapHandler::Instance().Create(dx12Context.Device())) {
 		logHandler.Print("Cannot create DX12 descriptor heaps.\n");
 		return false;
+	}
+	if (HasFeature(GfxFeature::BindlessTextures) and not bindlessTextureHeap.Create(dx12Context.Device())) {
+		logHandler.Print("DirectX texture heap could not be created - bindless textures are off.\n");
+		m_gfxFeatures &= ~GfxFeatureBit(GfxFeature::BindlessTextures);
 	}
 	// Open the command list so displayHandler.Create() and renderer.Create()
 	// can record initial state (viewport/scissor, resource barriers).
@@ -151,6 +158,7 @@ noexcept
 	GfxDataLayout::DestroyDefaultStreams();
 	meshHandler.Destroy();
 	Shader::DestroyRootSignature();
+	bindlessTextureHeap.Destroy();
 	commandListHandler.Destroy();
 }
 

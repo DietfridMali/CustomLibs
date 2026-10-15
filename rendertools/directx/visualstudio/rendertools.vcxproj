@@ -190,6 +190,7 @@
     <ClInclude Include="..\include\shader_loading.h" />
     <ClInclude Include="..\include\compute_shader.h" />
     <ClInclude Include="..\include\acceleration_structure.h" />
+    <ClInclude Include="..\include\bindless_texture_heap.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
     <ClInclude Include="..\..\include\shadowmap.h" />
@@ -269,6 +270,7 @@
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\src\compute_shader.cpp" />
     <ClCompile Include="..\src\acceleration_structure.cpp" />
+    <ClCompile Include="..\src\bindless_texture_heap.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\lightningnoise.cpp" />

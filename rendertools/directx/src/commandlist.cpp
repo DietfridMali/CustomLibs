@@ -3,6 +3,7 @@
 #include "dx12context.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
+#include "bindless_texture_heap.h"
 #include "resource_handler.h"
 #include "gfxrenderer.h"
 #include "shader.h"
@@ -421,6 +422,7 @@ noexcept
 	for (uint32_t i = 0; i < kSamplerSlots; ++i)
 		m_appliedSamplers[i] = UINT32_MAX;
 	m_appliedAccelStructure = 0;
+	m_appliedBindless = 0;
 }
 
 
@@ -848,6 +850,14 @@ noexcept
 	if (shader and shader->m_usesAccelStructure and (cl->m_appliedAccelStructure != m_boundAccelStructure)) {
 		list->SetGraphicsRootShaderResourceView(UINT(Shader::kAccelBase), m_boundAccelStructure);
 		cl->m_appliedAccelStructure = m_boundAccelStructure;
+	}
+
+	const uint64_t bindlessVersion = descriptorHeaps.HeapVersion() + 1;
+
+	if (shader and shader->m_usesBindless and (cl->m_appliedBindless != bindlessVersion)) {
+		for (uint32_t t = 0; t < BindlessTextureHeap::kTableCount; ++t)
+			list->SetGraphicsRootDescriptorTable(UINT(Shader::kBindlessBase) + t, bindlessTextureHeap.Table(t));
+		cl->m_appliedBindless = bindlessVersion;
 	}
 	return true;
 }

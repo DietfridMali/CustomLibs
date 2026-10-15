@@ -333,6 +333,10 @@ noexcept
 #ifdef _DEBUG
 	logHandler.Print("DirectX ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
 #endif
+	m_hasBindlessTextures = SupportsBindlessTextures();
+#ifdef _DEBUG
+	logHandler.Print("DirectX bindless textures: %s\n", m_hasBindlessTextures ? "available" : "not available");
+#endif
 	return true;
 }
 
@@ -350,6 +354,16 @@ noexcept
 	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel))))
 		return false;
 	return shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5;
+}
+
+
+bool DX12Context::SupportsBindlessTextures(void)
+noexcept
+{
+	D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+		return false;
+	return options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_2;
 }
 
 // =================================================================================================

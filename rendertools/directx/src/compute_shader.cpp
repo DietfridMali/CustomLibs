@@ -22,6 +22,7 @@
 #include "descriptor_heap.h"
 #include "rendertarget.h"
 #include "gfxrenderer.h"
+#include "bindless_texture_heap.h"
 #include "loghandler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -70,6 +71,23 @@ noexcept
 		while (*utf8)
 			s.push_back(wchar_t(uint8_t(*utf8++)));
 	return s;
+}
+
+bool ReflectUsesBindless(ID3DBlob* blob)
+noexcept
+{
+	if (not blob or not InitDxc())
+		return false;
+
+	DxcBuffer rb{};
+	rb.Ptr = blob->GetBufferPointer();
+	rb.Size = blob->GetBufferSize();
+	rb.Encoding = DXC_CP_ACP;
+
+	ComPtr<ID3D12ShaderReflection> refl;
+	if (FAILED(g_dxcUtils->CreateReflection(&rb, IID_PPV_ARGS(refl.GetAddressOf()))))
+		return false;
+	return BindlessTextureHeap::ReflectUsesHeap(refl.Get());
 }
 
 static_assert(ComputeShader::kAccelSpace == uint32_t(Shader::kAccelSpace),
@@ -315,6 +333,21 @@ noexcept
 		params.push_back(p);
 	}
 
+	D3D12_DESCRIPTOR_RANGE bindlessRanges[BindlessTextureHeap::kTableCount]{};
+
+	if (m_usesBindless) {
+		BindlessTextureHeap::DescriptorRanges(bindlessRanges);
+		m_bindlessRootIndex = int32_t(params.size());
+		for (uint32_t t = 0; t < BindlessTextureHeap::kTableCount; ++t) {
+			D3D12_ROOT_PARAMETER p{};
+			p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			p.DescriptorTable.NumDescriptorRanges = 1;
+			p.DescriptorTable.pDescriptorRanges = &bindlessRanges[t];
+			p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+			params.push_back(p);
+		}
+	}
+
 	D3D12_ROOT_SIGNATURE_DESC rsd{};
 	rsd.NumParameters = UINT(params.size());
 	rsd.pParameters = params.data();
@@ -378,6 +411,12 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 #if USE_AFTERMATH
 	dx12Context.LogShaderHash(static_cast<const char*>(m_name), "compute", m_csBytecode->GetBufferPointer(), m_csBytecode->GetBufferSize());
 #endif
+	m_usesBindless = ReflectUsesBindless(m_csBytecode.Get());
+	if (m_usesBindless and not bindlessTextureHeap.IsAvailable()) {
+		logHandler.Print("ComputeShader '%s': reads the texture heap, which this device does not have - not created\n",
+						 static_cast<const char*>(m_name));
+		return false;
+	}
 	m_bindings = bindings;
 	if (not CreateRootSignature(bindings))
 		return false;
@@ -462,7 +501,9 @@ noexcept
 	for (uint32_t i = 0; i < kReadOnlySlots; ++i)
 		m_readOnlyRootIndex[i] = -1;
 	m_accelRootIndex = -1;
+	m_bindlessRootIndex = -1;
 	m_usesAccelStructure = false;
+	m_usesBindless = false;
 }
 
 
@@ -517,6 +558,7 @@ bool ComputeShader::Record(CommandList* cmdList, uint32_t groupCountX, uint32_t 
 	list->SetDescriptorHeaps(2, heaps);
 	list->SetComputeRootSignature(m_rootSignature.Get());
 	list->SetPipelineState(m_pipeline.Get());
+	cmdList->m_activePSO = nullptr;
 
 	if (m_cbvRootIndex[0] >= 0) {
 		CbAlloc b0a = cbvAllocator.Allocate(UINT(sizeof(FrameConstants)));
@@ -587,6 +629,10 @@ bool ComputeShader::Record(CommandList* cmdList, uint32_t groupCountX, uint32_t 
 	}
 	if (m_usesAccelStructure)
 		list->SetComputeRootShaderResourceView(UINT(m_accelRootIndex), accelStructure);
+	if (m_usesBindless) {
+		for (uint32_t t = 0; t < BindlessTextureHeap::kTableCount; ++t)
+			list->SetComputeRootDescriptorTable(UINT(m_bindlessRootIndex) + t, bindlessTextureHeap.Table(t));
+	}
 	commandListHandler.TransitionBoundBuffers(list);
 
 	list->Dispatch(groupCountX, groupCountY, groupCountZ);
@@ -656,8 +702,8 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 	if (not list)
 		return false;
 
-	ID3D12DescriptorHeap* heaps[] = { descriptorHeaps.SrvHeapPtr() };
-	list->SetDescriptorHeaps(1, heaps);
+	ID3D12DescriptorHeap* heaps[] = { descriptorHeaps.SrvHeapPtr(), descriptorHeaps.m_samplerHeap.Ptr() };
+	list->SetDescriptorHeaps(m_usesBindless ? 2 : 1, heaps);
 	list->SetComputeRootSignature(m_rootSignature.Get());
 	list->SetPipelineState(m_pipeline.Get());
 
@@ -682,6 +728,10 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 	}
 	if (m_usesAccelStructure)
 		list->SetComputeRootShaderResourceView(UINT(m_accelRootIndex), accelStructure);
+	if (m_usesBindless) {
+		for (uint32_t t = 0; t < BindlessTextureHeap::kTableCount; ++t)
+			list->SetComputeRootDescriptorTable(UINT(m_bindlessRootIndex) + t, bindlessTextureHeap.Table(t));
+	}
 	commandListHandler.TransitionBoundBuffers(list);
 
 	list->Dispatch(groupCountX, groupCountY, groupCountZ);

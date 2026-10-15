@@ -15,6 +15,7 @@ public:
 	ComPtr<IDXGIAdapter1>	m_adapter;
 	D3D_FEATURE_LEVEL		m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
 	bool					m_hasRayTracing{ false };
+	bool					m_hasBindlessTextures{ false };
 
 #if DBG_DIRECTX
 	ComPtr<ID3D12Debug>		m_debugController;
@@ -36,6 +37,12 @@ public:
 	noexcept
 	{
 		return m_hasRayTracing;
+	}
+
+	inline bool HasBindlessTextures(void) const
+	noexcept
+	{
+		return m_hasBindlessTextures;
 	}
 
 #if DBG_DIRECTX
@@ -68,6 +75,8 @@ private:
 	bool SelectAdapter(void)
 	noexcept;
 	bool SupportsRayTracing(void)
+	noexcept;
+	bool SupportsBindlessTextures(void)
 	noexcept;
 };
 

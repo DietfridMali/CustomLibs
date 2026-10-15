@@ -20,6 +20,7 @@
 #include "dx12context.h"
 #include "dx12upload.h"
 #include "resource_handler.h"
+#include "bindless_texture_heap.h"
 #include "texture_mips.h"
 #include "gfxpixelformat_dx.h"
 #include "ddsloader.h"
@@ -62,6 +63,7 @@ noexcept
 		textureLUT.Remove(m_name);
 		m_name = "";
 	}
+	ReleaseBindless();
 	if (m_isValid)
 		Destroy();
 }
@@ -97,6 +99,7 @@ noexcept
 		Destroy();
 		m_handle = std::exchange(other.m_handle, UINT32_MAX);
 		m_ownedHandle = std::exchange(other.m_ownedHandle, UINT32_MAX);
+		m_bindlessIndex = std::exchange(other.m_bindlessIndex, UINT32_MAX);
 		m_resource = std::move(other.m_resource);
 		m_name = std::move(other.m_name);
 		m_buffers = std::move(other.m_buffers);
@@ -155,6 +158,7 @@ noexcept
 
 void Texture::Destroy(void)
 {
+	ReleaseBindless();
 	if (m_isValid) {
 		m_isValid = false;
 		// OUT of the texture slot bookkeeping BEFORE the descriptor index goes back. GfxStates keys
@@ -339,7 +343,48 @@ bool Texture::CreateSRV(void)
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
 	device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
 	descriptorHeaps.m_srvHeap.Publish(m_handle);
+	return RefreshBindless();
+}
+
+
+bool Texture::EnableBindless(void)
+{
+	if (m_bindlessIndex != UINT32_MAX)
+		return true;
+	if (not m_isValid or (m_handle == UINT32_MAX) or not m_resource or not BindlessTextureHeap::s_isAlive)
+		return false;
+
+	const uint32_t index = bindlessTextureHeap.Allocate();
+	if (index == BindlessTextureHeap::kInvalidIndex)
+		return false;
+	if (not m_hasParams)
+		SetParams(false);
+	if (not bindlessTextureHeap.Write(index, m_type, m_handle, m_sampling)) {
+		bindlessTextureHeap.Free(index);
+		return false;
+	}
+	m_bindlessIndex = index;
 	return true;
+}
+
+
+bool Texture::RefreshBindless(void)
+{
+	if (m_bindlessIndex == UINT32_MAX)
+		return true;
+	ReleaseBindless();
+	return EnableBindless();
+}
+
+
+void Texture::ReleaseBindless(void)
+noexcept
+{
+	if (m_bindlessIndex == UINT32_MAX)
+		return;
+	if (BindlessTextureHeap::s_isAlive)
+		bindlessTextureHeap.Free(m_bindlessIndex);
+	m_bindlessIndex = UINT32_MAX;
 }
 
 
@@ -482,6 +527,7 @@ noexcept
 	m_sampling.wrapV = wrapV;
 	m_sampling.wrapW = wrapV;
 	m_hasParams = false; // SetParams () writes them on the next use
+	RefreshBindless();
 }
 
 

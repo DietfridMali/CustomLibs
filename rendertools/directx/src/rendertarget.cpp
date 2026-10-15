@@ -621,8 +621,7 @@ void RenderTarget::Destroy(bool immediate)
 		const uint32_t srvIndex = m_bufferInfo[i].SRVIndex();
 		if (srvIndex != UINT32_MAX)
 			gfxStates.ReleaseTexture(GL_TEXTURE_2D, srvIndex);
-		if (immediate)
-			commandListHandler.UnbindImage(srvIndex);
+		commandListHandler.UnbindImage(srvIndex);
 		m_bufferInfo[i].Release(immediate);
 		gfxStates.CheckError();
 	}
