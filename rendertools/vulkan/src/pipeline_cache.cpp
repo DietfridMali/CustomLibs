@@ -524,6 +524,8 @@ bool PipelineCache::SaveRecords(void)
 		return false;
 	std::vector<uint8_t> payload;
 	for (int i = 0; i < m_records.Length(); ++i) {
+		if (m_recordNames[i].IsEmpty())
+			continue;
 		const char*		name = static_cast<const char*>(m_recordNames[i]);
 		uint32_t		nameLength = uint32_t(std::strlen(name));
 		const uint8_t*	lengthBytes = reinterpret_cast<const uint8_t*>(&nameLength);
@@ -560,6 +562,11 @@ noexcept
 #if VK_STALL_DIAG
 			++withoutShader;
 #endif
+			continue;
+		}
+		if (shader->IsTessellated() and (m_records[i].states.topology != TopologyForPatchControlPoints(shader->m_patchControlPoints))) {
+			m_recordNames[i] = String();
+			m_recordsDirty = true;
 			continue;
 		}
 		PipelineKey key{};
