@@ -4,6 +4,8 @@
 #include "basesingleton.hpp"
 #include "rendertypes.h"
 
+#define USE_AFTERMATH DBG_DIRECTX
+
 // =================================================================================================
 // DX12Context: Singleton managing the D3D12 device, DXGI factory and selected adapter.
 // Must be created before any other DX12 resource.
