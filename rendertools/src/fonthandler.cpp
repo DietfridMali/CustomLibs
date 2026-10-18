@@ -366,7 +366,7 @@ bool FontHandler::GetGlyphMetrics(uint32_t codepoint, GlyphMetrics& metrics)
 }
 
 
-Texture* FontHandler::RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics)
+SDL_Surface* FontHandler::RenderGlyphSurface(uint32_t codepoint, GlyphMetrics& metrics)
 {
 	if (not GetGlyphMetrics(codepoint, metrics))
 		return nullptr;
@@ -376,6 +376,15 @@ Texture* FontHandler::RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics)
 	// what the surface really is, in case SDL_ttf's layout differs from the estimate above
 	metrics.width = surface->w;
 	metrics.height = surface->h;
+	return surface;
+}
+
+
+Texture* FontHandler::RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics)
+{
+	SDL_Surface* surface = RenderGlyphSurface(codepoint, metrics);
+	if (surface == nullptr)
+		return nullptr;
 	Texture* texture = new (std::nothrow) Texture();
 	if (texture == nullptr) {
 		SDL_FreeSurface(surface);

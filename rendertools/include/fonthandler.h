@@ -177,6 +177,8 @@ public:
 	// The glyph in white on a transparent texture, metrics filled in. The caller owns the texture.
 	Texture* RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics);
 
+	SDL_Surface* RenderGlyphSurface(uint32_t codepoint, GlyphMetrics& metrics);
+
 	int Ascent(void);
 
 	int Descent(void);
