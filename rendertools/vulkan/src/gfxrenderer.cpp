@@ -189,8 +189,15 @@ noexcept
 	// reject them.
 	baseDisplayHandler.CloseBackBufferList();
 	commandListHandler.ExecuteAll(true);
-	gfxResourceHandler.Cleanup(0);
-	gfxResourceHandler.Cleanup(1);
+	commandListHandler.CmdQueue().WaitIdle();
+
+	uint32_t frameIndex = commandListHandler.CmdQueue().FrameIndex();
+
+	for (uint32_t i = 0; i < GfxResourceHandler::FRAME_COUNT; ++i) {
+		if (i != frameIndex)
+			gfxResourceHandler.Cleanup(i);
+	}
+	gfxResourceHandler.Cleanup(frameIndex);
 	commandListHandler.ResetBindings();
 }
 

@@ -141,6 +141,13 @@ noexcept
 {
 	baseDisplayHandler.CloseBackBufferList();
 	commandListHandler.Flush();
+
+	int frameIndex = commandListHandler.FrameIndex();
+
+	for (int i = 0; i < commandListHandler.FrameCount(); ++i) {
+		if (i != frameIndex)
+			gfxResourceHandler.CleanupBefore(i, UINT64_MAX);
+	}
 }
 
 
