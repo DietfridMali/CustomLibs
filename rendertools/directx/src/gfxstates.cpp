@@ -410,6 +410,23 @@ bool GfxStates::GetDeviceInfo(int index, GfxDeviceInfo& info)
 }
 
 
+bool GfxStates::GetMemoryBudget(uint64_t& usage, uint64_t& budget)
+{
+	ComPtr<IDXGIAdapter3> adapter;
+
+	if (not dx12Context.m_adapter or FAILED(dx12Context.m_adapter.As(&adapter)))
+		return false;
+
+	DXGI_QUERY_VIDEO_MEMORY_INFO info{};
+
+	if (FAILED(adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+		return false;
+	usage = uint64_t(info.CurrentUsage);
+	budget = uint64_t(info.Budget);
+	return true;
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT support{ .Format = ToDXGIFormat(format) };

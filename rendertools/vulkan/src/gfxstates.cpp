@@ -602,6 +602,35 @@ bool GfxStates::GetDeviceInfo(int index, GfxDeviceInfo& info)
 }
 
 
+bool GfxStates::GetMemoryBudget(uint64_t& usage, uint64_t& budget)
+{
+	VmaAllocator allocator = vkContext.Allocator();
+
+	if (allocator == VK_NULL_HANDLE)
+		return false;
+
+	VkPhysicalDeviceMemoryProperties memory{};
+	vkGetPhysicalDeviceMemoryProperties(vkContext.PhysicalDevice(), &memory);
+
+	VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+	vmaGetHeapBudgets(allocator, budgets);
+
+	uint32_t heap = VK_MAX_MEMORY_HEAPS;
+
+	for (uint32_t i = 0; i < memory.memoryHeapCount; ++i) {
+		if (not (memory.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT))
+			continue;
+		if ((heap == VK_MAX_MEMORY_HEAPS) or (memory.memoryHeaps[i].size > memory.memoryHeaps[heap].size))
+			heap = i;
+	}
+	if (heap == VK_MAX_MEMORY_HEAPS)
+		return false;
+	usage = uint64_t(budgets[heap].usage);
+	budget = uint64_t(budgets[heap].budget);
+	return true;
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	VkFormatProperties props{};

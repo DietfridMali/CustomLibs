@@ -347,6 +347,8 @@ public:
 
 	bool GetDeviceInfo(int index, GfxDeviceInfo& info);
 
+	bool GetMemoryBudget(uint64_t& usage, uint64_t& budget);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
