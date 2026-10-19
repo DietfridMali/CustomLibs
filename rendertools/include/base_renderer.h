@@ -39,7 +39,8 @@ public:
 	enum eRenderPerspective {
 		rpForward,
 		rpTopDown,
-		rpRespawn
+		rpRespawn,
+		rpFreeCamera
 	};
 
 protected:
@@ -352,13 +353,19 @@ public:
 	inline bool HasExternalView(void)
 	noexcept
 	{
-		return (m_perspective == rpTopDown) or (m_perspective == rpRespawn);
+		return (m_perspective == rpTopDown) or (m_perspective == rpRespawn) or (m_perspective == rpFreeCamera);
+	}
+
+	inline bool HasExternalCamera(void)
+	noexcept
+	{
+		return m_perspective == rpTopDown;
 	}
 
 	inline bool HasFreeCamera(void)
 	noexcept
 	{
-		return m_perspective == rpTopDown;
+		return m_perspective == rpFreeCamera;
 	}
 
 	inline void SetPerspective(eRenderPerspective value)
