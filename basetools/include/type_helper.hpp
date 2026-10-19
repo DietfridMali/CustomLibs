@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-// Prüft, ob ein gegebener Ausdruck als Member-Zeiger existiert
+// Checks whether a given expression exists as a member pointer
 template <auto Member>
 constexpr bool is_static_member_v = !std::is_member_object_pointer_v<decltype(Member)>;
 
