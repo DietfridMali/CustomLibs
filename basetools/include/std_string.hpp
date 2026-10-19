@@ -204,6 +204,18 @@ public:
 		return String(m_str.substr(offset, length));
 	}
 
+	inline String Left(int count) const {
+		return SubStr(0, (count < 0) ? 0 : count);
+	}
+
+	inline String Mid(int offset) const {
+		return Mid(offset, Length());
+	}
+
+	inline String Mid(int offset, int count) const {
+		return SubStr((offset < 0) ? 0 : offset, (count < 0) ? 0 : count);
+	}
+
 	inline String& Delete(int offset, int length)
 	noexcept
 	{
@@ -224,6 +236,13 @@ public:
 	noexcept
 	{
 		auto pos = m_str.find(c);
+		return pos != std::string::npos ? static_cast<int>(pos) : -1;
+	}
+
+	inline int ReverseFind(const char c) const
+	noexcept
+	{
+		auto pos = m_str.rfind(c);
 		return pos != std::string::npos ? static_cast<int>(pos) : -1;
 	}
 
@@ -302,6 +321,27 @@ public:
 		else
 			m_str.erase(0, start);
 		return *this;
+	}
+
+	String& TrimRight(String filter)
+	{
+		size_t last = m_str.find_last_not_of(filter.m_str);
+		if (last == std::string::npos)
+			m_str.clear();
+		else
+			m_str.erase(last + 1);
+		return *this;
+	}
+
+	String& TrimRight(char c)
+	{
+		return TrimRight(String(c));
+	}
+
+	String& Trim(String filter)
+	{
+		TrimRight(filter);
+		return LTrim(filter);
 	}
 
 	template <typename T>
