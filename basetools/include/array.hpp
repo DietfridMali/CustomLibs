@@ -28,6 +28,7 @@
 #include <string>
 #include <type_traits>
 #include <algorithm>
+#include <functional>
 #include <initializer_list>
 
 // Fixed-capacity array after AutoArray's model: std::array as a member (composition,
@@ -157,6 +158,34 @@ public:
 	noexcept
 	{
 		return static_cast<uint32_t>(elem - m_array.data());
+	}
+
+	inline void SortAscending(int32_t left = 0, int32_t right = -1)
+	{
+		if (right < 0)
+			right = Length() - 1;
+		if (right > left)
+			std::sort(Data() + left, Data() + right + 1);
+	}
+
+	inline void SortDescending(int32_t left = 0, int32_t right = -1)
+	{
+		if (right < 0)
+			right = Length() - 1;
+		if (right > left)
+			std::sort(Data() + left, Data() + right + 1, std::greater<DATA_T>());
+	}
+
+	template <typename COMPARE_T>
+	inline void Sort(COMPARE_T compare, int32_t left = 0, int32_t right = -1)
+	{
+		if (right < 0)
+			right = Length() - 1;
+		if (right > left)
+			std::sort(Data() + left, Data() + right + 1,
+					  [compare](const DATA_T& a, const DATA_T& b) {
+						  return compare(const_cast<DATA_T*>(&a), const_cast<DATA_T*>(&b)) < 0;
+					  });
 	}
 
 	// Non owning view of [offset, offset + count), count < 0 = up to the last element.
