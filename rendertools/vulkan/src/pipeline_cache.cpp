@@ -4,6 +4,7 @@
 #include "vkcontext.h"
 #include "shadercache.h"
 #include "base_shaderhandler.h"
+#include "gfxrenderer.h"
 #include "resource_handler.h"
 #include "loghandler.h"
 
@@ -38,7 +39,7 @@ struct BuildContext {
 
 }
 
-static constexpr uint32_t kPipelineRecordVersion = 1;
+static constexpr uint32_t kPipelineRecordVersion = 2;
 
 static constexpr uint8_t kVertexInputPart = 0;
 static constexpr uint8_t kPreRasterizationPart = 1;
@@ -141,11 +142,13 @@ noexcept
 }
 
 
-static VkPipelineRenderingCreateInfo RenderingInfo(const VkFormat* colorFormats, uint32_t colorFormatCount, VkFormat depthFormat)
+static VkPipelineRenderingCreateInfo RenderingInfo(const VkFormat* colorFormats, uint32_t colorFormatCount, VkFormat depthFormat,
+												   uint32_t viewMask)
 noexcept
 {
 	VkPipelineRenderingCreateInfo renderingInfo{};
 	renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	renderingInfo.viewMask = viewMask;
 	renderingInfo.colorAttachmentCount = colorFormatCount;
 	renderingInfo.pColorAttachmentFormats = colorFormats;
 	renderingInfo.depthAttachmentFormat = depthFormat;
@@ -468,6 +471,7 @@ noexcept
 	std::memcpy(record.colorFormats, key.colorFormats, sizeof(record.colorFormats));
 	record.colorFormatCount = key.colorFormatCount;
 	record.depthFormat = key.depthFormat;
+	record.viewMask = key.viewMask;
 	for (int i = 0; i < m_records.Length(); ++i) {
 		if ((m_recordNames[i] == key.shader->m_name) and (std::memcmp(&m_records[i], &record, sizeof(PipelineRecord)) == 0))
 			return;
@@ -575,6 +579,7 @@ noexcept
 		std::memcpy(key.colorFormats, m_records[i].colorFormats, sizeof(key.colorFormats));
 		key.colorFormatCount = m_records[i].colorFormatCount;
 		key.depthFormat = m_records[i].depthFormat;
+		key.viewMask = m_records[i].viewMask;
 #if VK_STALL_DIAG
 		if (GetOrCreate(key) == VK_NULL_HANDLE)
 			++failed;
@@ -603,10 +608,11 @@ noexcept
 	const RenderStates	defaults{};
 	const uint8_t		topology =
 		 shader->IsTessellated() ? TopologyForPatchControlPoints(shader->m_patchControlPoints) : uint8_t(MeshTopology::Triangles);
+	const uint32_t		viewMask = (baseRenderer.ViewCount() > 1) ? ((1u << uint32_t(baseRenderer.ViewCount())) - 1u) : 0u;
 	vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
 	VertexInputLibrary(shader, topology);
-	PreRasterizationLibrary(shader, uint8_t(defaults.fillMode), defaults.depthClip, topology);
-	FragmentShaderLibrary(shader);
+	PreRasterizationLibrary(shader, uint8_t(defaults.fillMode), defaults.depthClip, topology, viewMask);
+	FragmentShaderLibrary(shader, viewMask);
 	vkContext.SetValidationShader(nullptr);
 #if VK_STALL_DIAG
 	VkStallEvent("shader libraries", stallStart, static_cast<const char*>(shader->m_name));
@@ -716,7 +722,7 @@ noexcept
 }
 
 
-VkPipeline PipelineCache::PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology)
+VkPipeline PipelineCache::PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology, uint32_t viewMask)
 noexcept
 {
 	const bool			isTessellated = shader->IsTessellated();
@@ -726,6 +732,7 @@ noexcept
 	key.fillMode = fillMode;
 	key.depthClip = depthClip;
 	key.topology = isTessellated ? topology : 0;
+	key.viewMask = viewMask;
 	for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
 		if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
 			return m_shaderLibraries[i];
@@ -750,7 +757,7 @@ noexcept
 	VkPipelineRasterizationStateCreateInfo rasterization{};
 	states.SetRasterizationInfo(rasterization);
 
-	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED);
+	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED, viewMask);
 
 	VkGraphicsPipelineCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -771,12 +778,13 @@ noexcept
 }
 
 
-VkPipeline PipelineCache::FragmentShaderLibrary(Shader* shader)
+VkPipeline PipelineCache::FragmentShaderLibrary(Shader* shader, uint32_t viewMask)
 noexcept
 {
 	ShaderLibraryKey key{};
 	key.shader = shader;
 	key.part = kFragmentShaderPart;
+	key.viewMask = viewMask;
 	for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
 		if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
 			return m_shaderLibraries[i];
@@ -793,7 +801,7 @@ noexcept
 	VkPipelineDepthStencilStateCreateInfo	depthStencil{};
 	states.SetDepthStencilInfo(depthStencil);
 
-	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED);
+	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED, viewMask);
 
 	VkGraphicsPipelineCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -830,6 +838,7 @@ noexcept
 	std::memcpy(key.colorFormats, pipelineKey.colorFormats, sizeof(key.colorFormats));
 	key.colorFormatCount = pipelineKey.colorFormatCount;
 	key.depthFormat = pipelineKey.depthFormat;
+	key.viewMask = pipelineKey.viewMask;
 	for (int i = 0; i < m_outputLibraryKeys.Length(); ++i) {
 		if (std::memcmp(&m_outputLibraryKeys[i], &key, sizeof(OutputLibraryKey)) == 0)
 			return m_outputLibraries[i];
@@ -849,7 +858,7 @@ noexcept
 	multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkPipelineRenderingCreateInfo renderingInfo =
-		RenderingInfo(pipelineKey.colorFormats, pipelineKey.colorFormatCount, pipelineKey.depthFormat);
+		RenderingInfo(pipelineKey.colorFormats, pipelineKey.colorFormatCount, pipelineKey.depthFormat, pipelineKey.viewMask);
 
 	VkGraphicsPipelineCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -875,8 +884,8 @@ noexcept
 
 	VkPipeline libraries[4] = {
 		VertexInputLibrary(shader, key.states.topology),
-		PreRasterizationLibrary(shader, uint8_t(key.states.fillMode), key.states.depthClip, key.states.topology),
-		FragmentShaderLibrary(shader),
+		PreRasterizationLibrary(shader, uint8_t(key.states.fillMode), key.states.depthClip, key.states.topology, key.viewMask),
+		FragmentShaderLibrary(shader, key.viewMask),
 		FragmentOutputLibrary(key)
 	};
 	for (VkPipeline library : libraries) {
@@ -973,7 +982,7 @@ noexcept
 	VkPipelineDynamicStateCreateInfo dynamic = DynamicStateInfo();
 
 	// Dynamic Rendering — Vulkan 1.3 Core. Replaces classic VkRenderPass binding.
-	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(key.colorFormats, key.colorFormatCount, key.depthFormat);
+	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(key.colorFormats, key.colorFormatCount, key.depthFormat, key.viewMask);
 
 	VkGraphicsPipelineCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;

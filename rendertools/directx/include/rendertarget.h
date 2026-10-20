@@ -193,6 +193,7 @@ public:
 		// (SelectArrayLayer); sampling reads the whole stack through a Texture2DArray. Everything else
 		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
 		int			arrayLayerCount{ 0 };
+		int			viewCount{ 1 };
 		int			mipLevels{ 1 };
 		int			cubeMapCount{ 0 };
 		DXGI_FORMAT	cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
@@ -627,6 +628,22 @@ public:
 	noexcept
 	{
 		return m_arrayLayerCount > 0;
+	}
+
+	inline int ViewCount(void) const
+	noexcept
+	{
+		return 1;
+	}
+
+	inline void SetCoverageAlpha(bool)
+	noexcept
+	{}
+
+	inline bool CoverageAlpha(void) const
+	noexcept
+	{
+		return false;
 	}
 
 	inline int MipLevels(void)

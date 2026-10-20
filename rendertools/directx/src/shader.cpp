@@ -31,6 +31,7 @@
 #include "gfxstates.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
+#include "multiview_hlsl.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -202,6 +203,10 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 		logHandler.Print("Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
 		return false;
 	}
+
+	String code = MultiviewHlslPrelude(baseRenderer.ViewCount()) + String(hlslCode);
+
+	hlslCode = static_cast<const char*>(code);
 
 	DxcBuffer source{};
 	source.Ptr = hlslCode;
@@ -1122,6 +1127,13 @@ int Shader::SetMatrix4f(eBaseMatrices id, const float* data, bool /*transpose*/)
 noexcept
 {
 	return TrySetB0Field(id, data) ? 0 : -1;
+}
+
+
+int Shader::SetMatrix4fArray(const char* name, const float* data, int count)
+noexcept
+{
+	return (count > 0) ? SetB1Field(name, data, size_t(count) * 16 * sizeof(float)) : -1;
 }
 
 

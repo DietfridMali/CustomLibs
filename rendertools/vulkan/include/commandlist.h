@@ -57,6 +57,7 @@ public:
 	uint64_t	m_frameNumber{ 0 }; // monotonic; ++ per BeginFrame — reliable frame-boundary signal
 	bool		m_acquireWaitPending{ false };
 	bool		m_swapchainIsOutOfDate{ false };
+	bool		m_hasImage{ false };
 
 	bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
 				uint32_t graphicsFamily, uint32_t presentFamily,
@@ -69,7 +70,7 @@ public:
 	void Destroy(void)
 	noexcept;
 
-	bool BeginFrame(void)
+	bool BeginFrame(bool acquireImage = true)
 	noexcept;
 	bool ReacquireImage(void)
 	noexcept;
@@ -144,6 +145,11 @@ public:
 	noexcept
 	{
 		return m_swapchainIsOutOfDate;
+	}
+	inline bool HasImage(void) const
+	noexcept
+	{
+		return m_hasImage;
 	}
 
 	VkCommandBuffer CmdBuffer(void) const
@@ -349,6 +355,7 @@ public:
 
 	VkBuffer					m_boundInstanceStreams[kVertexSlots]{};
 	VkImageView					m_boundSrvViews[kSrvSlots]{};
+	VkImageView					m_boundSrvArrayViews[kSrvSlots]{};
 	VkImageLayout				m_boundSrvLayouts[kSrvSlots]{};
 	VkSampler					m_boundSamplers[kSamplerSlots]{};
 	VkBuffer					m_boundStorageBuffers[kUavSlots]{};
@@ -361,7 +368,8 @@ public:
 	noexcept;
 	void BindAccelerationStructure(VkAccelerationStructureKHR accelStructure)
 	noexcept;
-	void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+						  VkImageView arrayView = VK_NULL_HANDLE)
 	noexcept;
 	void BindSampler(uint32_t slot, VkSampler sampler)
 	noexcept;

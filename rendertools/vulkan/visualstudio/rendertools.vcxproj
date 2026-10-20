@@ -85,7 +85,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VulkanSDK)\Include;$(VulkanSDK)\Source\SPIRV-Reflect;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VulkanSDK)\Include;$(VulkanSDK)\Source\SPIRV-Reflect;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir);$(ExternalLibs)OpenXR-SDK\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
@@ -109,7 +109,7 @@
       <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VulkanSDK)\Include;$(VulkanSDK)\Source\SPIRV-Reflect;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VulkanSDK)\Include;$(VulkanSDK)\Source\SPIRV-Reflect;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir);$(ExternalLibs)OpenXR-SDK\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>
@@ -138,6 +138,7 @@
     <ClInclude Include="..\include\commandlist.h" />
     <ClInclude Include="..\include\meshhandler.h" />
     <ClInclude Include="..\include\vkcontext.h" />
+    <ClInclude Include="..\include\xrhandler.h" />
     <ClInclude Include="..\include\vk13api.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\texturearray.h" />
@@ -165,6 +166,7 @@
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\kuwaharafilter.h" />
+    <ClInclude Include="..\..\include\multiview_hlsl.h" />
     <ClInclude Include="..\..\include\oceanfft.h" />
     <ClInclude Include="..\..\include\lightningnoise.h" />
     <ClInclude Include="..\..\include\lightningbolt.h" />
@@ -229,6 +231,7 @@
     <ClCompile Include="..\..\src\billboard.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\blur_shader.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\tonemap_shader.cpp" />
+    <ClCompile Include="..\..\src\common-hlsl\xr_shaders.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\lightning_shader.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\line_shader.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\blackhole_shader.cpp" />
@@ -238,6 +241,7 @@
     <ClCompile Include="..\src\commandlist.cpp" />
     <ClCompile Include="..\src\meshhandler.cpp" />
     <ClCompile Include="..\src\vkcontext.cpp" />
+    <ClCompile Include="..\src\xrhandler.cpp" />
     <ClCompile Include="..\src\vk13api.cpp" />
     <ClCompile Include="..\src\image_layout_tracker.cpp" />
     <ClCompile Include="..\src\descriptor_pool_handler.cpp" />

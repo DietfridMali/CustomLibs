@@ -30,25 +30,29 @@ struct PipelineKey {
 	VkFormat		colorFormats[8]{};
 	uint32_t		colorFormatCount{ 0 };
 	VkFormat		depthFormat{ VK_FORMAT_UNDEFINED };
+	uint32_t		viewMask{ 0 };
 };
 struct PipelineRecord {
 	RenderStates	states;
 	VkFormat		colorFormats[8]{};
 	uint32_t		colorFormatCount{ 0 };
 	VkFormat		depthFormat{ VK_FORMAT_UNDEFINED };
+	uint32_t		viewMask{ 0 };
 };
 struct ShaderLibraryKey {
-	Shader* shader{ nullptr };
-	uint8_t part{ 0 };
-	uint8_t fillMode{ 0 };
-	uint8_t depthClip{ 0 };
-	uint8_t topology{ 0 };
+	Shader*		shader{ nullptr };
+	uint8_t		part{ 0 };
+	uint8_t		fillMode{ 0 };
+	uint8_t		depthClip{ 0 };
+	uint8_t		topology{ 0 };
+	uint32_t	viewMask{ 0 };
 };
 struct OutputLibraryKey {
 	RenderStates	states;
 	VkFormat		colorFormats[8]{};
 	uint32_t		colorFormatCount{ 0 };
 	VkFormat		depthFormat{ VK_FORMAT_UNDEFINED };
+	uint32_t		viewMask{ 0 };
 };
 #pragma pack(pop)
 
@@ -140,10 +144,10 @@ private:
 	VkPipeline VertexInputLibrary(Shader* shader, uint8_t topology)
 	noexcept;
 
-	VkPipeline PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology)
+	VkPipeline PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology, uint32_t viewMask)
 	noexcept;
 
-	VkPipeline FragmentShaderLibrary(Shader* shader)
+	VkPipeline FragmentShaderLibrary(Shader* shader, uint32_t viewMask)
 	noexcept;
 
 	VkPipeline FragmentOutputLibrary(const PipelineKey& key)

@@ -379,10 +379,11 @@ noexcept
 }
 
 
-bool CommandQueue::BeginFrame(void)
+bool CommandQueue::BeginFrame(bool acquireImage)
 noexcept
 {
 	++m_frameNumber;
+	m_hasImage = false;
 #if VK_STALL_DIAG
 	VkStallEndFrame(m_frameNumber);
 	// VMA refreshes what it knows of the driver's heap budgets when the frame index changes
@@ -417,6 +418,8 @@ noexcept
 	descriptorPoolHandler.BeginFrame(m_frameIndex);
 	VkStallNote("descriptor pool reset", stallStart, nullptr);
 	cbvAllocator.Reset(m_frameIndex);
+	if (not acquireImage)
+		return false;
 	stallStart = VkStallClock();
 	bool acquired = AcquireNextImage();
 	VkStallNote("acquire next image", stallStart, nullptr);
@@ -425,7 +428,7 @@ noexcept
 	gfxResourceHandler.Cleanup(m_frameIndex);
 	descriptorPoolHandler.BeginFrame(m_frameIndex);
 	cbvAllocator.Reset(m_frameIndex);
-	return AcquireNextImage();
+	return acquireImage and AcquireNextImage();
 #endif
 }
 
@@ -445,7 +448,9 @@ noexcept
 void CommandQueue::EndFrame(void)
 noexcept
 {
-	Present();
+	if (m_hasImage)
+		Present();
+	m_hasImage = false;
 	m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
 #if VK_STALL_DIAG
 	VkGpuPassAdvance(m_frameIndex);
@@ -571,6 +576,7 @@ noexcept
 		return false;
 	}
 	m_acquireWaitPending = true;
+	m_hasImage = true;
 	return true;
 }
 
@@ -1530,6 +1536,7 @@ struct PipelineTarget {
 	VkFormat colorFormats[8]{};
 	uint32_t colorFormatCount{ 0 };
 	VkFormat depthFormat{ VK_FORMAT_UNDEFINED };
+	uint32_t viewMask{ 0 };
 
 	bool operator==(const PipelineTarget& other) const
 	noexcept = default;
@@ -1563,6 +1570,7 @@ noexcept
 	std::memcpy(target.colorFormats, key.colorFormats, sizeof(target.colorFormats));
 	target.colorFormatCount = key.colorFormatCount;
 	target.depthFormat = key.depthFormat;
+	target.viewMask = key.viewMask;
 	return target;
 }
 #endif
@@ -1585,6 +1593,26 @@ noexcept
 	}
 	for (uint32_t i = writtenCount; i < attachmentCount; ++i)
 		states.colorMask[i] = 0;
+}
+
+
+static void ApplyCoverageAlpha(RenderStates& states)
+noexcept
+{
+	using BlendFactor = GfxOperations::BlendFactor;
+
+	for (int i = 0; i < RenderStates::kColorTargets; ++i) {
+		if (not states.blendEnable[i])
+			continue;
+		if (states.blendDstRGB[i] == BlendFactor::InvSrcAlpha) {
+			states.blendSrcAlpha[i] = BlendFactor::One;
+			states.blendDstAlpha[i] = BlendFactor::InvSrcAlpha;
+		}
+		else if (states.blendDstRGB[i] == BlendFactor::One) {
+			states.blendSrcAlpha[i] = BlendFactor::Zero;
+			states.blendDstAlpha[i] = BlendFactor::One;
+		}
+	}
 }
 
 
@@ -1682,6 +1710,9 @@ noexcept
 #endif
 	const RenderStates	liveStates = key.states;
 	const uint32_t		numRT = uint32_t(shader->m_dataLayout.m_numRenderTargets);
+	RenderTarget*		activeTarget = baseRenderer.GetActiveBuffer();
+	if (activeTarget and activeTarget->CoverageAlpha())
+		ApplyCoverageAlpha(key.states);
 	if (numRT < key.colorFormatCount) {
 		if (vkContext.HasFeature(GfxFeature::UnusedAttachments)) {
 			for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
@@ -1879,12 +1910,14 @@ noexcept
 			submit.pWaitSemaphoreInfos = &waitInfo;
 		}
 		if (not intermediate) {
-			signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-			signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
-			signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+			if (m_cmdQueue.HasImage()) {
+				signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+				signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
+				signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
-			submit.signalSemaphoreInfoCount = 1;
-			submit.pSignalSemaphoreInfos = &signalInfo;
+				submit.signalSemaphoreInfoCount = 1;
+				submit.pSignalSemaphoreInfos = &signalInfo;
+			}
 			fence = m_cmdQueue.SubmitSignalFence();
 		}
 
@@ -2121,6 +2154,7 @@ noexcept
 {
 	for (uint32_t i = 0; i < kSrvSlots; ++i) {
 		m_boundSrvViews[i] = VK_NULL_HANDLE;
+		m_boundSrvArrayViews[i] = VK_NULL_HANDLE;
 		m_boundSrvLayouts[i] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 	for (uint32_t i = 0; i < kSamplerSlots; ++i)
@@ -2146,11 +2180,12 @@ noexcept
 }
 
 
-void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout)
+void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout, VkImageView arrayView)
 noexcept
 {
 	if (slot < kSrvSlots) {
 		m_boundSrvViews[slot] = view;
+		m_boundSrvArrayViews[slot] = arrayView;
 		m_boundSrvLayouts[slot] = layout;
 	}
 }
@@ -2215,7 +2250,7 @@ noexcept
 	if (view == VK_NULL_HANDLE)
 		return;
 	for (uint32_t i = 0; i < kSrvSlots; ++i)
-		if (m_boundSrvViews[i] == view)
+		if ((m_boundSrvViews[i] == view) or (m_boundSrvArrayViews[i] == view))
 			BindSampledImage(i, VK_NULL_HANDLE);
 }
 

@@ -3,6 +3,7 @@
 #include "rendertarget.h"
 #include "readtarget.h"
 #include "vkcontext.h"
+#include "gfxrenderer.h"
 #include "image_layout_tracker.h"
 #include "vkupload.h" // CreateReadbackBuffer / one-shot command buffer for ReadBuffer ()
 #include "resource_handler.h"
@@ -142,6 +143,32 @@ noexcept
 	return true;
 }
 
+
+static VkImageView CreateImageView(VkImage image, VkImageViewType viewType, VkFormat format, VkImageAspectFlags aspect,
+								   uint32_t baseLayer, uint32_t layerCount)
+noexcept
+{
+	VkImageViewCreateInfo vci{};
+
+	vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	vci.image = image;
+	vci.viewType = viewType;
+	vci.format = format;
+	vci.subresourceRange.aspectMask = aspect;
+	vci.subresourceRange.baseMipLevel = 0;
+	vci.subresourceRange.levelCount = 1;
+	vci.subresourceRange.baseArrayLayer = baseLayer;
+	vci.subresourceRange.layerCount = layerCount;
+
+	VkImageView view = VK_NULL_HANDLE;
+
+	if (vkCreateImageView(vkContext.Device(), &vci, nullptr, &view) != VK_SUCCESS) {
+		logHandler.Print("RenderTarget: vkCreateImageView failed (type %d, layers %u..%u)\n", int(viewType), baseLayer, baseLayer + layerCount);
+		return VK_NULL_HANDLE;
+	}
+	return view;
+}
+
 // =================================================================================================
 // BufferInfo
 
@@ -151,7 +178,10 @@ void BufferInfo::Init(void)
 	m_allocation = VK_NULL_HANDLE;
 	m_imageView = VK_NULL_HANDLE;
 	m_depthSampleView = VK_NULL_HANDLE;
+	m_depthArrayView = VK_NULL_HANDLE;
 	m_mipView = VK_NULL_HANDLE;
+	m_flatView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
 	for (int face = 0; face < 6; ++face)
 		m_cubeView[face] = VK_NULL_HANDLE;
 	m_layerView.Destroy();
@@ -159,6 +189,7 @@ void BufferInfo::Init(void)
 	m_srvIndex = UINT32_MAX;
 	m_type = btColor;
 	m_isArray = false;
+	m_isExternal = false;
 }
 
 
@@ -197,7 +228,10 @@ void BufferInfo::Release(bool immediate)
 
 	commandListHandler.UnbindImage(m_imageView);
 	commandListHandler.UnbindImage(m_depthSampleView);
+	commandListHandler.UnbindImage(m_depthArrayView);
 	commandListHandler.UnbindImage(m_mipView);
+	commandListHandler.UnbindImage(m_flatView);
+	commandListHandler.UnbindImage(m_arrayView);
 	// Defer GPU-resource teardown by one frame slot - in-flight command buffers may still
 	// reference the image/view. Same pattern as Texture::Destroy(). Safe in the
 	// app-shutdown path as long as gfxResourceHandler.Cleanup() processes both frame slots
@@ -249,7 +283,18 @@ void BufferInfo::Release(bool immediate)
 		});
 		m_mipView = VK_NULL_HANDLE;
 	}
-	if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+	for (VkImageView* extraView : { &m_depthArrayView, &m_flatView, &m_arrayView }) {
+		if ((*extraView == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
+			continue;
+
+		VkImageView view = *extraView;
+
+		cleanup([device, view]() {
+			vkDestroyImageView(device, view, nullptr);
+		});
+		*extraView = VK_NULL_HANDLE;
+	}
+	if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE) and not m_isExternal) {
 		VkImage			image = m_image;
 		VmaAllocation	alloc = m_allocation;
 		cleanup([allocator, image, alloc]() {
@@ -277,6 +322,8 @@ void RenderTarget::Init(void)
 	m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
 	m_arrayLayerCount = 0;
 	m_arrayLayer = 0;
+	m_viewCount = 1;
+	m_externalDepthFormat = VK_FORMAT_UNDEFINED;
 	m_mipLevels = 1;
 	m_extraBufferIndex = -1;
 	m_idBufferCount = 0;
@@ -366,27 +413,34 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 	// because Vulkan forbids sampling a view that spans depth AND stencil.
 	VkImageAspectFlags attachmentAspect = m_hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
 													   : VK_IMAGE_ASPECT_DEPTH_BIT;
+	int layerCount = (m_viewCount > 1) ? LayerGroupCount() * m_viewCount : 1;
+
 	if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
-						  info.m_image, info.m_allocation))
+						  info.m_image, info.m_allocation, layerCount))
 		return;
 	info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, attachmentAspect);
 
 	// Attachment view: depth (plus stencil, if the target asked for a stencil plane).
-	if (not CreateSRV(info, fmt, attachmentAspect))
+	if (m_viewCount > 1) {
+		info.m_imageView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, attachmentAspect, 0, uint32_t(layerCount));
+		if (info.m_imageView == VK_NULL_HANDLE)
+			return;
+		info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);
+		if (LayerGroupCount() > 1) {
+			info.m_layerView.Resize(LayerGroupCount());
+			for (int group = 0; group < LayerGroupCount(); ++group)
+				info.m_layerView[group] = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, attachmentAspect,
+														  uint32_t(group * m_viewCount), uint32_t(m_viewCount));
+		}
+	}
+	else if (not CreateSRV(info, fmt, attachmentAspect))
 		return;
 
 	// Sampling view: depth aspect only - for use as a sampled texture (sampler2DShadow / shadow map).
-	VkDevice				device = vkContext.Device();
-	VkImageViewCreateInfo	vci{};
-	vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	vci.image = info.m_image;
-	vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	vci.format = fmt;
-	vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	vci.subresourceRange.levelCount = 1;
-	vci.subresourceRange.layerCount = 1;
-	if (vkCreateImageView(device, &vci, nullptr, &info.m_depthSampleView) != VK_SUCCESS)
-		logHandler.Print("RenderTarget::CreateDepthBuffer: depth-sample view creation failed\n");
+	info.m_depthSampleView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D, fmt, VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1);
+	if (baseRenderer.ViewCount() > 1)
+		info.m_depthArrayView =
+			CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, VK_IMAGE_ASPECT_DEPTH_BIT, 0, uint32_t(layerCount));
 }
 
 
@@ -395,7 +449,9 @@ void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 	VkFormat fmt = (info.m_type == BufferInfo::btColor) ? info.m_colorFormat
 		: (info.m_type == BufferInfo::btSkyMap)			? m_skyMapFormat
 														: FormatForType(info.m_type);
-	info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
+	bool isAttachment = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btId);
+
+	info.m_isArray = ((info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0)) or ((m_viewCount > 1) and isAttachment);
 	if (info.m_isArray) {
 		CreateArrayBuffer(info, w, h, fmt);
 		return;
@@ -410,6 +466,8 @@ void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 		return;
 	if ((mipLevels > 1) and not CreateMipView(info, fmt))
 		return;
+	if ((baseRenderer.ViewCount() > 1) and isAttachment)
+		info.m_arrayView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1);
 	// Initial layout transition (UNDEFINED -> SHADER_READ_ONLY / COLOR_ATTACHMENT) is performed
 	// on the first Activate via BufferInfo::SetState on the live VkCommandBuffer.
 }
@@ -469,45 +527,26 @@ void RenderTarget::CreateCubemapBuffer(BufferInfo& info, int edge)
 
 void RenderTarget::CreateArrayBuffer(BufferInfo& info, int w, int h, VkFormat fmt)
 {
-	VkDevice device = vkContext.Device();
+	int groupCount = LayerGroupCount();
+	int layerCount = groupCount * m_viewCount;
 
-	if (not CreateRTImage(w, h, fmt, UsageForType(BufferInfo::btColor),
-						  info.m_image, info.m_allocation, m_arrayLayerCount))
+	if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
+						  info.m_image, info.m_allocation, layerCount))
 		return;
 	info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	info.m_layerView.Resize(m_arrayLayerCount);
-	for (int layer = 0; layer < m_arrayLayerCount; ++layer) {
-		VkImageViewCreateInfo vci{};
-
-		vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		vci.image = info.m_image;
-		vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		vci.format = fmt;
-		vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		vci.subresourceRange.levelCount = 1;
-		vci.subresourceRange.baseArrayLayer = uint32_t(layer);
-		vci.subresourceRange.layerCount = 1;
-		if (vkCreateImageView(device, &vci, nullptr, &info.m_layerView[layer]) != VK_SUCCESS) {
-			logHandler.Print("RenderTarget::CreateArrayBuffer: vkCreateImageView failed for layer %d\n", layer);
+	info.m_layerView.Resize(groupCount);
+	for (int group = 0; group < groupCount; ++group) {
+		info.m_layerView[group] = CreateImageView(info.m_image, (m_viewCount > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D, fmt,
+												  VK_IMAGE_ASPECT_COLOR_BIT, uint32_t(group * m_viewCount), uint32_t(m_viewCount));
+		if (info.m_layerView[group] == VK_NULL_HANDLE)
 			return;
-		}
 	}
 
-	VkImageViewCreateInfo arrayView{};
-
-	arrayView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	arrayView.image = info.m_image;
-	arrayView.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-	arrayView.format = fmt;
-	arrayView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	arrayView.subresourceRange.levelCount = 1;
-	arrayView.subresourceRange.baseArrayLayer = 0;
-	arrayView.subresourceRange.layerCount = uint32_t(m_arrayLayerCount);
-	if (vkCreateImageView(device, &arrayView, nullptr, &info.m_imageView) != VK_SUCCESS) {
-		logHandler.Print("RenderTarget::CreateArrayBuffer: array view creation failed\n");
+	info.m_imageView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, VK_IMAGE_ASPECT_COLOR_BIT, 0, uint32_t(layerCount));
+	if (info.m_imageView == VK_NULL_HANDLE)
 		return;
-	}
+	info.m_flatView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D, fmt, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1);
 	// The same logical id CreateSRV () derives - GetAsTexture () and everything downstream identify a
 	// buffer's sampling source by it, and an array buffer does not go through CreateSRV ().
 	info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);
@@ -630,7 +669,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	// allocate, and SelectArrayLayer () bounds against it.
 	m_arrayLayerCount = params.arrayLayerCount;
 	m_arrayLayer = 0;
-	m_mipLevels = (m_arrayLayerCount > 0) ? 1 : std::clamp(params.mipLevels, 1, CalcMipLevels(width * scale, height * scale, 1));
+	m_viewCount = std::clamp(params.viewCount, 1, kMaxRenderViews);
+	m_externalDepthFormat = VK_FORMAT_UNDEFINED;
+	m_mipLevels = ((m_arrayLayerCount > 0) or (m_viewCount > 1)) ? 1
+																  : std::clamp(params.mipLevels, 1, CalcMipLevels(width * scale, height * scale, 1));
 	// Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
 	// for stencil without depth still yields one combined buffer.
 	m_hasStencil = params.stencilBufferCount > 0;
@@ -684,6 +726,134 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	CreateRenderArea();
 	m_isAvailable = true;
 	return true;
+}
+
+
+static bool FormatHasStencil(VkFormat format)
+noexcept
+{
+	return (format == VK_FORMAT_D24_UNORM_S8_UINT) or (format == VK_FORMAT_D32_SFLOAT_S8_UINT) or (format == VK_FORMAT_D16_UNORM_S8_UINT);
+}
+
+
+bool RenderTarget::CreateExternal(int width, int height, const String& name, int viewCount, VkImage colorImage, VkFormat colorFormat,
+								  VkImage depthImage, VkFormat depthFormat)
+{
+	Destroy();
+
+	if ((vkContext.Device() == VK_NULL_HANDLE) or ((colorImage == VK_NULL_HANDLE) and (depthImage == VK_NULL_HANDLE)))
+		return false;
+
+	m_name = name;
+	m_width = width;
+	m_height = height;
+	m_scale = 1;
+	m_viewCount = std::clamp(viewCount, 1, kMaxRenderViews);
+	m_arrayLayerCount = 0;
+	m_arrayLayer = 0;
+	m_mipLevels = 1;
+	m_colorBufferCount = (colorImage != VK_NULL_HANDLE) ? 1 : 0;
+	if (colorImage != VK_NULL_HANDLE)
+		m_colorFormat = colorFormat;
+	m_hasStencil = (depthImage != VK_NULL_HANDLE) and FormatHasStencil(depthFormat);
+	m_externalDepthFormat = (depthImage != VK_NULL_HANDLE) ? depthFormat : VK_FORMAT_UNDEFINED;
+	m_bufferInfo.Resize(m_colorBufferCount + ((depthImage != VK_NULL_HANDLE) ? 1 : 0));
+	m_renderTextures.Resize(m_colorBufferCount);
+	for (int i = 0; i < m_renderTextures.Length(); i++) {
+		m_renderTextures[i].m_filtering = m_filtering;
+		m_renderTextures[i].m_useMipMaps = false;
+		if (m_renderTextures[i].m_hasParams)
+			m_renderTextures[i].SetParams(true);
+	}
+	m_pingPong = false;
+	m_isScreenBuffer = false;
+	m_cmdList = nullptr;
+
+	if (colorImage != VK_NULL_HANDLE) {
+		BufferInfo& info = m_bufferInfo[m_bufferCount];
+
+		info.Init();
+		info.m_type = BufferInfo::btColor;
+		info.m_colorFormat = colorFormat;
+		info.m_isExternal = true;
+		info.m_image = colorImage;
+		info.m_layoutTracker.Init(colorImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+		if (m_viewCount > 1) {
+			info.m_isArray = true;
+			info.m_layerView.Resize(1);
+			info.m_layerView[0] = CreateImageView(colorImage, VK_IMAGE_VIEW_TYPE_2D_ARRAY, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 0,
+												  uint32_t(m_viewCount));
+			info.m_imageView =
+				CreateImageView(colorImage, VK_IMAGE_VIEW_TYPE_2D_ARRAY, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 0, uint32_t(m_viewCount));
+			info.m_flatView = CreateImageView(colorImage, VK_IMAGE_VIEW_TYPE_2D, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1);
+		}
+		else {
+			info.m_imageView = CreateImageView(colorImage, VK_IMAGE_VIEW_TYPE_2D, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1);
+			if (baseRenderer.ViewCount() > 1)
+				info.m_arrayView = CreateImageView(colorImage, VK_IMAGE_VIEW_TYPE_2D_ARRAY, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1);
+		}
+		if (info.m_imageView == VK_NULL_HANDLE) {
+			Destroy();
+			return false;
+		}
+		info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);
+		++m_bufferCount;
+	}
+
+	m_depthBufferIndex = -1;
+	m_stencilBufferIndex = -1;
+	if (depthImage != VK_NULL_HANDLE) {
+		BufferInfo&			info = m_bufferInfo[m_bufferCount];
+		VkImageAspectFlags	aspect = m_hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) : VK_IMAGE_ASPECT_DEPTH_BIT;
+
+		info.Init();
+		info.m_type = BufferInfo::btDepth;
+		info.m_isExternal = true;
+		info.m_image = depthImage;
+		info.m_layoutTracker.Init(depthImage, VK_IMAGE_LAYOUT_UNDEFINED, aspect);
+		info.m_imageView = CreateImageView(depthImage, (m_viewCount > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D, depthFormat,
+										   aspect, 0, uint32_t(m_viewCount));
+		if (info.m_imageView == VK_NULL_HANDLE) {
+			Destroy();
+			return false;
+		}
+		info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);
+		m_depthBufferIndex = m_bufferCount;
+		m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
+		++m_bufferCount;
+	}
+
+	m_vertexBufferCount = 0;
+	m_extraBufferIndex = -1;
+	m_idBufferCount = 0;
+	m_idBufferIndex = -1;
+	m_computeBufferIndex = -1;
+	m_computeBufferCount = 0;
+	m_cubeMapIndex = -1;
+	m_cubeMapCount = 0;
+	m_cubeFace = 0;
+	m_viewport = Viewport(0, 0, width, height);
+	CreateRenderArea();
+	m_isAvailable = true;
+	return true;
+}
+
+
+void RenderTarget::PrepareExternalRelease(VkCommandBuffer cb)
+noexcept
+{
+	if (cb == VK_NULL_HANDLE)
+		return;
+	for (int i = 0; i < m_bufferCount; ++i) {
+		BufferInfo& info = m_bufferInfo[i];
+
+		if (not info.m_isExternal)
+			continue;
+		if (info.m_type == BufferInfo::btDepth)
+			info.m_layoutTracker.ToDepthAttachment(cb);
+		else
+			info.m_layoutTracker.ToColorAttachment(cb);
+	}
 }
 
 
@@ -858,7 +1028,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 	VkRenderingAttachmentInfo depth{};
 	if (wantDepth) {
 		depth.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		depth.imageView = depthInfo->m_imageView;
+		depth.imageView = (m_arrayLayer < depthInfo->m_layerView.Length()) ? depthInfo->m_layerView[m_arrayLayer] : depthInfo->m_imageView;
 		// Read-only depth: a shared source (SetDepthSource, only ever tested against) or an activation
 		// that asked for dbmReadOnly. The read-only layout lets the SAME image serve as the depth
 		// attachment AND a sampled texture in the same pass (WBOIT soft particles). An own depth buffer
@@ -878,6 +1048,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 	info.renderArea.offset = { 0, 0 };
 	info.renderArea.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
 	info.layerCount = 1;
+	info.viewMask = ViewMask();
 	info.colorAttachmentCount = uint32_t(colorCount);
 	info.pColorAttachments = (colorCount > 0) ? colors : nullptr;
 	info.pDepthAttachment = wantDepth ? &depth : nullptr;
@@ -886,7 +1057,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 	// and the stencil test never runs. Contents are always preserved -- shadow volumes clear the stencil
 	// themselves, between passes.
 	VkRenderingAttachmentInfo stencil{};
-	if (wantDepth and (DepthFormat() == kDepthStencilFormat)) {
+	if (wantDepth and FormatHasStencil(DepthFormat())) {
 		stencil = depth;
 		stencil.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		stencil.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1503,10 +1674,24 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
 	texture->m_sampling.minFilter = filtering;
 	texture->m_sampling.magFilter = filtering;
 	texture->m_image = info.m_image;
-	texture->m_imageView = (info.m_mipView != VK_NULL_HANDLE) ? info.m_mipView : info.m_imageView;
+	SetTextureViews(info, *texture);
 	texture->m_handle = info.m_srvIndex;
 	texture->Validate();
 	return texture->Bind(tmuIndex);
+}
+
+
+void RenderTarget::SetTextureViews(const BufferInfo& info, Texture& texture)
+noexcept
+{
+	if (info.m_isArray) {
+		texture.m_imageView = ((baseRenderer.ViewCount() > 1) and (info.m_flatView != VK_NULL_HANDLE)) ? info.m_flatView : info.m_imageView;
+		texture.m_arrayView = info.m_imageView;
+	}
+	else {
+		texture.m_imageView = (info.m_mipView != VK_NULL_HANDLE) ? info.m_mipView : info.m_imageView;
+		texture.m_arrayView = info.m_arrayView;
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1538,7 +1723,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 	if (texture == nullptr)
 		texture = &m_externalTexture;
 	texture->m_image = info.m_image;
-	texture->m_imageView = (info.m_mipView != VK_NULL_HANDLE) ? info.m_mipView : info.m_imageView;
+	SetTextureViews(info, *texture);
 	texture->m_handle = info.m_srvIndex;
 	texture->Validate();
 	return texture;
@@ -1569,6 +1754,7 @@ Texture* RenderTarget::GetDepthAsTexture(void)
 
 	m_depthTexture.m_image = info.m_image;
 	m_depthTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+	m_depthTexture.m_arrayView = info.m_depthArrayView;
 	m_depthTexture.m_sampleLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	m_depthTexture.m_handle = info.m_srvIndex;
 	m_depthTexture.Validate();
@@ -1599,6 +1785,7 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
 	}
 	m_shadowTexture.m_image = info.m_image;
 	m_shadowTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+	m_shadowTexture.m_arrayView = info.m_depthArrayView;
 	m_shadowTexture.m_sampleLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	m_shadowTexture.m_handle = info.m_srvIndex;
 	m_shadowTexture.Validate();
@@ -1727,6 +1914,7 @@ noexcept
 	}
 	if (HaveActiveDepthBuffer())
 		key.depthFormat = DepthFormat();
+	key.viewMask = ViewMask();
 }
 
 // =================================================================================================

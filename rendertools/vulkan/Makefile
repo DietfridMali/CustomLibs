@@ -57,7 +57,8 @@ VULKAN_FILES := \
  texturehandler \
  vk13api \
  vkcontext \
- vkupload
+ vkupload \
+ xrhandler
 
 HLSL_FILES := \
  base_shader_funcs \
@@ -71,7 +72,8 @@ HLSL_FILES := \
  outline_shader \
  primitive_shaders \
  skybox_shader \
- tonemap_shader
+ tonemap_shader \
+ xr_shaders
 
 COMMON_FILES := \
  base_noisetexture \

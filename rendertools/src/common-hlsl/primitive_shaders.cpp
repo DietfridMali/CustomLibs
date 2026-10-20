@@ -205,6 +205,7 @@ const ShaderSource& CircleShader()
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
+                FRAME_EYE_MATRICES
             };
             struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
             struct PSInput {
@@ -213,10 +214,11 @@ const ShaderSource& CircleShader()
                 float2 fragCoord : TEXCOORD1;
                 float  vertexY   : TEXCOORD2;
             };
-            PSInput VSMain(VSInput i) {
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
                 PSInput o;
                 float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
-                o.pos      = mul(mViewport, mul(mProjection, viewPos));
+                o.pos      = mul(mViewport, mul(VIEW_PROJECTION, viewPos));
                 o.fragCoord = i.tc;
                 o.fragPos   = viewPos.xyz;
                 o.vertexY   = i.pos.y;

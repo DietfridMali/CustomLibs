@@ -70,7 +70,10 @@ public:
 	// m_layerView[layer] is what gets attached (RenderTarget::SelectArrayLayer).
 	AutoArray<VkImageView>	m_layerView;
 	VkImageView				m_depthSampleView{ VK_NULL_HANDLE }; // depth-only sampling view (set for btDepth)
+	VkImageView				m_depthArrayView{ VK_NULL_HANDLE };
 	VkImageView				m_mipView{ VK_NULL_HANDLE };
+	VkImageView				m_flatView{ VK_NULL_HANDLE };
+	VkImageView				m_arrayView{ VK_NULL_HANDLE };
 	ImageLayoutTracker		m_layoutTracker;
 	uint32_t				m_srvIndex{ UINT32_MAX }; // logical id for source-compat
 	eBufferType				m_type{ btColor };
@@ -79,6 +82,7 @@ public:
 	// than a buffer type of its own, because such a buffer IS a colour buffer - it takes part in MRT,
 	// in the attachment list and in every count, and only its views differ.
 	bool m_isArray{ false };
+	bool m_isExternal{ false };
 
 	void Init(void);
 
@@ -136,6 +140,7 @@ public:
 		// (SelectArrayLayer); sampling reads the whole stack through a sampler2DArray. Everything else
 		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
 		int			arrayLayerCount{ 0 };
+		int			viewCount{ 1 };
 		int			mipLevels{ 1 };
 		int			cubeMapCount{ 0 };
 		VkFormat	cubeMapFormat{ VK_FORMAT_R32_SFLOAT };
@@ -196,6 +201,9 @@ public:
 	// this target a texture array of that many layers, of which m_arrayLayer is the one attached.
 	int					m_arrayLayerCount{ 0 };
 	int					m_arrayLayer{ 0 }; // layer currently attached, see SelectArrayLayer
+	int					m_viewCount{ 1 };
+	VkFormat			m_externalDepthFormat{ VK_FORMAT_UNDEFINED };
+	bool				m_coverageAlpha{ false };
 	int					m_mipLevels{ 1 };
 	int					m_activeBufferIndex{ 0 };
 	int					m_lastDestination{ -1 };
@@ -250,7 +258,25 @@ public:
 
 	bool Create(int width, int height, int scale, const RTCreationParams& params);
 
+	bool CreateExternal(int width, int height, const String& name, int viewCount, VkImage colorImage, VkFormat colorFormat,
+						VkImage depthImage = VK_NULL_HANDLE, VkFormat depthFormat = VK_FORMAT_UNDEFINED);
+
 	void Destroy(bool immediate = false);
+
+	inline void SetCoverageAlpha(bool coverageAlpha)
+	noexcept
+	{
+		m_coverageAlpha = coverageAlpha;
+	}
+
+	inline bool CoverageAlpha(void) const
+	noexcept
+	{
+		return m_coverageAlpha;
+	}
+
+	void PrepareExternalRelease(VkCommandBuffer cb)
+	noexcept;
 
 	void SetName(const String& name)
 	noexcept
@@ -561,6 +587,24 @@ public:
 		return m_arrayLayerCount > 0;
 	}
 
+	inline int ViewCount(void) const
+	noexcept
+	{
+		return m_viewCount;
+	}
+
+	inline uint32_t ViewMask(void) const
+	noexcept
+	{
+		return (m_viewCount > 1) ? ((1u << uint32_t(m_viewCount)) - 1u) : 0u;
+	}
+
+	inline int LayerGroupCount(void) const
+	noexcept
+	{
+		return (m_arrayLayerCount > 0) ? m_arrayLayerCount : 1;
+	}
+
 	inline int MipLevels(void)
 	noexcept
 	{
@@ -644,6 +688,9 @@ private:
 
 	void CreateRenderArea(void);
 
+	void SetTextureViews(const BufferInfo& info, Texture& texture)
+	noexcept;
+
 public:
 	inline bool HaveDepthBuffer(bool checkHandle = true)
 	noexcept
@@ -688,6 +735,8 @@ private:
 	noexcept
 	{
 		RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;
+		if (owner->m_externalDepthFormat != VK_FORMAT_UNDEFINED)
+			return owner->m_externalDepthFormat;
 		return owner->m_hasStencil ? VK_FORMAT_D32_SFLOAT_S8_UINT : VK_FORMAT_D32_SFLOAT;
 	}
 

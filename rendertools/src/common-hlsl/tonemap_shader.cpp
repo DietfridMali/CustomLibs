@@ -25,8 +25,9 @@ const ShaderSource& ToneMapShader()
                 int   bEncodeSRGB;
                 float2 tcOffset;
                 float2 tcScale;
+                int   bDecodeSRGB;
             };
-            Texture2D    surface : register(t0);
+            ScreenTexture surface : register(t0);
             SamplerState s0      : register(s0);
             struct PSInput {
                 float4 pos       : SV_Position;
@@ -54,11 +55,19 @@ const ShaderSource& ToneMapShader()
                 return lerp(c * 12.92, 1.055 * pow(c, 1.0 / 2.4) - 0.055, step(0.0031308, c));
             }
 
-            float4 PSMain(PSInput i) : SV_Target {
-                float4 sceneColor = surface.Sample(s0, tcOffset + tcScale * i.fragCoord);
+            float3 SRGBToLinear(float3 c) {
+                c = saturate(c);
+                return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
+            }
+
+            float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+                SET_VIEW_ID
+                float4 sceneColor = surface.Sample(s0, SCREEN_UV(tcOffset + tcScale * i.fragCoord));
                 float3 color = ToneMap(sceneColor.rgb);
                 if (bEncodeSRGB != 0)
                     color = LinearToSRGB(color);
+                else if (bDecodeSRGB != 0)
+                    color = SRGBToLinear(color);
                 return float4(color, sceneColor.a);
             }
         )"),

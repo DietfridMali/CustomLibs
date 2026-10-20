@@ -92,6 +92,7 @@ public:
 
 	VkImage				m_image{ VK_NULL_HANDLE };
 	VkImageView			m_imageView{ VK_NULL_HANDLE };
+	VkImageView			m_arrayView{ VK_NULL_HANDLE };
 	VmaAllocation		m_allocation{ VK_NULL_HANDLE };
 	ImageLayoutTracker	m_layoutTracker;
 	VkImageLayout		m_sampleLayout{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
@@ -340,6 +341,12 @@ public:
 	noexcept
 	{
 		return m_isRenderTarget;
+	}
+
+	inline bool HasArrayView(void) const
+	noexcept
+	{
+		return m_arrayView != VK_NULL_HANDLE;
 	}
 
 	inline bool IsDeployed(void) const

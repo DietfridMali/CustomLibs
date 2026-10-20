@@ -27,6 +27,7 @@ const String& Standard2DVS()
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
             column_major float4x4 mViewport;
+            FRAME_EYE_MATRICES
         };
         struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
         struct PSInput {
@@ -34,10 +35,11 @@ const String& Standard2DVS()
             float3 fragPos   : TEXCOORD0;
             float2 fragCoord : TEXCOORD1;
         };
-        PSInput VSMain(VSInput i) {
+        PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+            SET_VIEW_ID
             PSInput o;
             float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
-            o.pos       = mul(mViewport, mul(mProjection, viewPos));
+            o.pos       = mul(mViewport, mul(VIEW_PROJECTION, viewPos));
             o.fragCoord = i.tc;
             o.fragPos   = viewPos.xyz;
             return o;
@@ -55,6 +57,8 @@ const String& Standard3DVS()
         cbuffer FrameConstants : register(b0) {
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
+            column_major float4x4 mViewport;
+            FRAME_EYE_MATRICES
         };
         struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
         struct PSInput {
@@ -62,10 +66,11 @@ const String& Standard3DVS()
             float3 fragPos   : TEXCOORD0;
             float2 fragCoord : TEXCOORD1;
         };
-        PSInput VSMain(VSInput i) {
+        PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+            SET_VIEW_ID
             PSInput o;
             float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
-            o.pos       = mul(mProjection, viewPos);
+            o.pos       = mul(VIEW_PROJECTION, viewPos);
             o.fragCoord = i.tc;
             o.fragPos   = viewPos.xyz;
             return o;
@@ -85,6 +90,7 @@ const String& Offset2DVS()
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
             column_major float4x4 mViewport;
+            FRAME_EYE_MATRICES
         };
         cbuffer ShaderConstants : register(b1) { float offset; };
         struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
@@ -93,11 +99,12 @@ const String& Offset2DVS()
             float3 fragPos   : TEXCOORD0;
             float2 fragCoord : TEXCOORD1;
         };
-        PSInput VSMain(VSInput i) {
+        PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+            SET_VIEW_ID
             PSInput o;
             float4 viewPos  = mul(mModelView, float4(i.pos, 1.0));
             float4 shifted  = float4(viewPos.x + offset, viewPos.y + offset, viewPos.z, 1.0);
-            o.pos       = mul(mViewport, mul(mProjection, shifted));
+            o.pos       = mul(mViewport, mul(VIEW_PROJECTION, shifted));
             o.fragCoord = i.tc;
             o.fragPos   = viewPos.xyz;
             return o;

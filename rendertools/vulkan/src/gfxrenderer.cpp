@@ -21,6 +21,7 @@
 #include "resource_handler.h"
 #include "gfxapitype.h"
 #include "image_layout_tracker.h"
+#include "xrhandler.h"
 #include "vkupload.h" // CreateReadbackBuffer for ReadBuffer ()
 #include "loghandler.h"
 
@@ -76,9 +77,17 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 		logHandler.Print("Smiley-Battle: Cannot create Vulkan CommandQueue.\n");
 		return false;
 	}
+	if (xrHandler.IsAvailable())
+		baseDisplayHandler.SetVSync(false);
 	if (not baseDisplayHandler.SetupSwapchain()) {
 		logHandler.Print("Smiley-Battle: Cannot create Vulkan swapchain.\n");
 		return false;
+	}
+	if (xrHandler.IsAvailable()) {
+		if (not vkContext.HasFeature(GfxFeature::Multiview))
+			logHandler.Print("The graphics device has no multiview with geometry and tessellation shaders - VR is off.\n");
+		else if (not xrHandler.CreateSession(baseDisplayHandler.GetWidth(), baseDisplayHandler.GetHeight()))
+			logHandler.Print("OpenXR session could not be created - VR is off.\n");
 	}
 	// Arm the first frame slot so subsequent BeginFrame paths have a valid sync state.
 	if (not commandListHandler.CmdQueue().BeginFrame()) {
@@ -151,6 +160,13 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 
 	Set2DRenderStates();
 
+	bool isXR = xrHandler.IsRunning();
+
+	if (isXR)
+		xrHandler.RenderLayer(m_screenBuffer->GetAsTexture({}), bRotate, bFlipVertically);
+	if (not baseDisplayHandler.CurrentBackBuffer())
+		return;
+
 	void* cl = StartOperation("DrawScreen", false);
 
 	// Bring the swapchain back buffer to COLOR_ATTACHMENT and clear it before blitting.
@@ -160,8 +176,16 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 	}
 	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
+	bool isMirrored = isXR and xrHandler.RenderMirror(bFlipVertically);
+
+	if (isMirrored) {
+		gfxStates.SetBlending(1);
+		gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
+	}
 	m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
 	RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
+	if (isMirrored)
+		Set2DRenderStates();
 
 	// Transition back to PRESENT_SRC_KHR for vkQueuePresentKHR.
 	if (baseDisplayHandler.CurrentBackBuffer())
@@ -210,6 +234,7 @@ noexcept
 	// (RT BufferInfo::Release, disposable textures, ...), so the underlying VkImage / VkImageView
 	// / VmaAllocation handles are destroyed before gfxResourceHandler / vkContext are torn down.
 	commandListHandler.CmdQueue().WaitIdle();
+	xrHandler.DestroySession();
 	SavePipelineCache();
 	pipelineCache.Destroy();
 	GfxDataLayout::DestroyDefaultStreams();
@@ -218,6 +243,7 @@ noexcept
 	gfxResourceHandler.Cleanup(0);
 	gfxResourceHandler.Cleanup(1);
 	bindlessTextureHeap.Destroy();
+	xrHandler.Destroy();
 }
 
 

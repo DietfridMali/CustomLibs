@@ -186,6 +186,7 @@ public:
 		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it, which
 		// is the point of putting it here rather than into a buffer type of its own.
 		int		arrayLayerCount{ 0 };
+		int		viewCount{ 1 };
 		int		mipLevels{ 1 };
 		bool	hasMRTs{ false };
 		bool	isScreenBuffer{ false };
@@ -374,6 +375,22 @@ public:
 	noexcept
 	{
 		return m_isAvailable;
+	}
+
+	inline int ViewCount(void) const
+	noexcept
+	{
+		return 1;
+	}
+
+	inline void SetCoverageAlpha(bool)
+	noexcept
+	{}
+
+	inline bool CoverageAlpha(void) const
+	noexcept
+	{
+		return false;
 	}
 
 	inline void SetClearColor(RGBAColor color)

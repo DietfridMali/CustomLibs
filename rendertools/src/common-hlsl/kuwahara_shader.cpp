@@ -58,13 +58,9 @@ static const String& KuwaharaFuncs()
 }
 
 
-static const String& KuwaharaPlaneSource()
+static const String& KuwaharaPlaneSource(bool screenSource)
 {
-	static const String source(R"(
-        float4 SourceTexel(int2 p) {
-            return srcTex.Load(int3(FilterTexel(p), 0));
-        }
-
+	static const String common(R"(
         bool SourceInside(int2 p) {
             return InsideFilter(p);
         }
@@ -73,7 +69,17 @@ static const String& KuwaharaPlaneSource()
             return int2(pos.xy);
         }
     )");
-	return source;
+	static const String plane(String(R"(
+        float4 SourceTexel(int2 p) {
+            return srcTex.Load(int3(FilterTexel(p), 0));
+        }
+    )") + common);
+	static const String screen(String(R"(
+        float4 SourceTexel(int2 p) {
+            return srcTex.Load(SCREEN_TEXEL(FilterTexel(p)));
+        }
+    )") + common);
+	return screenSource ? screen : plane;
 }
 
 
@@ -153,7 +159,8 @@ static const String& KuwaharaTensorBody()
             return Opaque(c) ? c.rgb : center;
         }
 
-        float4 PSMain(PSInput i) : SV_Target {
+        float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+            SET_VIEW_ID
             int2 p = TensorOrigin(i.pos);
             float3 c = SourceTexel(p).rgb;
             float3 bl = SobelColor(p + int2(-1, -1), c);
@@ -178,7 +185,8 @@ static const String& KuwaharaFilterBody()
 	static const String source(R"(
         static const float sectorHalfAngle = 3.14159265 / 8.0;
 
-        float4 PSMain(PSInput i) : SV_Target {
+        float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+            SET_VIEW_ID
             int2 p = int2(i.pos.xy);
             float4 src = SourceTexel(p);
             if (!Opaque(src))
@@ -297,7 +305,25 @@ const ShaderSource& KuwaharaTensorShader()
         Texture2D srcTex : register(t0);
         )") +
 			KuwaharaFuncs() +
-			KuwaharaPlaneSource() +
+			KuwaharaPlaneSource(false) +
+			KuwaharaTensorBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
+}
+
+
+const ShaderSource& KuwaharaScreenTensorShader()
+{
+	static const ShaderSource source(
+		"kuwaharaScreenTensor",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			String(R"(
+        };
+        ScreenTexture srcTex : register(t0);
+        )") +
+			KuwaharaFuncs() +
+			KuwaharaPlaneSource(true) +
 			KuwaharaTensorBody(),
 		ShaderDataLayout(VtxTcAttrs, 2));
 	return source;
@@ -337,11 +363,12 @@ const ShaderSource& KuwaharaTensorBlurShader()
             int    directionY;
             float  sigma;
         };
-        Texture2D tensorTex : register(t0);
+        ScreenTexture tensorTex : register(t0);
         )") +
 			KuwaharaFuncs() +
 			String(R"(
-        float4 PSMain(PSInput i) : SV_Target {
+        float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+            SET_VIEW_ID
             int2 p = int2(i.pos.xy);
             int2 direction = int2(directionX, directionY);
             int radius = int(ceil(3.0 * sigma));
@@ -350,7 +377,7 @@ const ShaderSource& KuwaharaTensorBlurShader()
             float weightSum = 0.0;
             for (int k = -radius; k <= radius; k++) {
                 float w = exp(-float(k * k) / twoSigma2);
-                sum += w * tensorTex.Load(int3(FilterTexel(p + k * direction), 0)).rgb;
+                sum += w * tensorTex.Load(SCREEN_TEXEL(FilterTexel(p + k * direction))).rgb;
                 weightSum += w;
             }
             return float4(sum / weightSum, 1.0);
@@ -362,30 +389,49 @@ const ShaderSource& KuwaharaTensorBlurShader()
 
 // -------------------------------------------------------------------------------------------------
 
-const ShaderSource& KuwaharaFilterShader()
+static const String& KuwaharaPlaneFilterSource(bool screenSource)
 {
-	static const ShaderSource source(
-		"kuwaharaFilter",
-		Standard2DVS(),
-		KuwaharaConstants() +
-			String(R"(
+	static const String tensor(R"(
+        float3 TensorTexel(int2 p) {
+            return tensorTex.Load(SCREEN_TEXEL(p)).rgb;
+        }
+        )");
+	static const String plane(KuwaharaConstants() +
+							  String(R"(
             float  radius;
             float  anisotropy;
             float  sharpness;
             float  minSigma;
         };
-        Texture2D srcTex    : register(t0);
-        Texture2D tensorTex : register(t1);
+        Texture2D     srcTex    : register(t0);
+        ScreenTexture tensorTex : register(t1);
         )") +
-			KuwaharaFuncs() +
-			KuwaharaPlaneSource() +
-			String(R"(
-        float3 TensorTexel(int2 p) {
-            return tensorTex.Load(int3(p, 0)).rgb;
-        }
+							  KuwaharaFuncs() + KuwaharaPlaneSource(false) + tensor + KuwaharaFilterBody());
+	static const String screen(KuwaharaConstants() +
+							   String(R"(
+            float  radius;
+            float  anisotropy;
+            float  sharpness;
+            float  minSigma;
+        };
+        ScreenTexture srcTex    : register(t0);
+        ScreenTexture tensorTex : register(t1);
         )") +
-			KuwaharaFilterBody(),
-		ShaderDataLayout(VtxTcAttrs, 2));
+							   KuwaharaFuncs() + KuwaharaPlaneSource(true) + tensor + KuwaharaFilterBody());
+	return screenSource ? screen : plane;
+}
+
+
+const ShaderSource& KuwaharaFilterShader()
+{
+	static const ShaderSource source("kuwaharaFilter", Standard2DVS(), KuwaharaPlaneFilterSource(false), ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
+}
+
+
+const ShaderSource& KuwaharaScreenFilterShader()
+{
+	static const ShaderSource source("kuwaharaScreenFilter", Standard2DVS(), KuwaharaPlaneFilterSource(true), ShaderDataLayout(VtxTcAttrs, 2));
 	return source;
 }
 
@@ -444,7 +490,7 @@ const ShaderSource& KuwaharaSourceShader()
         Texture2D srcTex : register(t0);
         )") +
 			KuwaharaFuncs() +
-			KuwaharaPlaneSource() +
+			KuwaharaPlaneSource(false) +
 			KuwaharaSourceBody(),
 		ShaderDataLayout(VtxTcAttrs, 2));
 	return source;

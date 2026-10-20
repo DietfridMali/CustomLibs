@@ -19,11 +19,11 @@ static int TensorMargin(const KuwaharaFilter::Params& params)
 }
 
 
-KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat)
+KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat, int viewCount)
 {
 	for (Targets& targets : m_targets) {
 		if ((targets.width == width) and (targets.height == height) and (targets.margin == margin) and
-			(targets.filterFormat == filterFormat))
+			(targets.filterFormat == filterFormat) and (targets.viewCount == viewCount))
 			return &targets;
 	}
 
@@ -31,6 +31,7 @@ KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int m
 	targets.width = width;
 	targets.height = height;
 	targets.margin = margin;
+	targets.viewCount = viewCount;
 	targets.filterFormat = filterFormat;
 	targets.filter = new (std::nothrow) RenderTarget();
 	targets.tensor = new (std::nothrow) RenderTarget();
@@ -41,6 +42,7 @@ KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int m
 	filterParams.depthBufferCount = 0;
 	filterParams.colorFormat = ToNativeColorFormat(filterFormat);
 	filterParams.hasMRTs = false;
+	filterParams.viewCount = viewCount;
 
 	RenderTarget::RTCreationParams tensorParams;
 	tensorParams.name = "kuwaharaTensor";
@@ -48,6 +50,7 @@ KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int m
 	tensorParams.depthBufferCount = 0;
 	tensorParams.colorFormat = ToNativeColorFormat(GfxPixelFormat::RGBA16_SFloat);
 	tensorParams.hasMRTs = true;
+	tensorParams.viewCount = viewCount;
 
 	if (not (targets.filter and targets.tensor and
 			targets.filter->Create(width, height, 1, filterParams) and
@@ -135,7 +138,10 @@ bool KuwaharaFilter::RenderTensor(Targets& targets, Texture* source, const Param
 	if (not targets.tensor->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = (area == nullptr) }))
 		return false;
 	SetPassArea(area, areaMargin, tensorWidth, tensorHeight);
-	Shader*	shader = SetupShader(isCube ? "kuwaharaCubeTensor" : "kuwaharaTensor", tensorWidth, tensorHeight, wrapU, wrapV, params);
+	Shader*	shader = SetupShader(isCube						 ? "kuwaharaCubeTensor"
+								 : (targets.viewCount > 1) ? "kuwaharaScreenTensor"
+															: "kuwaharaTensor",
+								 tensorWidth, tensorHeight, wrapU, wrapV, params);
 	bool	ok = (shader != nullptr);
 	if (ok) {
 		if (baseRenderer.UsesOpenGL())
@@ -180,8 +186,10 @@ bool KuwaharaFilter::RenderFilter(Targets& targets, Texture* source, const Param
 	if (not targets.filter->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = (area == nullptr) }))
 		return false;
 	SetPassArea(area, 0, targets.width, targets.height);
-	Shader* shader = SetupShader(isCube ? "kuwaharaCubeFilter" : "kuwaharaFilter", targets.width, targets.height,
-								 params.wrapU and not isCube, params.wrapV and not isCube, params);
+	Shader* shader = SetupShader(isCube						 ? "kuwaharaCubeFilter"
+								 : (targets.viewCount > 1) ? "kuwaharaScreenFilter"
+															: "kuwaharaFilter",
+								 targets.width, targets.height, params.wrapU and not isCube, params.wrapV and not isCube, params);
 	bool	ok = (shader != nullptr) and targets.tensor->BindBuffer(0, 1);
 	if (ok) {
 		if (baseRenderer.UsesOpenGL()) {
@@ -378,9 +386,9 @@ bool KuwaharaFilter::ApplyCube(Texture* cubemap, const Params& params)
 
 
 RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat,
-											 const Params& params, const Viewport* area)
+											 const Params& params, const Viewport* area, int viewCount)
 {
-	Targets* targets = GetTargets(width, height, 0, filterFormat);
+	Targets* targets = GetTargets(width, height, 0, filterFormat, viewCount);
 	if (not targets)
 		return nullptr;
 
@@ -406,9 +414,9 @@ RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int hei
 }
 
 
-bool KuwaharaFilter::Prepare(int width, int height, GfxPixelFormat filterFormat)
+bool KuwaharaFilter::Prepare(int width, int height, GfxPixelFormat filterFormat, int viewCount)
 {
-	return GetTargets(width, height, 0, filterFormat) != nullptr;
+	return GetTargets(width, height, 0, filterFormat, viewCount) != nullptr;
 }
 
 

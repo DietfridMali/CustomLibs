@@ -6,6 +6,7 @@
 #include "shader_compiler.h"
 #include "acceleration_structure.h"
 #include "vk13api.h"
+#include "xrhandler.h"
 #include "array.hpp"
 #include "loghandler.h"
 
@@ -245,7 +246,8 @@ noexcept
 		info.ppEnabledLayerNames = &layerName;
 	}
 
-	VkResult res = vkCreateInstance(&info, nullptr, &m_instance);
+	VkResult res = xrHandler.IsAvailable() ? (xrHandler.CreateVulkanInstance(info, m_instance) ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED)
+										   : vkCreateInstance(&info, nullptr, &m_instance);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("VKContext::CreateInstance: vkCreateInstance failed (%d)\n", (int)res);
 		return false;
@@ -290,9 +292,16 @@ noexcept
 	StaticArray<VkPhysicalDevice, kMaxPhysicalDevices> devices{};
 	vkEnumeratePhysicalDevices(m_instance, &count, devices.data());
 
+	VkPhysicalDevice xrDevice = VK_NULL_HANDLE;
+
+	if (xrHandler.IsAvailable() and not xrHandler.GetVulkanPhysicalDevice(m_instance, xrDevice))
+		return false;
+
 	int					bestScore = -1;
 	VkPhysicalDevice	bestDevice = VK_NULL_HANDLE;
 	for (uint32_t i = 0; i < count; ++i) {
+		if ((xrDevice != VK_NULL_HANDLE) and (devices[i] != xrDevice))
+			continue;
 		int score = RatePhysicalDevice(devices[i], request);
 		if (score > bestScore) {
 			bestScore = score;
@@ -381,6 +390,8 @@ noexcept
 
 	VkPhysicalDeviceFeatures2 features{};
 	features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	VkPhysicalDeviceVulkan11Features feats11{};
+	feats11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
 	VkPhysicalDeviceVulkan12Features feats12{};
 	feats12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 	VkPhysicalDeviceVulkan13Features feats13{};
@@ -405,6 +416,7 @@ noexcept
 		  *chain = &feature;
 		  chain = &feature.pNext;
 	};
+	append(feats11);
 	append(feats12);
 	if (core13)
 		append(feats13);
@@ -474,6 +486,7 @@ noexcept
 	set(GfxFeature::BindlessTextures, feats12.shaderSampledImageArrayNonUniformIndexing and feats12.runtimeDescriptorArray and
 		feats12.descriptorBindingPartiallyBound and feats12.descriptorBindingSampledImageUpdateAfterBind and
 		feats12.descriptorBindingUpdateUnusedWhilePending);
+	set(GfxFeature::Multiview, feats11.multiview and feats11.multiviewGeometryShader and feats11.multiviewTessellationShader);
 	for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
 		if ((request.required & ~support.features) & GfxFeatureBit(GfxFeature(i)))
 			logHandler.Print("Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
@@ -692,6 +705,14 @@ noexcept
 #endif
 	append(feats12);
 
+	VkPhysicalDeviceVulkan11Features feats11{};
+	feats11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+	feats11.multiview = VK_TRUE;
+	feats11.multiviewGeometryShader = VK_TRUE;
+	feats11.multiviewTessellationShader = VK_TRUE;
+	if (HasFeature(GfxFeature::Multiview))
+		append(feats11);
+
 	VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT featsPipelineLibrary{};
 	featsPipelineLibrary.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
 	featsPipelineLibrary.graphicsPipelineLibrary = VK_TRUE;
@@ -770,7 +791,9 @@ noexcept
 	info.ppEnabledExtensionNames = deviceExtensions;
 	info.pEnabledFeatures = &features;
 
-	VkResult res = vkCreateDevice(m_physicalDevice, &info, nullptr, &m_device);
+	VkResult res = xrHandler.IsAvailable()
+					   ? (xrHandler.CreateVulkanDevice(m_physicalDevice, info, m_device) ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED)
+					   : vkCreateDevice(m_physicalDevice, &info, nullptr, &m_device);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("VKContext::CreateDevice: vkCreateDevice failed (%d)\n", (int)res);
 		return false;

@@ -7,6 +7,7 @@
 #include "descriptor_pool_handler.h"
 #include "cbv_allocator.h"
 #include "resource_handler.h"
+#include "xrhandler.h"
 #include "tracy_wrapper.h"
 
 #ifdef _MSC_VER
@@ -202,10 +203,17 @@ noexcept
 }
 
 
+bool BaseDisplayHandler::HasBackBuffer(void) const
+noexcept
+{
+	return (m_swapchain.Handle() != VK_NULL_HANDLE) and commandListHandler.CmdQueue().HasImage();
+}
+
+
 void BaseDisplayHandler::EnableBackBuffer(void)
 noexcept
 {
-	if (not BackBufferList())
+	if (not (HasBackBuffer() and BackBufferList()))
 		return;
 
 	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
@@ -265,7 +273,8 @@ noexcept
 
 	if (cb == VK_NULL_HANDLE)
 		return;
-	m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
+	if (HasBackBuffer())
+		m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
 	TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
 }
 
@@ -283,14 +292,19 @@ noexcept
 void BaseDisplayHandler::EndFrame(void)
 {
 	ZoneScoped;
-	if (m_swapchain.Handle() == VK_NULL_HANDLE)
+	if ((m_swapchain.Handle() == VK_NULL_HANDLE) and not xrHandler.HasSession())
 		return;
 	// The back buffer goes to the present from here, whoever drew on it last - the scope may still be
 	// open from a draw that did not go through DrawScreen (). Idempotent: an already presentable image
 	// is left alone (ImageLayoutTracker::TransitionTo).
 	DisableBackBuffer();
+	if (xrHandler.HasSession()) {
+		CloseBackBufferList();
+		xrHandler.PrepareRelease();
+	}
 	// Submit all registered command buffers, then present + advance frame slot.
 	commandListHandler.ExecuteAll();
+	xrHandler.EndFrame();
 	commandListHandler.CmdQueue().EndFrame();
 	m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
 	m_backBufferList = nullptr;
@@ -301,17 +315,23 @@ void BaseDisplayHandler::EndFrame(void)
 void BaseDisplayHandler::BeginFrame(void)
 {
 	ZoneScoped;
-	if (m_swapchain.Handle() == VK_NULL_HANDLE)
+	if ((m_swapchain.Handle() == VK_NULL_HANDLE) and not xrHandler.HasSession())
 		return;
 	// CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, resets the slot's
 	// per-frame resources (deferred cleanup, descriptor pools, UBO allocator) and acquires the image.
 	//gfxStates.CheckError();
 	CommandQueue& cmdQueue = commandListHandler.CmdQueue();
 	WaitWhileMinimized();
-	if (cmdQueue.SwapchainIsOutOfDate() and not RestoreSwapchain())
-		return;
-	bool hasImage = cmdQueue.BeginFrame();
-	while (not hasImage and cmdQueue.SwapchainIsOutOfDate() and RestoreSwapchain())
+	xrHandler.BeginFrame();
+
+	bool useWindow = (m_swapchain.Handle() != VK_NULL_HANDLE) and not IsMinimized();
+
+	if (useWindow and cmdQueue.SwapchainIsOutOfDate() and not RestoreSwapchain())
+		useWindow = false;
+
+	bool hasImage = cmdQueue.BeginFrame(useWindow);
+
+	while (useWindow and not hasImage and cmdQueue.SwapchainIsOutOfDate() and RestoreSwapchain())
 		hasImage = cmdQueue.ReacquireImage();
 	//gfxStates.CheckError();
 	m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
@@ -400,7 +420,7 @@ bool BaseDisplayHandler::RestoreSwapchain(void)
 {
 	SDL_PumpEvents();
 	WaitWhileMinimized();
-	if (not RecreateSwapchain())
+	if (IsMinimized() or not RecreateSwapchain())
 		return false;
 	VkExtent2D extent = m_swapchain.Extent();
 	if ((extent.width != uint32_t(m_width)) or (extent.height != uint32_t(m_height)))
@@ -412,7 +432,7 @@ bool BaseDisplayHandler::RestoreSwapchain(void)
 
 void BaseDisplayHandler::WaitWhileMinimized(void)
 {
-	if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) == 0)
+	if (xrHandler.HasSession() or not IsMinimized())
 		return;
 	OnMinimized();
 	bool restoreRequested = false;

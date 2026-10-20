@@ -28,6 +28,7 @@
 #include "texturesampling.h"
 #include "vkupload.h"
 #include "loghandler.h"
+#include "multiview_hlsl.h"
 #include <spirv_reflect.h>
 
 #if VK_STALL_DIAG
@@ -816,8 +817,9 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 			args.push_back(bindArgs[i]);
 	}
 	String error;
-	if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target, args.data(), uint32_t(args.size()), spirvOut, error,
-											   shaderFolder,
+	String source = MultiviewHlslPrelude(baseRenderer.ViewCount()) + String(hlslCode);
+	if (not ShaderCompiler::CompileHlslToSpirv(static_cast<const char*>(source), entryPoint, target, args.data(), uint32_t(args.size()),
+											   spirvOut, error, shaderFolder,
 											   m_name + String(".") + String(target) +
 												   String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
 		logHandler.Print("Shader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
@@ -1087,6 +1089,8 @@ noexcept
 		}
 		if ((b->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE) or not SrvSlotOfBinding(b->binding, slot))
 			continue;
+		if ((b->image.dim == SpvDim2D) and (b->image.arrayed != 0))
+			m_srvArrayed[slot] = true;
 		if (not b->type_description or not (b->type_description->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT))
 			continue;
 		if (b->image.ms != 0)
@@ -1185,18 +1189,20 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 		logHandler.Print("Shader '%s': needs tessellation, which is not enabled on this device - not created\n", (const char*)m_name);
 		return false;
 	}
-	if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv, shaderFolder))
+	const bool multiview = baseRenderer.ViewCount() > 1;
+
+	if (not Compile((const char*)vsCode, "VSMain", multiview ? "vs_6_1" : "vs_6_0", m_vsSpirv, shaderFolder))
 		return false;
-	if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_fsSpirv, shaderFolder))
+	if (not Compile((const char*)fsCode, "PSMain", multiview ? "ps_6_1" : "ps_6_0", m_fsSpirv, shaderFolder))
 		return false;
 	if (not gsCode.IsEmpty()) {
-		if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsSpirv, shaderFolder))
+		if (not Compile((const char*)gsCode, "GSMain", multiview ? "gs_6_1" : "gs_6_0", m_gsSpirv, shaderFolder))
 			return false;
 	}
 	if (not tcsCode.IsEmpty()) {
-		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsSpirv, shaderFolder))
+		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", multiview ? "hs_6_1" : "hs_6_0", m_hsSpirv, shaderFolder))
 			return false;
-		if (not Compile(static_cast<const char*>(tesCode), "DSMain", "ds_6_0", m_dsSpirv, shaderFolder))
+		if (not Compile(static_cast<const char*>(tesCode), "DSMain", multiview ? "ds_6_1" : "ds_6_0", m_dsSpirv, shaderFolder))
 			return false;
 		m_patchControlPoints = ReflectPatchControlPoints(m_hsSpirv);
 		if (m_patchControlPoints == 0) {
@@ -1298,6 +1304,7 @@ noexcept
 	m_vsInputAttributes.clear();
 	m_vsInputBindings.clear();
 	std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
+	std::memset(m_srvArrayed, 0, sizeof(m_srvArrayed));
 	std::memset(m_samplerDeclared, 0, sizeof(m_samplerDeclared));
 #if OPTIMIZE_SHADER_LOADING
 	std::memset(m_bindingDeclared, 0, sizeof(m_bindingDeclared));
@@ -1377,6 +1384,7 @@ noexcept
 		m_vsInputAttributes = std::move(other.m_vsInputAttributes);
 		m_vsInputBindings = std::move(other.m_vsInputBindings);
 		std::memcpy(m_srvDefaults, other.m_srvDefaults, sizeof(m_srvDefaults));
+		std::memcpy(m_srvArrayed, other.m_srvArrayed, sizeof(m_srvArrayed));
 		std::memcpy(m_samplerDeclared, other.m_samplerDeclared, sizeof(m_samplerDeclared));
 #if OPTIMIZE_SHADER_LOADING
 		std::memcpy(m_bindingDeclared, other.m_bindingDeclared, sizeof(m_bindingDeclared));
@@ -1402,8 +1410,11 @@ bool Shader::Activate(void)
 	// has one open. The draw buffer handler only sees the MOMENT a target comes or goes - an app that
 	// draws on the back buffer without ever having activated one (a menu before the game starts) would
 	// otherwise record nothing at all. Idempotent, and skipped while a target is active.
-	if (baseRenderer.GetActiveBuffer() == nullptr)
+	if (baseRenderer.GetActiveBuffer() == nullptr) {
+		if (not baseDisplayHandler.HasBackBuffer())
+			return false;
 		baseDisplayHandler.EnableBackBuffer();
+	}
 
 	CommandList* cl = commandListHandler.CurrentCmdList();
 	if (cl == nullptr)
@@ -1436,10 +1447,11 @@ noexcept
 	if ((m_b0Generation == generation) and (std::memcmp(&m_b0Uploaded, &m_b0Staging, sizeof(FrameConstants)) == 0))
 		return true;
 #endif
-	CbAlloc a = cbvAllocator.Allocate(uint32_t(sizeof(FrameConstants)));
+	const uint32_t	b0Size = FrameConstantsSize(baseRenderer.ViewCount());
+	CbAlloc			a = cbvAllocator.Allocate(b0Size);
 	if (not a.IsValid())
 		return false;
-	std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+	std::memcpy(a.cpu, &m_b0Staging, b0Size);
 	m_dynamicOffsets[0] = a.offset; // binding 0 (b0)
 #if OPTIMIZE_SHADER_LOADING
 	m_dynamicBuffers[0] = a.buffer;
@@ -1505,6 +1517,15 @@ bool Shader::UpdateMatrices(void)
 	std::memcpy(m_b0Staging.mViewport, baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
 	if (shadowMap.IsReady())
 		std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(), 16 * sizeof(float));
+	if (baseRenderer.ViewCount() > 1) {
+		const BaseRenderer::ViewProjections* views = baseRenderer.FindViewProjections(baseRenderer.Projection());
+
+		for (int i = 0; i < kMaxRenderViews; ++i) {
+			std::memcpy(m_b0Staging.mEyeProjection[i], views ? views->eyeProjection[i].AsArray() : baseRenderer.Projection().AsArray(),
+						16 * sizeof(float));
+			std::memcpy(m_b0Staging.mEyeView[i], views ? views->eyeView[i].AsArray() : Matrix4f::IDENTITY.AsArray(), 16 * sizeof(float));
+		}
+	}
 	return true;
 }
 
@@ -1563,7 +1584,9 @@ noexcept
 	for (uint32_t i = 0; i < kSrvSlots; ++i) {
 		if (not m_bindingDeclared[SrvBinding(i)])
 			continue;
-		VkImageView		v = commandListHandler.m_boundSrvViews[i];
+		VkImageView		v = (m_srvArrayed[i] and (commandListHandler.m_boundSrvArrayViews[i] != VK_NULL_HANDLE))
+				? commandListHandler.m_boundSrvArrayViews[i]
+				: commandListHandler.m_boundSrvViews[i];
 		VkImageLayout	layout = commandListHandler.m_boundSrvLayouts[i];
 		if (v == VK_NULL_HANDLE) {
 			v = DefaultView(m_srvDefaults[i]);
@@ -1669,7 +1692,7 @@ noexcept
 		w.pBufferInfo = &bufInfos[bufSlot];
 	};
 
-	AddDynamicUbo(kBindingB0, uint32_t(sizeof(FrameConstants)), 0);
+	AddDynamicUbo(kBindingB0, FrameConstantsSize(baseRenderer.ViewCount()), 0);
 	AddDynamicUbo(kBindingB1VS, m_stages[kStageVS].size, 1);
 	AddDynamicUbo(kBindingB1PS, m_stages[kStagePS].size, 2);
 	AddDynamicUbo(kBindingB1GS, m_stages[kStageGS].size, 3);
@@ -1688,7 +1711,9 @@ noexcept
 		imgInfos[i].imageView = contents.views[i];
 		imgInfos[i].imageLayout = contents.layouts[i];
 #else
-		VkImageView		v = commandListHandler.m_boundSrvViews[i];
+		VkImageView		v = (m_srvArrayed[i] and (commandListHandler.m_boundSrvArrayViews[i] != VK_NULL_HANDLE))
+				? commandListHandler.m_boundSrvArrayViews[i]
+				: commandListHandler.m_boundSrvViews[i];
 		VkImageLayout	layout = commandListHandler.m_boundSrvLayouts[i];
 		if (v == VK_NULL_HANDLE) {
 			v = DefaultView(m_srvDefaults[i]);
@@ -1961,6 +1986,13 @@ int Shader::SetMatrix4f(eBaseMatrices id, const float* data, bool /*transpose*/)
 noexcept
 {
 	return TrySetB0Field(id, data) ? 0 : -1;
+}
+
+
+int Shader::SetMatrix4fArray(const char* name, const float* data, int count)
+noexcept
+{
+	return (count > 0) ? SetB1Field(name, data, size_t(count) * 16 * sizeof(float)) : -1;
 }
 
 

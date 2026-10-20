@@ -136,20 +136,21 @@ const ShaderSource& GaussBlurShader()
                 float2 _pad1;
                 float  coeffs[33];
             };
-            Texture2D    surface : register(t0);
+            ScreenTexture surface : register(t0);
             SamplerState s0      : register(s0);
             struct PSInput {
                 float4 pos       : SV_Position;
                 float3 fragPos   : TEXCOORD0;
                 float2 fragCoord : TEXCOORD1;
             };
-            float4 PSMain(PSInput i) : SV_Target {
+            float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+                SET_VIEW_ID
                 float2 scrollDir = float2(1.0 - direction, direction);
                 float4 sum = (float4)0;
                 int n = 2 * radius + 1;
                 for (int k = 0; k < n; ++k) {
                     float2 coord = i.fragCoord + scrollDir * float(k - radius) * texelSize;
-                    sum += surface.Sample(s0, coord) * coeffs[k];
+                    sum += surface.Sample(s0, SCREEN_UV(coord)) * coeffs[k];
                 }
                 return float4(sum.rgb, sum.a);
             }
@@ -184,8 +185,8 @@ static const String& BilateralBlurFS(bool useSceneDepth)
                 int    distanceSource;
                 float2 projDepth;
             };
-            Texture2D    surface         : register(t0);
-            Texture2D    uWorldNormals   : register(t1);
+            ScreenTexture surface         : register(t0);
+            ScreenTexture uWorldNormals   : register(t1);
             SamplerState s0 : register(s0);
             SamplerState s1 : register(s1);
             struct PSInput {
@@ -200,10 +201,10 @@ static const String& BilateralBlurFS(bool useSceneDepth)
 	// steps are rejected. The old length(PC-PS) blew up on grazing surfaces (screen-adjacent pixels
 	// sit far apart in world space) -> every tap rejected -> no blur -> raw noise survived.
 	static const String positionSource(R"(
-            Texture2D    uWorldPositions : register(t2);
+            ScreenTexture uWorldPositions : register(t2);
             SamplerState s2 : register(s2);
             float3 SurfaceKey(float2 uv) {
-                return uWorldPositions.SampleLevel(s2, uv, 0).xyz;
+                return uWorldPositions.SampleLevel(s2, SCREEN_UV(uv), 0).xyz;
             }
             float SurfaceDistance(float3 keyC, float3 keyS, float3 NC) {
                 return abs(dot(keyS - keyC, NC));
@@ -211,13 +212,13 @@ static const String& BilateralBlurFS(bool useSceneDepth)
     )");
 
 	static const String depthSource(R"(
-            Texture2D    uSceneDepth     : register(t3);
+            ScreenTexture uSceneDepth     : register(t3);
             SamplerState s3 : register(s3);
             float EyeDepth(float d) {
                 return abs(projDepth.y / (d + projDepth.x));
             }
             float3 SurfaceKey(float2 uv) {
-                return float3(EyeDepth(uSceneDepth.SampleLevel(s3, uv, 0).r), 0.0, 0.0);
+                return float3(EyeDepth(uSceneDepth.SampleLevel(s3, SCREEN_UV(uv), 0).r), 0.0, 0.0);
             }
             float SurfaceDistance(float3 keyC, float3 keyS, float3 NC) {
                 return abs(keyS.x - keyC.x);
@@ -225,11 +226,12 @@ static const String& BilateralBlurFS(bool useSceneDepth)
     )");
 
 	static const String body(R"(
-            float4 PSMain(PSInput i) : SV_Target {
+            float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+                SET_VIEW_ID
                 float2 uv = i.fragCoord;
-                float4 nrmC = uWorldNormals.SampleLevel(s1, uv, 0);
+                float4 nrmC = uWorldNormals.SampleLevel(s1, SCREEN_UV(uv), 0);
                 if (dot(nrmC.xyz, nrmC.xyz) < 0.25)
-                    return surface.SampleLevel(s0, uv, 0);
+                    return surface.SampleLevel(s0, SCREEN_UV(uv), 0);
                 float3 NC = normalize(nrmC.xyz);
                 float3 keyC = SurfaceKey(uv);
                 float2 dirStep = (direction < 0.5) ? float2(texelSize.x, 0.0) : float2(0.0, texelSize.y);
@@ -238,7 +240,7 @@ static const String& BilateralBlurFS(bool useSceneDepth)
                 float sumW = 0.0;
                 [loop] for (int k = -radius; k <= radius; ++k) {
                     float2 suv = uv + dirStep * float(k);
-                    float4 nrmS = uWorldNormals.SampleLevel(s1, suv, 0);
+                    float4 nrmS = uWorldNormals.SampleLevel(s1, SCREEN_UV(suv), 0);
                     if (dot(nrmS.xyz, nrmS.xyz) < 0.25)
                         continue;
                     float3 NS = normalize(nrmS.xyz);
@@ -247,10 +249,10 @@ static const String& BilateralBlurFS(bool useSceneDepth)
                     float dP = SurfaceDistance(keyC, SurfaceKey(suv), NC);
                     float wP = exp(-(dP * dP) / (2.0 * posSigma * posSigma));
                     float w = wS * wN * wP;
-                    sum += surface.SampleLevel(s0, suv, 0) * w;
+                    sum += surface.SampleLevel(s0, SCREEN_UV(suv), 0) * w;
                     sumW += w;
                 }
-                return (sumW > 0.0) ? sum / sumW : surface.SampleLevel(s0, uv, 0);
+                return (sumW > 0.0) ? sum / sumW : surface.SampleLevel(s0, SCREEN_UV(uv), 0);
             }
     )");
 

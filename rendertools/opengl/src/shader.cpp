@@ -313,6 +313,13 @@ noexcept
 }
 
 
+GLint Shader::SetMatrix4fArray(const char*, const float*, int)
+noexcept
+{
+	return -1;
+}
+
+
 GLint Shader::SetMatrix3f(const char* name, float* data, bool transpose)
 noexcept
 {

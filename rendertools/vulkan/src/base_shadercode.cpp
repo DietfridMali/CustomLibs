@@ -22,6 +22,7 @@ const ShaderSource& ShadedRingShader();
 const ShaderSource& ColorMeshShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
+const ShaderSource& PlainScreenTextureShader();
 const ShaderSource& ColoredTextureShader();
 const ShaderSource& GlyphShader();
 const ShaderSource& MovingTextureShader();
@@ -42,6 +43,8 @@ const ShaderSource& LineDrawShader();
 const ShaderSource& SkyboxShader();
 const ShaderSource& BlackholeShader();
 const ShaderSource& KuwaharaTensorShader();
+const ShaderSource& KuwaharaScreenTensorShader();
+const ShaderSource& KuwaharaScreenFilterShader();
 const ShaderSource& KuwaharaTensorBlurShader();
 const ShaderSource& KuwaharaFilterShader();
 const ShaderSource& KuwaharaCubeTensorShader();
@@ -53,6 +56,9 @@ const ShaderSource& OceanInitShader();
 const ShaderSource& OceanSpectrumShader();
 const ShaderSource& OceanTransformShader();
 const ShaderSource& OceanAssembleShader();
+const ShaderSource& XRLayerCopyShader();
+const ShaderSource& XRMirrorShader();
+const ShaderSource& XRDepthCopyShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -75,6 +81,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
 		&ColorMeshShader(),
 		&PlainColorShader(),
 		&PlainTextureShader(),
+		&PlainScreenTextureShader(),
 		&ColoredTextureShader(),
 		&GlyphShader(),
 		&MovingTextureShader(),
@@ -95,6 +102,8 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
 		&SkyboxShader(),
 		&BlackholeShader(),
 		&KuwaharaTensorShader(),
+		&KuwaharaScreenTensorShader(),
+		&KuwaharaScreenFilterShader(),
 		&KuwaharaTensorBlurShader(),
 		&KuwaharaFilterShader(),
 		&KuwaharaCubeTensorShader(),
@@ -105,7 +114,10 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
 		&OceanInitShader(),
 		&OceanSpectrumShader(),
 		&OceanTransformShader(),
-		&OceanAssembleShader()
+		&OceanAssembleShader(),
+		&XRLayerCopyShader(),
+		&XRMirrorShader(),
+		&XRDepthCopyShader()
 	};
 	AddShaders(shaderSource);
 }

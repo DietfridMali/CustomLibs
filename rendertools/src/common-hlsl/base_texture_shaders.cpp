@@ -61,12 +61,14 @@ const ShaderSource& StencilShader()
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
+                FRAME_EYE_MATRICES
             };
             struct VSInput { [[vk::location(0)]] float3 pos : POSITION; };
             struct PSInput { float4 pos : SV_Position; };
-            PSInput VSMain(VSInput i) {
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
                 PSInput o;
-                o.pos = mul(mViewport, mul(mProjection, float4(i.pos, 1.0)));
+                o.pos = mul(mViewport, mul(VIEW_PROJECTION, float4(i.pos, 1.0)));
                 return o;
             }
         )",
@@ -197,16 +199,18 @@ const ShaderSource& ColorMeshShader()
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
+                FRAME_EYE_MATRICES
             };
             struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(4)]] float4 color : COLOR; };
             struct PSInput {
                 float4 pos          : SV_Position;
                 float4 surfaceColor : COLOR;
             };
-            PSInput VSMain(VSInput i) {
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
                 PSInput o;
                 float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
-                o.pos          = mul(mViewport, mul(mProjection, viewPos));
+                o.pos          = mul(mViewport, mul(VIEW_PROJECTION, viewPos));
                 o.surfaceColor = i.color;
                 return o;
             }
@@ -283,12 +287,21 @@ const ShaderSource& GrayScaleShader()
 
 // -------------------------------------------------------------------------------------------------
 // Textured quad with per-fragment tint colour; alpha zero → discard.
-const ShaderSource& PlainTextureShader()
+static String PlainTextureFS(bool screenTexture)
 {
-	static const ShaderSource source(
-		"plainTexture",
-		Standard2DVS(),
-		R"(
+	return String(screenTexture ? R"(
+            #define SURFACE_TEXTURE ScreenTexture
+            #define SURFACE_UV(uv) SCREEN_UV(uv)
+            #define SURFACE_VIEW_ID VIEW_ID_PARAM
+            #define SURFACE_SET_VIEW_ID SET_VIEW_ID
+        )"
+								: R"(
+            #define SURFACE_TEXTURE Texture2D
+            #define SURFACE_UV(uv) (uv)
+            #define SURFACE_VIEW_ID
+            #define SURFACE_SET_VIEW_ID
+        )") +
+		String(R"(
             cbuffer ShaderConstants : register(b1) {
                 float4 surfaceColor;
                 float2 tcOffset;
@@ -297,7 +310,7 @@ const ShaderSource& PlainTextureShader()
                 int    bDecodeColors;
                 int    bDecodeTexture;
             };
-            Texture2D    surface : register(t0);
+            SURFACE_TEXTURE surface : register(t0);
             SamplerState s0      : register(s0);
             struct PSInput {
                 float4 pos       : SV_Position;
@@ -312,8 +325,9 @@ const ShaderSource& PlainTextureShader()
                 c = max(c, 0.0);
                 return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
             }
-            float4 PSMain(PSInput i) : SV_Target {
-                float4 texColor = surface.Sample(s0, tcOffset + tcScale * i.fragCoord);
+            float4 PSMain(PSInput i SURFACE_VIEW_ID) : SV_Target {
+                SURFACE_SET_VIEW_ID
+                float4 texColor = surface.Sample(s0, SURFACE_UV(tcOffset + tcScale * i.fragCoord));
                 if (bEncodeTexture != 0)
                     texColor.rgb = LinearToSRGB(texColor.rgb);
                 else if (bDecodeTexture != 0)
@@ -323,8 +337,20 @@ const ShaderSource& PlainTextureShader()
                 if (a == 0) discard;
                 return float4(texColor.rgb * color, a);
             }
-        )",
-		ShaderDataLayout(VtxTcAttrs, 2));
+        )");
+}
+
+
+const ShaderSource& PlainTextureShader()
+{
+	static const ShaderSource source("plainTexture", Standard2DVS(), PlainTextureFS(false), ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
+}
+
+
+const ShaderSource& PlainScreenTextureShader()
+{
+	static const ShaderSource source("plainScreenTexture", Standard2DVS(), PlainTextureFS(true), ShaderDataLayout(VtxTcAttrs, 2));
 	return source;
 }
 
@@ -343,6 +369,7 @@ const ShaderSource& ColoredTextureShader()
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
+                FRAME_EYE_MATRICES
             };
             struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; [[vk::location(4)]] float4 color : COLOR; };
             struct PSInput {
@@ -350,10 +377,11 @@ const ShaderSource& ColoredTextureShader()
                 float2 fragCoord   : TEXCOORD0;
                 float4 vertexColor : COLOR;
             };
-            PSInput VSMain(VSInput i) {
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
                 PSInput o;
                 float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
-                o.pos         = mul(mViewport, mul(mProjection, viewPos));
+                o.pos         = mul(mViewport, mul(VIEW_PROJECTION, viewPos));
                 o.fragCoord   = i.tc;
                 o.vertexColor = i.color;
                 return o;

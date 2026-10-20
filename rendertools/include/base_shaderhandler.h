@@ -216,7 +216,7 @@ public:
 
 	Shader* LoadPlainTextureShader(const RGBAColor& color, bool flipVertically = false, const Vector2f& tcOffset = Vector2f::ZERO,
 								   const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false,
-								   eColorEncoding textureEncoding = ecLinear);
+								   eColorEncoding textureEncoding = ecLinear, bool screenTexture = false);
 
 	Shader* LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding = ecLinear);
 

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <cstdio>
+#include <cstring>
 #include <algorithm>
 #include <utility>
 #include "conversions.hpp"
@@ -11,6 +12,7 @@
 #include "base_displayhandler.h"
 #include "gfxapitype.h"
 #include "shadowmap.h"
+#include "xrhandler.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
 
@@ -58,6 +60,7 @@ bool BaseRenderer::CreateScreenBuffer(void)
 	if (not (m_screenBuffer = new RenderTarget()))
 		return false;
 	m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 });
+	m_screenBuffer->SetCoverageAlpha(xrHandler.HasSession());
 	return true;
 }
 
@@ -188,6 +191,48 @@ noexcept
 	else
 		gfxStates.BlendFunc(src, dst);
 	gfxStates.BlendEquation(op);
+}
+
+// =================================================================================================
+
+void BaseRenderer::SetViewProjections(const Matrix4f& projection, const Matrix4f* eyeProjections, const Matrix4f* eyeViews)
+noexcept
+{
+	ViewProjections* views = nullptr;
+
+	for (int i = 0; i < m_viewProjections.Length(); ++i) {
+		if (std::memcmp(m_viewProjections[i].projection.AsArray(), projection.AsArray(), 16 * sizeof(float)) == 0) {
+			views = &m_viewProjections[i];
+			break;
+		}
+	}
+	if (views == nullptr) {
+		if (not (views = m_viewProjections.Append()))
+			return;
+		views->projection = projection;
+	}
+	for (int i = 0; i < kMaxRenderViews; ++i) {
+		views->eyeProjection[i] = eyeProjections[i];
+		views->eyeView[i] = eyeViews[i];
+	}
+}
+
+
+void BaseRenderer::ClearViewProjections(void)
+noexcept
+{
+	m_viewProjections.Reset();
+}
+
+
+const BaseRenderer::ViewProjections* BaseRenderer::FindViewProjections(const Matrix4f& projection) const
+noexcept
+{
+	for (int i = 0; i < m_viewProjections.Length(); ++i) {
+		if (std::memcmp(m_viewProjections[i].projection.AsArray(), projection.AsArray(), 16 * sizeof(float)) == 0)
+			return &m_viewProjections[i];
+	}
+	return nullptr;
 }
 
 // =================================================================================================

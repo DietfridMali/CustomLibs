@@ -24,6 +24,7 @@
 #include "gfxrenderer.h"
 #include "bindless_texture_heap.h"
 #include "loghandler.h"
+#include "multiview_hlsl.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -120,6 +121,10 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
 		logHandler.Print("ComputeShader '%s': DXC initialization failed\n", (const char*)m_name);
 		return false;
 	}
+
+	String code = MultiviewHlslPrelude(baseRenderer.ViewCount()) + String(hlslCode);
+
+	hlslCode = static_cast<const char*>(code);
 
 	DxcBuffer src{};
 	src.Ptr = hlslCode;

@@ -31,9 +31,9 @@ public:
 	bool FilterToBuffer(Texture* source, int width, int height, float* dest, const Params& params);
 
 	RenderTarget* FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params,
-								 const Viewport* area = nullptr);
+								 const Viewport* area = nullptr, int viewCount = 1);
 
-	bool Prepare(int width, int height, GfxPixelFormat filterFormat);
+	bool Prepare(int width, int height, GfxPixelFormat filterFormat, int viewCount = 1);
 
 	static int SourceMargin(const Params& params);
 
@@ -44,6 +44,7 @@ private:
 		int				width{ 0 };
 		int				height{ 0 };
 		int				margin{ 0 };
+		int				viewCount{ 1 };
 		GfxPixelFormat	filterFormat{ GfxPixelFormat::RGBA8_UNorm };
 		RenderTarget*	filter{ nullptr };
 		RenderTarget*	tensor{ nullptr };
@@ -51,7 +52,7 @@ private:
 
 	AutoArray<Targets> m_targets;
 
-	Targets* GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat);
+	Targets* GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat, int viewCount = 1);
 
 	Shader* SetupShader(const char* shaderId, int width, int height, bool wrapU, bool wrapV, const Params& params);
 

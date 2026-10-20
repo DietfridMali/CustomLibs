@@ -11,6 +11,7 @@
 #include "basesingleton.hpp"
 #include "array.hpp"
 #include "matrix.hpp"
+#include "rendertypes.h"
 #include "projector.h"
 #include "rendermatrices.h"
 #include "viewport.h"
@@ -41,6 +42,12 @@ public:
 		rpTopDown,
 		rpRespawn,
 		rpFreeCamera
+	};
+
+	struct ViewProjections {
+		Matrix4f	projection;
+		Matrix4f	eyeProjection[kMaxRenderViews];
+		Matrix4f	eyeView[kMaxRenderViews];
 	};
 
 protected:
@@ -82,6 +89,9 @@ protected:
 
 	uint32_t	m_gfxFeatures{ 0 };
 	bool		m_coverageAlpha{ false };
+
+	int							m_viewCount{ 1 };
+	AutoArray<ViewProjections>	m_viewProjections;
 
 public:
 #ifdef _DEBUG
@@ -254,6 +264,27 @@ public:
 		m_coverageAlpha = coverageAlpha;
 		return previous;
 	}
+
+	inline int ViewCount(void) const
+	noexcept
+	{
+		return m_viewCount;
+	}
+
+	inline void SetViewCount(int viewCount)
+	noexcept
+	{
+		m_viewCount = (viewCount < 1) ? 1 : (viewCount > kMaxRenderViews) ? kMaxRenderViews : viewCount;
+	}
+
+	void SetViewProjections(const Matrix4f& projection, const Matrix4f* eyeProjections, const Matrix4f* eyeViews)
+	noexcept;
+
+	void ClearViewProjections(void)
+	noexcept;
+
+	const ViewProjections* FindViewProjections(const Matrix4f& projection) const
+	noexcept;
 
 	virtual bool Start3DScene(void);
 

@@ -37,6 +37,7 @@ cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
     column_major float4x4 mProjection;
     column_major float4x4 mViewport;
+    FRAME_EYE_MATRICES
 };
 
 cbuffer ShaderConstants : register(b1) {   // same block as the PS
@@ -74,7 +75,8 @@ float3 PullToViewer(float3 vp) {
     return vp - vp * (viewerPull / (d * pow(d, 0.25)));
 }
 
-PSInput VSMain(VSInput v) {
+PSInput VSMain(VSInput v VIEW_ID_PARAM) {
+    SET_VIEW_ID
     LineInstance l = lines[v.iid + uint(firstLine)];
 
     float3 vp0 = PullToViewer(mul(mModelView, float4(l.p0, 1.0)).xyz);
@@ -99,7 +101,7 @@ PSInput VSMain(VSInput v) {
     // it was an ellipse: the round caps of a horizontal line stuck out 2.7 times further than those of
     // a vertical one on a menu frame, and a width taken from the y scale alone came out 1.78 times too
     // wide on a vertical line.
-    float4x4 mClip = mul(mViewport, mProjection);
+    float4x4 mClip = mul(mViewport, VIEW_PROJECTION);
     float4 cMid = mul(mClip, float4(0.5 * (vp0 + vp1), 1.0));
     float4 cPerp = mul(mClip, float4(perp, 0.0));
     float4 cAxis = mul(mClip, float4(axis, 0.0));
@@ -132,7 +134,7 @@ PSInput VSMain(VSInput v) {
     float3 node = vp0 + axis * along + perp * across;
 
     PSInput o;
-    o.pos = mul(mViewport, mul(mProjection, float4(node, 1.0)));
+    o.pos = mul(mViewport, mul(VIEW_PROJECTION, float4(node, 1.0)));
     o.cap = float4(along * pxAlong, across * pxAcross, segLen * pxAlong, halfWidth);
     o.color = l.color;
     o.pattern = float4(l.style, l.phase * pxAlong, l.pad.x, 0.0);

@@ -231,6 +231,12 @@ public:
 		return m_isRenderTarget;
 	}
 
+	inline bool HasArrayView(void) const
+	noexcept
+	{
+		return false;
+	}
+
 	inline bool IsDeployed(void)
 	noexcept
 	{

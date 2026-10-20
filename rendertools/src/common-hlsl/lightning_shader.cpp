@@ -34,6 +34,7 @@ cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
     column_major float4x4 mProjection;
     column_major float4x4 mViewport;
+    FRAME_EYE_MATRICES
 };
 
 cbuffer ShaderConstants : register(b1) {   // same layout as the FS block (VS needs minWidthPx/texelSize)
@@ -62,7 +63,8 @@ struct PSInput {
     float3 col : TEXCOORD2;   // per-bolt halo tint
 };
 
-PSInput VSMain(VSInput v) {
+PSInput VSMain(VSInput v VIEW_ID_PARAM) {
+    SET_VIEW_ID
     LightningSegment s = segments[v.iid];
 
     float3 vp0 = mul(mModelView, float4(s.p0, 1.0)).xyz;
@@ -89,7 +91,7 @@ PSInput VSMain(VSInput v) {
     // FS, which dims colour AND coverage by it -> the line turns continuous, not brighter.
     float widthComp = 1.0;
     if (minWidthPx > 0.0) {
-        float pxPerUnit = abs(mProjection[1][1]) * (0.5 / texelSize.y) / max(abs((vp0.z + vp1.z) * 0.5), 1e-3);
+        float pxPerUnit = abs(VIEW_PROJECTION[1][1]) * (0.5 / texelSize.y) / max(abs((vp0.z + vp1.z) * 0.5), 1e-3);
         float wMin = minWidthPx / (pxPerUnit * max(s.coreWidth, 0.1));
         if (wMax < wMin) {
             float grow = wMin / max(wMax, 1e-5);
@@ -109,7 +111,7 @@ PSInput VSMain(VSInput v) {
     float3 node = vp0 + axis * along + perp * across;
 
     PSInput o;
-    o.pos = mul(mViewport, mul(mProjection, float4(node, 1.0)));
+    o.pos = mul(mViewport, mul(VIEW_PROJECTION, float4(node, 1.0)));
     o.cap = float4(along, across, segLen, widthComp);
     o.wf  = float4(s.w0, s.w1, s.fade, s.coreWidth);
     o.col = s.color;
@@ -125,7 +127,7 @@ struct PSInput {
     float3 col : TEXCOORD2;   // per-bolt halo tint
 };
 
-Texture2D sceneDepth : register(t2);   // full-res opaque scene depth (read via Load) for manual occlusion
+ScreenTexture sceneDepth : register(t2);   // full-res opaque scene depth (read via Load) for manual occlusion
 
 cbuffer ShaderConstants : register(b1) {
     float3 coreColor;
@@ -140,13 +142,14 @@ cbuffer ShaderConstants : register(b1) {
     float  coreOpacity;                // 0 = fade as is; > 0 = fade * coreOpacity clamped to 1 -> flicker no longer thins the core, only the end fade does
 };
 
-float4 PSMain(PSInput i) : SV_Target {
+float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+    SET_VIEW_ID
     // Manual depth test -- the glow buffer has no depth attachment, so occlude the bolt against the opaque
     // scene depth (walls, and smileys via their depth prepass): i.pos.xy is half-res -> scale to the full-res
     // texel, discard fragments behind the surface (same LessEqual convention as the hardware depth test).
     // The full-res core pass renders into the scene buffer with the hardware depth test -> skipped there.
     if (softDepthScale > 0.0) {
-        float sceneNdcZ = sceneDepth.Load(int3(int2(i.pos.xy * softDepthScale), 0)).r;
+        float sceneNdcZ = sceneDepth.Load(SCREEN_TEXEL(int2(i.pos.xy * softDepthScale))).r;
         if (i.pos.z > sceneNdcZ)
             discard;
     }
@@ -227,6 +230,7 @@ cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
     column_major float4x4 mProjection;
     column_major float4x4 mViewport;
+    FRAME_EYE_MATRICES
 };
 
 cbuffer ShaderConstants : register(b1) {
@@ -255,14 +259,15 @@ struct PSInput {
     float3 col  : TEXCOORD2;
 };
 
-PSInput VSMain(VSInput v) {
+PSInput VSMain(VSInput v VIEW_ID_PARAM) {
+    SET_VIEW_ID
     LightningFlare f = flares[v.iid];
     float3 vc = mul(mModelView, float4(f.position, 1.0)).xyz;   // view-space centre
     vc += normalize(-vc) * viewerOffset;                        // toward the viewer (origin in view space) -> onto the front face
     vc.xy += v.pos.xy * (f.width * flareScale) / float2(1.0, flareAspect);   // view-aligned billboard; flareAspect > 1 stretches X -> wide/flat ellipse
 
     PSInput o;
-    o.pos = mul(mViewport, mul(mProjection, float4(vc, 1.0)));
+    o.pos = mul(mViewport, mul(VIEW_PROJECTION, float4(vc, 1.0)));
     o.tc = v.tc;
     o.fade = f.fade;
     o.col = f.color;
@@ -278,7 +283,7 @@ struct PSInput {
     float3 col  : TEXCOORD2;
 };
 
-Texture2D sceneDepth : register(t2);
+ScreenTexture sceneDepth : register(t2);
 
 cbuffer ShaderConstants : register(b1) {
     float3 coreColor;
@@ -293,14 +298,15 @@ cbuffer ShaderConstants : register(b1) {
     float  haloProfile;
 };
 
-float4 PSMain(PSInput i) : SV_Target {
+float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+    SET_VIEW_ID
     float2 uv = i.tc * 2.0 - 1.0;                    // [-1,1], centre at 0
     float r = length(uv);
     if (r > 1.0)
         discard;                                     // clip the quad corners to a disc
     // soft depth fade, not a hard cull: full where the surface is at/just behind the flare (impact on
     // the smiley), fading out where geometry is clearly in front (a nearer wall would occlude it).
-    float sceneNdcZ = sceneDepth.Load(int3(int2(i.pos.xy * softDepthScale), 0)).r;
+    float sceneNdcZ = sceneDepth.Load(SCREEN_TEXEL(int2(i.pos.xy * softDepthScale))).r;
     // The glow buffer has no depth attachment -> without this test the flare was drawn through walls
     // (occ was hard-wired to 1, so the sampled depth was never used). Same manual LessEqual test as the
     // ribbon FS. The flare centre is nudged viewerOffset (= smiley radius) toward the viewer in the VS,

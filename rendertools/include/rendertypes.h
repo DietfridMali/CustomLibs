@@ -89,6 +89,8 @@ enum eBaseMatrices {
 	bmCount
 };
 
+inline constexpr int kMaxRenderViews = 2;
+
 enum class GfxFeature : uint32_t {
 	GeometryShader = 0,
 	Tessellation,
@@ -106,6 +108,7 @@ enum class GfxFeature : uint32_t {
 	PipelineLibrary,
 	MultiDrawIndirect,
 	BindlessTextures,
+	Multiview,
 	Count
 };
 
@@ -157,6 +160,8 @@ noexcept
 			return "indirect multi draw";
 		case GfxFeature::BindlessTextures:
 			return "bindless textures";
+		case GfxFeature::Multiview:
+			return "multiview";
 		default:
 			return "unknown";
 	}
@@ -174,7 +179,7 @@ struct GfxFeatureRequest {
 	};
 	uint32_t optional{
 		GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary) |
-		GfxFeatureBit(GfxFeature::BindlessTextures)
+		GfxFeatureBit(GfxFeature::BindlessTextures) | GfxFeatureBit(GfxFeature::Multiview)
 	};
 
 	inline constexpr uint32_t Requested(void) const

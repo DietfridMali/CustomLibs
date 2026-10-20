@@ -94,6 +94,7 @@ Texture& Texture::Copy(const Texture& other)
 		// After Copy the new Texture has no GPU image; caller is expected to Deploy again.
 		m_image = VK_NULL_HANDLE;
 		m_imageView = VK_NULL_HANDLE;
+		m_arrayView = VK_NULL_HANDLE;
 		m_allocation = VK_NULL_HANDLE;
 		m_layoutTracker = ImageLayoutTracker{};
 		m_name = other.m_name;
@@ -120,6 +121,7 @@ noexcept
 		m_handle = std::exchange(other.m_handle, UINT32_MAX);
 		m_image = std::exchange(other.m_image, VkImage(VK_NULL_HANDLE));
 		m_imageView = std::exchange(other.m_imageView, VkImageView(VK_NULL_HANDLE));
+		m_arrayView = std::exchange(other.m_arrayView, VkImageView(VK_NULL_HANDLE));
 		m_allocation = std::exchange(other.m_allocation, VmaAllocation(VK_NULL_HANDLE));
 		m_bindlessIndex = std::exchange(other.m_bindlessIndex, UINT32_MAX);
 		m_layoutTracker = other.m_layoutTracker;
@@ -195,6 +197,7 @@ void Texture::Destroy(void)
 		m_image = VK_NULL_HANDLE;
 		m_allocation = VK_NULL_HANDLE;
 	}
+	m_arrayView = VK_NULL_HANDLE;
 	m_layoutTracker = ImageLayoutTracker{};
 	m_handle = UINT32_MAX;
 
@@ -233,7 +236,7 @@ bool Texture::Bind(int tmuIndex, bool)
 	// next draw (descriptorPoolHandler.Allocate + vkUpdateDescriptorSets + vkCmdBindDescriptorSets).
 	// The DX12 SetGraphicsRootDescriptorTable equivalent.
 	if (tmuIndex >= 0 and uint32_t(tmuIndex) < CommandListHandler::kSrvSlots) {
-		commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView, m_sampleLayout);
+		commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView, m_sampleLayout, m_arrayView);
 		VkSampler sampler = samplerCache.GetSampler(m_sampling);
 		commandListHandler.BindSampler(uint32_t(tmuIndex), sampler);
 	}
@@ -646,6 +649,7 @@ void ShadowTexture::SetParams(bool forceUpdate)
 void RenderTargetTexture::Destroy(void)
 {
 	m_imageView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
 	m_image = VK_NULL_HANDLE;
 	m_allocation = VK_NULL_HANDLE;
 	Texture::Destroy();
@@ -659,6 +663,7 @@ void RenderTargetTexture::Destroy(void)
 RenderTargetTexture::~RenderTargetTexture()
 {
 	m_imageView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
 	m_image = VK_NULL_HANDLE;
 	m_allocation = VK_NULL_HANDLE;
 }
@@ -667,6 +672,7 @@ RenderTargetTexture::~RenderTargetTexture()
 void ShadowTexture::Destroy(void)
 {
 	m_imageView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
 	m_image = VK_NULL_HANDLE;
 	m_allocation = VK_NULL_HANDLE;
 	Texture::Destroy();
@@ -676,6 +682,7 @@ void ShadowTexture::Destroy(void)
 ShadowTexture::~ShadowTexture()
 {
 	m_imageView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
 	m_image = VK_NULL_HANDLE;
 	m_allocation = VK_NULL_HANDLE;
 }

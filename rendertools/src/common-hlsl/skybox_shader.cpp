@@ -29,6 +29,8 @@ const ShaderSource& SkyboxShader()
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+                FRAME_EYE_MATRICES
             };
             cbuffer ShaderConstants : register(b1) {
                 column_major float4x4 mView;
@@ -38,9 +40,14 @@ const ShaderSource& SkyboxShader()
                 float4 pos          : SV_Position;
                 float3 viewDirection : TEXCOORD0;
             };
-            PSInput VSMain(VSInput i) {
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
                 PSInput o;
+            #if VIEW_COUNT > 1
+                float4 clipPos = mul(VIEW_PROJECTION, float4(mul(mView, float4(i.pos, 1.0)).xyz, 0.0));
+            #else
                 float4 clipPos = mul(mProjection, mul(mView, float4(i.pos, 1.0)));
+            #endif
                 o.pos = float4(clipPos.xy, clipPos.w, clipPos.w);
                 o.viewDirection = i.pos;
                 return o;

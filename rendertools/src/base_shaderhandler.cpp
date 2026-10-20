@@ -340,9 +340,10 @@ Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply)
 
 
 Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset,
-												  const Vector2f& tcScale, bool premultiply, eColorEncoding textureEncoding)
+												  const Vector2f& tcScale, bool premultiply, eColorEncoding textureEncoding,
+												  bool screenTexture)
 {
-	Shader* shader = SetupRenderShader("plainTexture");
+	Shader* shader = SetupRenderShader((screenTexture and (baseRenderer.ViewCount() > 1)) ? "plainScreenTexture" : "plainTexture");
 	if (shader) {
 		shader->SetVector4f("surfaceColor", color);
 		shader->SetInt("bEncodeTexture",

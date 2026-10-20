@@ -147,7 +147,7 @@ Shader* BaseQuadMesh::LoadShader(std::span<Texture* const> textures, const RGBAC
 	if (textures.size() > 1)
 		return baseShaderHandler.LoadPlainTextureShader(color, false, Vector2f::ZERO, Vector2f::ONE, m_premultiply);
 	return baseShaderHandler.LoadPlainTextureShader(color, textures[0]->IsRenderTarget(), Vector2f::ZERO, Vector2f::ONE,
-													m_premultiply, textures[0]->ColorEncoding());
+													m_premultiply, textures[0]->ColorEncoding(), textures[0]->HasArrayView());
 }
 
 

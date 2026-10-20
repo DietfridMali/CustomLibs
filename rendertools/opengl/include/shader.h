@@ -363,6 +363,9 @@ public:
 	GLint SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false)
 	noexcept;
 
+	GLint SetMatrix4fArray(const char* name, const float* data, int count)
+	noexcept;
+
 	GLint SetMatrix3f(const char* name, float* data, bool transpose = false)
 	noexcept;
 

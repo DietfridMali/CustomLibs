@@ -20,6 +20,7 @@
 #include "rendertarget.h"
 #include "gfxrenderer.h"
 #include "loghandler.h"
+#include "multiview_hlsl.h"
 #include <spirv_reflect.h>
 
 #if VK_STALL_DIAG
@@ -436,8 +437,9 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
 	}
 
 	String error;
-	if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target, args.data(), uint32_t(args.size()), spirvOut, error,
-											   shaderFolder,
+	String source = MultiviewHlslPrelude(baseRenderer.ViewCount()) + String(hlslCode);
+	if (not ShaderCompiler::CompileHlslToSpirv(static_cast<const char*>(source), entryPoint, target, args.data(), uint32_t(args.size()),
+											   spirvOut, error, shaderFolder,
 											   m_name + String(".") + String(target) +
 												   String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
 		logHandler.Print("ComputeShader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
@@ -737,17 +739,17 @@ bool ComputeShader::Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t gr
 	uint32_t				dynamicOffsetCount = 0;
 
 	if (HasBinding(0, ComputeBindingDesc::Kind::UniformBuffer)) {
-		CbAlloc b0a = cbvAllocator.Allocate(uint32_t(sizeof(FrameConstants)));
+		CbAlloc b0a = cbvAllocator.Allocate(kMonoFrameConstantsSize);
 		if (not b0a.IsValid())
 			return false;
 		FrameConstants fc{};
 		std::memcpy(fc.mModelView, baseRenderer.ModelView().AsArray(), 64);
 		std::memcpy(fc.mProjection, baseRenderer.Projection().AsArray(), 64);
 		std::memcpy(fc.mViewport, baseRenderer.ViewportTransformation().AsArray(), 64);
-		std::memcpy(b0a.cpu, &fc, sizeof(FrameConstants));
+		std::memcpy(b0a.cpu, &fc, kMonoFrameConstantsSize);
 		bufferInfos[bufferCount].buffer = b0a.buffer;
 		bufferInfos[bufferCount].offset = 0;
-		bufferInfos[bufferCount].range = sizeof(FrameConstants);
+		bufferInfos[bufferCount].range = kMonoFrameConstantsSize;
 		writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[writeCount].dstSet = set;
 		writes[writeCount].dstBinding = 0;

@@ -128,6 +128,15 @@ public:
 
 	void WaitWhileMinimized(void);
 
+	inline bool IsMinimized(void) const
+	noexcept
+	{
+		return m_window and ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0);
+	}
+
+	bool HasBackBuffer(void) const
+	noexcept;
+
 	virtual void OnMinimized(void) {}
 
 	virtual void OnRestored(void) {}
@@ -165,7 +174,7 @@ public:
 	inline VkImage CurrentBackBuffer(void) const
 	noexcept
 	{
-		return m_swapchain.Image(m_backBufferIndex);
+		return HasBackBuffer() ? m_swapchain.Image(m_backBufferIndex) : VK_NULL_HANDLE;
 	}
 
 	inline VkImageView CurrentBackBufferView(void) const

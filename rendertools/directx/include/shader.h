@@ -361,6 +361,9 @@ public:
 	int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false)
 	noexcept;
 
+	int SetMatrix4fArray(const char* name, const float* data, int count)
+	noexcept;
+
 	int SetMatrix3f(const char* name, float* data, bool transpose = false)
 	noexcept;
 	int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false)

@@ -46,7 +46,7 @@
 class Texture;
 
 // -------------------------------------------------------------------------------------------------
-// FrameConstants — layout of the b0 constant buffer (256 bytes, register b0 / set 0 binding 0)
+// FrameConstants — layout of the b0 constant buffer (512 bytes, register b0 / set 0 binding 0)
 
 #pragma pack(push, 4)
 struct FrameConstants {
@@ -54,9 +54,19 @@ struct FrameConstants {
 	float mProjection[16]{};
 	float mViewport[16]{};
 	float mLightTransform[16]{};
+	float mEyeProjection[kMaxRenderViews][16]{};
+	float mEyeView[kMaxRenderViews][16]{};
 };
-static_assert(sizeof(FrameConstants) == 256, "FrameConstants must be 256 bytes");
+static_assert(sizeof(FrameConstants) == 512, "FrameConstants must be 512 bytes");
 #pragma pack(pop)
+
+inline constexpr uint32_t kMonoFrameConstantsSize = 256;
+
+inline constexpr uint32_t FrameConstantsSize(int viewCount)
+noexcept
+{
+	return (viewCount > 1) ? uint32_t(sizeof(FrameConstants)) : kMonoFrameConstantsSize;
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -233,6 +243,7 @@ public:
 	};
 
 	uint8_t	m_srvDefaults[kSrvSlots]{};
+	bool	m_srvArrayed[kSrvSlots]{};
 	bool	m_samplerDeclared[kSamplerSlots]{};
 	bool	m_bindingDeclared[kBindingCount]{};
 	bool	m_usesAccelStructure{ false };
@@ -463,6 +474,9 @@ public:
 		return SetMatrix4f(name, data.Data(), transpose);
 	}
 	int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false)
+	noexcept;
+
+	int SetMatrix4fArray(const char* name, const float* data, int count)
 	noexcept;
 
 	int SetMatrix3f(const char* name, float* data, bool transpose = false)
