@@ -1253,7 +1253,7 @@ void GfxXRHandler::Recenter(void)
 noexcept
 {
 	if (HasSession())
-		RecenterAppSpace(*m_state);
+		m_state->recenterPending = true;
 }
 
 

@@ -291,6 +291,8 @@ noexcept
 	bindlessTextureHeap.Destroy();
 	samplerCache.Destroy();
 	cbvAllocator.Destroy();
+	gfxResourceHandler.Cleanup(0);
+	gfxResourceHandler.Cleanup(1);
 	descriptorPoolHandler.Destroy();
 	commandListHandler.Destroy();
 	m_cmdList = nullptr;

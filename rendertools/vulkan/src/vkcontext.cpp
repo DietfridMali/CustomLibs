@@ -1,5 +1,11 @@
 // VMA single-header implementation lives here (exactly one TU project-wide).
 #define VMA_IMPLEMENTATION
+#include "loghandler.h"
+#define VMA_LEAK_LOG_FORMAT(format, ...)           \
+	do {                                           \
+		logHandler.Print(format, __VA_ARGS__);     \
+		logHandler.Print("\n");                    \
+	} while (false)
 #include "vkframework.h"
 
 #include "vkcontext.h"
