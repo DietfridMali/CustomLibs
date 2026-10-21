@@ -999,6 +999,7 @@ bool BaseXRHandler::BeginFrame(void)
 		s.appliedViewPitch = xrViewPitch;
 	s.eyesRendered = false;
 	s.layerRendered = false;
+	s.layerInEyes = false;
 	s.depthSubmitted = false;
 
 	XrViewLocateInfo	locateInfo{ XR_TYPE_VIEW_LOCATE_INFO };
@@ -1513,6 +1514,21 @@ noexcept
 }
 
 
+void BaseXRHandler::SetLayerFovScale(float scale)
+noexcept
+{
+	if (not m_state)
+		return;
+	if ((scale > 1.0f) != (m_state->layerFovScale > 1.0f)) {
+		if (scale > 1.0f)
+			logHandler.Print("OpenXR: hud rendered into the eye images (field of view scale %.2f)\n", scale);
+		else
+			logHandler.Print("OpenXR: hud submitted as composition layer\n");
+	}
+	m_state->layerFovScale = scale;
+}
+
+
 bool BaseXRHandler::SubmitDepth(Texture* sceneDepth, float zNear, float zFar)
 {
 	RenderTarget* target = DepthTarget();
@@ -1547,6 +1563,9 @@ noexcept
 
 bool BaseXRHandler::RenderLayer(Texture* source, bool bRotate, bool bFlipVertically)
 {
+	if (source and m_state and (m_state->layerFovScale > 1.0f) and m_state->layerVisible and m_state->eyesRendered)
+		return RenderLayerToEyes(source, bFlipVertically);
+
 	RenderTarget* target = LayerTarget();
 
 	if (not (target and source))
@@ -1610,12 +1629,14 @@ bool BaseXRHandler::RenderMirror(bool bFlipVertically, int view)
 }
 
 
-static constexpr float	kMirrorZNear = 0.05f;
-static constexpr float	kMirrorZFar = 100.0f;
+static constexpr float	kLayerZNearScale = 0.1f;
+static constexpr float	kLayerZFarScale = 10.0f;
 static constexpr int	kMirrorStrips = 32;
 
 bool BaseXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int view)
 {
+	if (m_state and m_state->layerInEyes)
+		return true;
 	if (not (source and m_state and m_state->eyesRendered and m_state->layerVisible and (m_state->layerWidth > 0.0f) and
 			 (m_state->layer.width > 0) and (view >= 0) and (view < kMaxRenderViews)))
 		return false;
@@ -1627,13 +1648,14 @@ bool BaseXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int
 
 	XRState&	s = *m_state;
 	float		layerHeight = s.layerWidth * float(s.layer.height) / float(s.layer.width);
+	float		zNear = s.layerDistance * kLayerZNearScale;
+	float		zFar = s.layerDistance * kLayerZFarScale;
 
 	shader->SetInt("bDecodeSRGB", BackBufferIsSRGB() ? 1 : 0);
 	if (not s.layerCurved) {
 		glm::mat4	layerToApp = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -s.layerDistance)),
 											glm::vec3(s.layerWidth, layerHeight, 1.0f));
-		Matrix4f	layerToClip =
-			EyeProjection(view, kMirrorZNear, kMirrorZFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[view].pose)) * layerToApp);
+		Matrix4f	layerToClip = EyeProjection(view, zNear, zFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[view].pose)) * layerToApp);
 
 		shader->SetMatrix4f("mLayerToClip", layerToClip.AsArray());
 		shader->SetFloat("fCentralAngle", 0.0f);
@@ -1641,7 +1663,7 @@ bool BaseXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int
 		return true;
 	}
 
-	Matrix4f layerToClip = EyeProjection(view, kMirrorZNear, kMirrorZFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[view].pose)));
+	Matrix4f layerToClip = EyeProjection(view, zNear, zFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[view].pose)));
 
 	shader->SetMatrix4f("mLayerToClip", layerToClip.AsArray());
 	shader->SetFloat("fCentralAngle", s.layerWidth / s.layerRadius);
@@ -1653,6 +1675,62 @@ bool BaseXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int
 		shader->SetFloat("fStripStart", float(i) / float(kMirrorStrips));
 		baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
 	}
+	return true;
+}
+
+
+bool BaseXRHandler::RenderLayerToEyes(Texture* source, bool bFlipVertically)
+{
+	XRState&		s = *m_state;
+	RenderTarget*	eyes = EyeTarget();
+
+	if (not (eyes and (s.layerWidth > 0.0f) and (s.layer.width > 0)))
+		return false;
+
+	Shader* shader = baseShaderHandler.SetupRenderShader("xrLayerEyes");
+
+	if (not (shader and eyes->Activate({ .clear = false })))
+		return false;
+
+	float		layerHeight = s.layerWidth * float(s.layer.height) / float(s.layer.width);
+	float		zNear = s.layerDistance * kLayerZNearScale;
+	float		zFar = s.layerDistance * kLayerZFarScale;
+	float		tanScale = s.layerFovScale * zNear;
+	glm::mat4	stretch = glm::scale(glm::mat4(1.0f), glm::vec3(s.layerFovScale, s.layerFovScale, 1.0f));
+	glm::mat4	layerToApp = s.layerCurved ? stretch
+										   : stretch * glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -s.layerDistance)),
+																  glm::vec3(s.layerWidth, layerHeight, 1.0f));
+	Matrix4f	layerToClip[kMaxRenderViews];
+
+	for (int i = 0; i < kMaxRenderViews; ++i) {
+		const XrFovf& fov = s.views[i].fov;
+
+		layerToClip[i] = Matrix4f(glm::frustum(std::tan(fov.angleLeft) * tanScale, std::tan(fov.angleRight) * tanScale,
+											   std::tan(fov.angleDown) * tanScale, std::tan(fov.angleUp) * tanScale, zNear, zFar) *
+								  glm::inverse(PoseMatrix(s.views[i].pose)) * layerToApp);
+	}
+	baseRenderer.Set2DRenderStates();
+	gfxStates.SetBlending(1);
+	gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
+	shader->SetMatrix4fArray("mLayerToClip", layerToClip[0].AsArray(), baseRenderer.ViewCount());
+	if (not s.layerCurved) {
+		shader->SetFloat("fCentralAngle", 0.0f);
+		baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
+	}
+	else {
+		shader->SetFloat("fCentralAngle", s.layerWidth / s.layerRadius);
+		shader->SetFloat("fRadius", s.layerRadius);
+		shader->SetFloat("fCenterDistance", s.layerDistance - s.layerRadius);
+		shader->SetFloat("fLayerHeight", layerHeight);
+		shader->SetFloat("fStripWidth", 1.0f / float(kMirrorStrips));
+		for (int i = 0; i < kMirrorStrips; ++i) {
+			shader->SetFloat("fStripStart", float(i) / float(kMirrorStrips));
+			baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
+		}
+	}
+	eyes->Deactivate();
+	baseRenderer.Set2DRenderStates();
+	s.layerInEyes = true;
 	return true;
 }
 

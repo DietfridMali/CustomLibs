@@ -58,6 +58,7 @@ const ShaderSource& OceanTransformShader();
 const ShaderSource& OceanAssembleShader();
 const ShaderSource& XRLayerCopyShader();
 const ShaderSource& XRLayerMirrorShader();
+const ShaderSource& XRLayerEyesShader();
 const ShaderSource& XRMirrorShader();
 const ShaderSource& XRDepthCopyShader();
 
@@ -118,6 +119,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
 		&OceanAssembleShader(),
 		&XRLayerCopyShader(),
 		&XRLayerMirrorShader(),
+		&XRLayerEyesShader(),
 		&XRMirrorShader(),
 		&XRDepthCopyShader()
 	};

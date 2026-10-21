@@ -58,6 +58,7 @@ struct XRState {
 	bool							frameBegun{ false };
 	bool							eyesRendered{ false };
 	bool							layerRendered{ false };
+	bool							layerInEyes{ false };
 	bool							hasDepthExtension{ false };
 	bool							hasVisibilityMaskExtension{ false };
 	bool							hasPerformanceMetricsExtension{ false };
@@ -72,6 +73,7 @@ struct XRState {
 	bool							layerVisible{ false };
 	bool							layerCurved{ false };
 	float							layerRadius{ 1.0f };
+	float							layerFovScale{ 1.0f };
 	float							zNear{ 0.0f };
 	float							zFar{ 0.0f };
 	bool							depthSubmitted{ false };

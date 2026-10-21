@@ -116,6 +116,75 @@ const ShaderSource& XRLayerMirrorShader()
 }
 
 
+const ShaderSource& XRLayerEyesShader()
+{
+	static const ShaderSource xrLayerEyesShader(
+		"xrLayerEyes",
+		String(R"(
+            cbuffer ShaderConstants : register(b1) {
+                column_major float4x4 mLayerToClip [VIEW_COUNT];
+                float fCentralAngle;
+                float fRadius;
+                float fCenterDistance;
+                float fLayerHeight;
+                float fStripStart;
+                float fStripWidth;
+            };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
+                PSInput o;
+                if (fCentralAngle > 0.0) {
+                    float u = fStripStart + (i.pos.x + 0.5) * fStripWidth;
+                    float a = (u - 0.5) * fCentralAngle;
+                    o.pos = mul(mLayerToClip[gViewId], float4(fRadius * sin(a), i.pos.y * fLayerHeight, -fCenterDistance - fRadius * cos(a), 1.0));
+                    o.fragCoord = float2(u, i.tc.y);
+                }
+                else {
+                    o.pos = mul(mLayerToClip[gViewId], float4(i.pos.xy, 0.0, 1.0));
+                    o.fragCoord = i.tc;
+                }
+                return o;
+            }
+        )"),
+		String(R"(
+            cbuffer ShaderConstants : register(b1) {
+                column_major float4x4 mLayerToClip [VIEW_COUNT];
+                float fCentralAngle;
+                float fRadius;
+                float fCenterDistance;
+                float fLayerHeight;
+                float fStripStart;
+                float fStripWidth;
+            };
+            Texture2D surface : register(t0);
+            SamplerState s0  : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+
+            float3 SRGBToLinear(float3 c) {
+                c = saturate(c);
+                return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
+            }
+
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 c = surface.Sample(s0, i.fragCoord);
+                if (c.a <= 0.0)
+                    return float4(0.0, 0.0, 0.0, 0.0);
+                return float4(SRGBToLinear(c.rgb / c.a) * c.a, c.a);
+            }
+        )"),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return xrLayerEyesShader;
+}
+
+
 const ShaderSource& XRMirrorShader()
 {
 	static const ShaderSource xrMirrorShader(

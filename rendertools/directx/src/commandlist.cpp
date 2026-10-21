@@ -8,17 +8,35 @@
 #include "gfxrenderer.h"
 #include "shader.h"
 #include "shader_loading.h"
+#include "xrhandler.h"
 #if OPTIMIZE_SHADER_LOADING
 #include "base_displayhandler.h"
 #endif
 
 #include <cstdio>
 #include <cstring>
+#include <cstdarg>
+#include <chrono>
 #include "tracy_wrapper.h"
 #include "loghandler.h"
 
 // base_displayhandler.cpp - ends the program with a message when the device has been removed.
 extern void HandleDeviceLost(const char* where)
+noexcept;
+
+static void DxGpuFrameBegin(const CommandList* list, const char* name, ID3D12GraphicsCommandList* gfxList, uint32_t slotIndex)
+noexcept;
+
+static void DxGpuFrameEnd(const CommandList* list, ID3D12GraphicsCommandList* gfxList, uint32_t slotIndex)
+noexcept;
+
+static void DxGpuFrameResolve(uint32_t slotIndex, uint64_t frameNumber)
+noexcept;
+
+static void DxGpuFrameAdvance(uint32_t slotIndex)
+noexcept;
+
+static void DxGpuFrameDestroy(void)
 noexcept;
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
@@ -94,6 +112,7 @@ void CommandQueue::Destroy(void)
 noexcept
 {
 	WaitIdle();
+	DxGpuFrameDestroy();
 	cbvAllocator.Destroy();
 	if (m_fenceEvent) {
 		CloseHandle(m_fenceEvent);
@@ -239,6 +258,7 @@ noexcept
 		logHandler.Print("CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
 		return false;
 	}
+	DxGpuFrameBegin(this, static_cast<const char*>(m_name), m_gfxListPtr.Get(), frameIndex);
 	m_isRecording = true;
 	m_isFlushed = false;
 	m_openSerial = gfxResourceHandler.NextSerial();
@@ -290,6 +310,7 @@ noexcept
 	delete m_gpuZone;
 	m_gpuZone = nullptr;
 #endif
+	DxGpuFrameEnd(this, m_gfxListPtr.Get(), uint32_t(commandListHandler.FrameIndex()));
 	HRESULT hr = m_gfxListPtr->Close();
 	if (FAILED(hr))
 		logHandler.Print("CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
@@ -888,10 +909,12 @@ noexcept
 		SetFrameIndex(frameIndex);
 	else
 		NextFrame();
+	DxGpuFrameAdvance(uint32_t(m_frameIndex));
 	{
 		ZoneScopedN("WaitForFrame");
 		m_cmdQueue.WaitForFrame(m_frameIndex);
 	}
+	DxGpuFrameResolve(uint32_t(m_frameIndex), m_frameNumber);
 	{
 		ZoneScopedN("cbvAllocator::Reset");
 		cbvAllocator.Reset(UINT(m_frameIndex));
@@ -1255,9 +1278,508 @@ noexcept
 }
 
 
+static constexpr uint32_t	kGpuFrameSlotSize = 256;
+static constexpr uint32_t	kGpuFrameCycleMax = kGpuFrameSlotSize / 2;
+static constexpr uint32_t	kGpuFrameStageMax = 128;
+static constexpr uint32_t	kGpuFrameQueries = 2 + kGpuFrameStageMax;
+static constexpr size_t		kGpuFrameNameSize = 48;
+static constexpr uint32_t	kGpuFrameEntryMax = 128;
+static constexpr uint16_t	kGpuFrameOtherLists = 0;
+static constexpr uint16_t	kGpuFrameOtherStages = 1;
+static constexpr double		kGpuFrameMinMs = 0.1;
+static constexpr double		kGpuFrameSummaryMs = 1000.0;
+static constexpr size_t		kGpuFrameTextSize = 8192;
+
+struct DxGpuFrameRecord {
+	const CommandList*			list;
+	ID3D12GraphicsCommandList*	gfxList;
+	bool						isEnded;
+	uint16_t					entry;
+	uint32_t					stageCount;
+	uint32_t					stagesDropped;
+	uint16_t					stageEntries[kGpuFrameStageMax];
+};
+
+struct DxGpuFrameSlot {
+	uint32_t			first{ 0 };
+	uint32_t			count{ 0 };
+	uint32_t			dropped{ 0 };
+	uint64_t			frameNumber{ 0 };
+	uint32_t			previousFirst{ 0 };
+	uint32_t			previousCount{ 0 };
+	uint32_t			previousDropped{ 0 };
+	uint64_t			previousFrameNumber{ 0 };
+	DxGpuFrameRecord	records[kGpuFrameSlotSize]{};
+};
+
+struct DxGpuFrameEntry {
+	char	name[kGpuFrameNameSize];
+	bool	isStage;
+	double	frameMs;
+	double	totalMs;
+	double	maxMs;
+};
+
+struct DxGpuFrameSummary {
+	double			startMs{ 0.0 };
+	uint32_t		frames{ 0 };
+	uint32_t		overPeriod{ 0 };
+	uint32_t		listsDropped{ 0 };
+	uint32_t		stagesDropped{ 0 };
+	double			spanTotalMs{ 0.0 };
+	double			spanMaxMs{ 0.0 };
+	double			busyTotalMs{ 0.0 };
+	double			busyMaxMs{ 0.0 };
+	double			periodMs{ 0.0 };
+	uint32_t		entryCount{ 0 };
+	DxGpuFrameEntry	entries[kGpuFrameEntryMax]{};
+};
+
+static bool						dxGpuFrameOn = false;
+static ComPtr<ID3D12QueryHeap>	dxGpuFrameHeap;
+static ComPtr<ID3D12Resource>	dxGpuFrameReadback;
+static bool						dxGpuFrameUnavailable = false;
+static double					dxGpuFrameTickMs = 0.0;
+static DxGpuFrameSlot			dxGpuFrameSlots[CommandQueue::FRAME_COUNT];
+static DxGpuFrameSummary		dxGpuFrameSummary;
+static char						dxGpuFrameText[kGpuFrameTextSize];
+
+
+static double DxGpuFrameClock(void)
+noexcept
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+
+static inline uint32_t DxGpuFrameQuery(uint32_t slotIndex, uint32_t index)
+noexcept
+{
+	return (slotIndex * kGpuFrameSlotSize + index) * kGpuFrameQueries;
+}
+
+
+static void DxGpuFrameSetEntry(DxGpuFrameEntry& entry, const char* name, bool isStage)
+noexcept
+{
+	snprintf(entry.name, sizeof(entry.name), "%s", name);
+	entry.isStage = isStage;
+	entry.frameMs = 0.0;
+	entry.totalMs = 0.0;
+	entry.maxMs = 0.0;
+}
+
+
+static uint16_t DxGpuFrameEntryIndex(const char* name, bool isStage)
+noexcept
+{
+	DxGpuFrameSummary&	summary = dxGpuFrameSummary;
+	char				key[kGpuFrameNameSize];
+	size_t				length = 0;
+
+	if (summary.entryCount == 0) {
+		DxGpuFrameSetEntry(summary.entries[kGpuFrameOtherLists], "(other lists)", false);
+		DxGpuFrameSetEntry(summary.entries[kGpuFrameOtherStages], "(other stages)", true);
+		summary.entryCount = 2;
+	}
+	while ((name[length] != '\0') and (length < sizeof(key) - 1) and ((name[length] < '0') or (name[length] > '9'))) {
+		key[length] = name[length];
+		++length;
+	}
+	while ((length > 0) and ((key[length - 1] == ' ') or (key[length - 1] == ':')))
+		--length;
+	key[length] = '\0';
+	if (length == 0)
+		snprintf(key, sizeof(key), "%s", name);
+	for (uint32_t i = 2; i < summary.entryCount; ++i) {
+		if ((summary.entries[i].isStage == isStage) and (std::strcmp(summary.entries[i].name, key) == 0))
+			return uint16_t(i);
+	}
+	if (summary.entryCount >= kGpuFrameEntryMax)
+		return isStage ? kGpuFrameOtherStages : kGpuFrameOtherLists;
+	DxGpuFrameSetEntry(summary.entries[summary.entryCount], key, isStage);
+	return uint16_t(summary.entryCount++);
+}
+
+
+static DxGpuFrameRecord* DxGpuFrameFind(DxGpuFrameSlot& slot, const CommandList* list, uint32_t& index)
+noexcept
+{
+	for (uint32_t i = slot.count; i > 0; --i) {
+		index = (slot.first + i - 1) % kGpuFrameSlotSize;
+		DxGpuFrameRecord& record = slot.records[index];
+		if ((record.list == list) and not record.isEnded)
+			return &record;
+	}
+	return nullptr;
+}
+
+
+static bool DxGpuFrameCreate(void)
+noexcept
+{
+	if (dxGpuFrameHeap.Get() != nullptr)
+		return true;
+	if (dxGpuFrameUnavailable)
+		return false;
+	UINT64	frequency = 0;
+	HRESULT	hr = commandListHandler.GetQueue()->GetTimestampFrequency(&frequency);
+	if (FAILED(hr) or (frequency == 0)) {
+		logHandler.Print("GPU frame timing: the graphics queue has no timestamps (hr=0x%08X)\n", unsigned(hr));
+		dxGpuFrameUnavailable = true;
+		return false;
+	}
+	ID3D12Device*			device = dx12Context.Device();
+	D3D12_QUERY_HEAP_DESC	heapDesc{};
+	heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+	heapDesc.Count = CommandQueue::FRAME_COUNT * kGpuFrameSlotSize * kGpuFrameQueries;
+	hr = device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(&dxGpuFrameHeap));
+	if (FAILED(hr)) {
+		logHandler.Print("GPU frame timing: CreateQueryHeap failed (hr=0x%08X)\n", unsigned(hr));
+		dxGpuFrameHeap.Reset();
+		dxGpuFrameUnavailable = true;
+		return false;
+	}
+	D3D12_HEAP_PROPERTIES	heapProps{};
+	D3D12_RESOURCE_DESC		bufferDesc{};
+	heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProps.CreationNodeMask = 1;
+	heapProps.VisibleNodeMask = 1;
+	bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	bufferDesc.Width = UINT64(heapDesc.Count) * sizeof(uint64_t);
+	bufferDesc.Height = 1;
+	bufferDesc.DepthOrArraySize = 1;
+	bufferDesc.MipLevels = 1;
+	bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
+	bufferDesc.SampleDesc.Count = 1;
+	bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+										 IID_PPV_ARGS(&dxGpuFrameReadback));
+	if (FAILED(hr)) {
+		logHandler.Print("GPU frame timing: the readback buffer cannot be created (hr=0x%08X)\n", unsigned(hr));
+		dxGpuFrameHeap.Reset();
+		dxGpuFrameReadback.Reset();
+		dxGpuFrameUnavailable = true;
+		return false;
+	}
+	dxGpuFrameTickMs = 1000.0 / double(frequency);
+	return true;
+}
+
+
+static void DxGpuFrameBegin(const CommandList* list, const char* name, ID3D12GraphicsCommandList* gfxList, uint32_t slotIndex)
+noexcept
+{
+	if (not (dxGpuFrameOn and DxGpuFrameCreate()))
+		return;
+	DxGpuFrameSlot& slot = dxGpuFrameSlots[slotIndex];
+	if (slot.count >= kGpuFrameCycleMax) {
+		++slot.dropped;
+		return;
+	}
+	uint32_t index = (slot.first + slot.count) % kGpuFrameSlotSize;
+	++slot.count;
+	DxGpuFrameRecord& record = slot.records[index];
+	record.list = list;
+	record.gfxList = gfxList;
+	record.isEnded = false;
+	record.entry = DxGpuFrameEntryIndex(name, false);
+	record.stageCount = 0;
+	record.stagesDropped = 0;
+	gfxList->EndQuery(dxGpuFrameHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, DxGpuFrameQuery(slotIndex, index));
+}
+
+
+static void DxGpuFrameStage(ID3D12GraphicsCommandList* gfxList, const char* name)
+noexcept
+{
+	if ((dxGpuFrameHeap.Get() == nullptr) or (gfxList == nullptr))
+		return;
+	for (uint32_t slotIndex = 0; slotIndex < CommandQueue::FRAME_COUNT; ++slotIndex) {
+		DxGpuFrameSlot& slot = dxGpuFrameSlots[slotIndex];
+		for (uint32_t i = slot.count; i > 0; --i) {
+			uint32_t			index = (slot.first + i - 1) % kGpuFrameSlotSize;
+			DxGpuFrameRecord&	record = slot.records[index];
+			if ((record.gfxList != gfxList) or record.isEnded)
+				continue;
+			if (record.stageCount >= kGpuFrameStageMax) {
+				++record.stagesDropped;
+				return;
+			}
+			record.stageEntries[record.stageCount] = DxGpuFrameEntryIndex(name, true);
+			gfxList->EndQuery(dxGpuFrameHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, DxGpuFrameQuery(slotIndex, index) + 2 + record.stageCount);
+			++record.stageCount;
+			return;
+		}
+	}
+}
+
+
+static void DxGpuFrameEnd(const CommandList* list, ID3D12GraphicsCommandList* gfxList, uint32_t slotIndex)
+noexcept
+{
+	if (dxGpuFrameHeap.Get() == nullptr)
+		return;
+	uint32_t			index = 0;
+	DxGpuFrameRecord*	record = DxGpuFrameFind(dxGpuFrameSlots[slotIndex], list, index);
+	if (record == nullptr)
+		return;
+	record->isEnded = true;
+	uint32_t query = DxGpuFrameQuery(slotIndex, index);
+	gfxList->EndQuery(dxGpuFrameHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, query + 1);
+	gfxList->ResolveQueryData(dxGpuFrameHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, query, 2 + record->stageCount, dxGpuFrameReadback.Get(),
+							  UINT64(query) * sizeof(uint64_t));
+}
+
+
+static void DxGpuFrameAdvance(uint32_t slotIndex)
+noexcept
+{
+	DxGpuFrameSlot& slot = dxGpuFrameSlots[slotIndex];
+	slot.previousFirst = slot.first;
+	slot.previousCount = slot.count;
+	slot.previousDropped = slot.dropped;
+	slot.previousFrameNumber = slot.frameNumber;
+	slot.first = (slot.first + slot.count) % kGpuFrameSlotSize;
+	slot.count = 0;
+	slot.dropped = 0;
+}
+
+
+static void DxGpuFrameAppend(int& length, const char* format, ...)
+noexcept
+{
+	if (length >= int(kGpuFrameTextSize) - 1)
+		return;
+	va_list	args;
+	va_start(args, format);
+	int written = vsnprintf(dxGpuFrameText + length, kGpuFrameTextSize - size_t(length), format, args);
+	va_end(args);
+	if (written <= 0)
+		return;
+	length += written;
+	if (length > int(kGpuFrameTextSize) - 1)
+		length = int(kGpuFrameTextSize) - 1;
+}
+
+
+static void DxGpuFrameAppendEntries(int& length, bool isStage, bool isSummary)
+noexcept
+{
+	const DxGpuFrameSummary&	summary = dxGpuFrameSummary;
+	bool						isListed[kGpuFrameEntryMax]{};
+	const char*					separator = isStage ? "; stages:" : "; lists:";
+
+	for (;;) {
+		int		best = -1;
+		double	bestMs = kGpuFrameMinMs;
+		for (uint32_t i = 0; i < summary.entryCount; ++i) {
+			const DxGpuFrameEntry&	entry = summary.entries[i];
+			double					ms = isSummary ? entry.totalMs / double(summary.frames) : entry.frameMs;
+			if (isListed[i] or (entry.isStage != isStage) or (ms < bestMs))
+				continue;
+			best = int(i);
+			bestMs = ms;
+		}
+		if (best < 0)
+			return;
+		isListed[best] = true;
+		if (isSummary)
+			DxGpuFrameAppend(length, "%s %s %.2f/%.2f", separator, summary.entries[best].name, bestMs, summary.entries[best].maxMs);
+		else
+			DxGpuFrameAppend(length, "%s %s %.2f", separator, summary.entries[best].name, bestMs);
+		separator = ",";
+	}
+}
+
+
+static void DxGpuFrameLogFrame(uint64_t frameNumber, double periodMs, double busyMs, double spanMs, uint32_t timed, uint32_t count,
+							   uint32_t dropped, uint32_t stagesDropped)
+noexcept
+{
+	int length = 0;
+	DxGpuFrameAppend(length, "GPU frame %llu over the display period of %.2f ms: busy %.2f ms, span %.2f ms, %u of %u lists timed, %u lists and %u stages not recorded",
+					 static_cast<unsigned long long>(frameNumber), periodMs, busyMs, spanMs, timed, count, dropped, stagesDropped);
+	DxGpuFrameAppendEntries(length, false, false);
+	DxGpuFrameAppendEntries(length, true, false);
+	logHandler.Print("%s\n", dxGpuFrameText);
+}
+
+
+static void DxGpuFrameLogSummary(double elapsedMs)
+noexcept
+{
+	const DxGpuFrameSummary&	summary = dxGpuFrameSummary;
+	double						frames = double(summary.frames);
+	int							length = 0;
+	DxGpuFrameAppend(length, "GPU %u frames in %.2f s, display period %.2f ms: busy avg %.2f max %.2f ms, span avg %.2f max %.2f ms, %u frames busy longer than the period, %u lists and %u stages not recorded",
+					 summary.frames, elapsedMs * 0.001, summary.periodMs, summary.busyTotalMs / frames, summary.busyMaxMs, summary.spanTotalMs / frames,
+					 summary.spanMaxMs, summary.overPeriod, summary.listsDropped, summary.stagesDropped);
+	DxGpuFrameAppendEntries(length, false, true);
+	DxGpuFrameAppendEntries(length, true, true);
+	logHandler.Print("%s\n", dxGpuFrameText);
+}
+
+
+static void DxGpuFrameResetSummary(double startMs)
+noexcept
+{
+	DxGpuFrameSummary& summary = dxGpuFrameSummary;
+	summary.startMs = startMs;
+	summary.frames = 0;
+	summary.overPeriod = 0;
+	summary.listsDropped = 0;
+	summary.stagesDropped = 0;
+	summary.spanTotalMs = 0.0;
+	summary.spanMaxMs = 0.0;
+	summary.busyTotalMs = 0.0;
+	summary.busyMaxMs = 0.0;
+	for (uint32_t i = 0; i < summary.entryCount; ++i) {
+		summary.entries[i].frameMs = 0.0;
+		summary.entries[i].totalMs = 0.0;
+		summary.entries[i].maxMs = 0.0;
+	}
+}
+
+
+static void DxGpuFrameMeasure(uint32_t slotIndex, uint32_t first, uint32_t count, uint32_t dropped, uint64_t frameNumber)
+noexcept
+{
+	const DxGpuFrameSlot&	slot = dxGpuFrameSlots[slotIndex];
+	DxGpuFrameSummary&		summary = dxGpuFrameSummary;
+	uint64_t				firstBegin = UINT64_MAX;
+	uint64_t				lastEnd = 0;
+	double					busyMs = 0.0;
+	uint32_t				timed = 0;
+	uint32_t				stagesDropped = 0;
+	void*					mapped = nullptr;
+	D3D12_RANGE				readRange{ SIZE_T(DxGpuFrameQuery(slotIndex, 0)) * sizeof(uint64_t), SIZE_T(DxGpuFrameQuery(slotIndex + 1, 0)) * sizeof(uint64_t) };
+
+	if (FAILED(dxGpuFrameReadback->Map(0, &readRange, &mapped)))
+		return;
+
+	const uint64_t* data = static_cast<const uint64_t*>(mapped);
+
+	for (uint32_t i = 0; i < count; ++i) {
+		uint32_t				index = (first + i) % kGpuFrameSlotSize;
+		const DxGpuFrameRecord&	record = slot.records[index];
+		if (not record.isEnded)
+			continue;
+		uint32_t	query = DxGpuFrameQuery(slotIndex, index);
+		uint64_t	begin = data[query];
+		uint64_t	end = data[query + 1];
+		if (end < begin)
+			continue;
+		double listMs = double(end - begin) * dxGpuFrameTickMs;
+		summary.entries[record.entry].frameMs += listMs;
+		busyMs += listMs;
+		++timed;
+		if (firstBegin > begin)
+			firstBegin = begin;
+		if (lastEnd < end)
+			lastEnd = end;
+		stagesDropped += record.stagesDropped;
+		for (uint32_t j = 0; j < record.stageCount; ++j) {
+			uint64_t stage = data[query + 2 + j];
+			uint64_t stageEnd = (j + 1 < record.stageCount) ? data[query + 3 + j] : end;
+			if (stageEnd >= stage)
+				summary.entries[record.stageEntries[j]].frameMs += double(stageEnd - stage) * dxGpuFrameTickMs;
+		}
+	}
+
+	D3D12_RANGE writeRange{ 0, 0 };
+
+	dxGpuFrameReadback->Unmap(0, &writeRange);
+	if (timed == 0)
+		return;
+	double	spanMs = double(lastEnd - firstBegin) * dxGpuFrameTickMs;
+	double	periodMs = xrHandler.DisplayPeriod();
+	if ((periodMs > 0.0) and (busyMs > periodMs)) {
+		++summary.overPeriod;
+		DxGpuFrameLogFrame(frameNumber, periodMs, busyMs, spanMs, timed, count, dropped, stagesDropped);
+	}
+	if (periodMs > 0.0)
+		summary.periodMs = periodMs;
+	++summary.frames;
+	summary.listsDropped += dropped;
+	summary.stagesDropped += stagesDropped;
+	summary.spanTotalMs += spanMs;
+	if (summary.spanMaxMs < spanMs)
+		summary.spanMaxMs = spanMs;
+	summary.busyTotalMs += busyMs;
+	if (summary.busyMaxMs < busyMs)
+		summary.busyMaxMs = busyMs;
+	for (uint32_t i = 0; i < summary.entryCount; ++i) {
+		DxGpuFrameEntry& entry = summary.entries[i];
+		entry.totalMs += entry.frameMs;
+		if (entry.maxMs < entry.frameMs)
+			entry.maxMs = entry.frameMs;
+		entry.frameMs = 0.0;
+	}
+	double now = DxGpuFrameClock();
+	if (summary.startMs == 0.0)
+		summary.startMs = now;
+	else if (now - summary.startMs >= kGpuFrameSummaryMs) {
+		DxGpuFrameLogSummary(now - summary.startMs);
+		DxGpuFrameResetSummary(now);
+	}
+}
+
+
+static void DxGpuFrameSwitch(bool isOn)
+noexcept
+{
+	if (isOn == dxGpuFrameOn)
+		return;
+	dxGpuFrameOn = isOn;
+	if (isOn)
+		DxGpuFrameResetSummary(0.0);
+	logHandler.Print("GPU frame timing %s\n", isOn ? "on" : "off");
+}
+
+
+static void DxGpuFrameResolve(uint32_t slotIndex, uint64_t frameNumber)
+noexcept
+{
+	DxGpuFrameSlot&	slot = dxGpuFrameSlots[slotIndex];
+	uint32_t		first = slot.previousFirst;
+	uint32_t		count = slot.previousCount;
+	uint32_t		dropped = slot.previousDropped;
+	uint64_t		recordFrame = slot.previousFrameNumber;
+	slot.previousCount = 0;
+	slot.previousDropped = 0;
+	slot.frameNumber = frameNumber;
+	if ((dxGpuFrameHeap.Get() != nullptr) and (count > 0))
+		DxGpuFrameMeasure(slotIndex, first, count, dropped, recordFrame);
+	DxGpuFrameSwitch(xrHandler.IsRunning());
+}
+
+
+static void DxGpuFrameDestroy(void)
+noexcept
+{
+	dxGpuFrameHeap.Reset();
+	dxGpuFrameReadback.Reset();
+	for (DxGpuFrameSlot& slot : dxGpuFrameSlots) {
+		slot.first = 0;
+		slot.count = 0;
+		slot.dropped = 0;
+		slot.frameNumber = 0;
+		slot.previousFirst = 0;
+		slot.previousCount = 0;
+		slot.previousDropped = 0;
+		slot.previousFrameNumber = 0;
+	}
+}
+
+
 void GfxStageMark(const char* name)
 noexcept
 {
+	DxGpuFrameStage(commandListHandler.CurrentGfxList(), name);
 }
 
 

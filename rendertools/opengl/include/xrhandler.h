@@ -235,6 +235,10 @@ public:
 		return false;
 	}
 
+	inline void SetLayerFovScale(float)
+	noexcept
+	{}
+
 	inline bool SubmitDepth(Texture*, float, float)
 	{
 		return false;

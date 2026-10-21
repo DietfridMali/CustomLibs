@@ -77,6 +77,8 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 	}
 	if (not descriptorHeaps.CreateDefaultTextures(dx12Context.Device()))
 		return false;
+	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled())
+		baseDisplayHandler.SetVSync(false);
 	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled()) {
 		if (not HasFeature(GfxFeature::Multiview))
 			logHandler.Print("The graphics device has no view instancing with shader model 6.1 - VR is off.\n");
@@ -221,8 +223,8 @@ bool GfxRenderer::RestartGraphics(const GfxFeatureRequest& request)
 	PSO::RestorePipelineLibrary();
 	SetViewCount(xrHandler.HasSession() ? kMaxRenderViews : 1);
 	baseShaderHandler.RecreateShaders();
-	GpuRegistry::RestoreAll();
 	xrHandler.BeginFrame();
+	GpuRegistry::RestoreAll();
 	return true;
 }
 

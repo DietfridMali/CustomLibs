@@ -147,6 +147,9 @@ public:
 	bool HasCurvedLayer(void) const
 	noexcept;
 
+	void SetLayerFovScale(float scale)
+	noexcept;
+
 	bool SubmitDepth(Texture* sceneDepth, float zNear, float zFar);
 
 	bool DepthSubmitted(void) const
@@ -209,6 +212,8 @@ protected:
 
 private:
 	bool CreateSwapchain(XRSwapchain& swapchain, int64_t format, uint64_t usage, int width, int height, int layers, bool isDepth, const char* name);
+
+	bool RenderLayerToEyes(Texture* source, bool bFlipVertically);
 };
 
 // =================================================================================================
