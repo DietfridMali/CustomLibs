@@ -52,6 +52,10 @@ struct XRState {
 	bool							exitRequested{ false };
 	bool							sessionStopped{ false };
 	bool							recenterPending{ false };
+	bool							localChangePending{ false };
+	XrTime							localChangeTime{ 0 };
+	XrPosef							localChange{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
+	XrPosef							appPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
 	XrEnvironmentBlendMode			blendMode{ XR_ENVIRONMENT_BLEND_MODE_OPAQUE };
 	XrSpace							localSpace{ XR_NULL_HANDLE };
 	XrSpace							viewSpace{ XR_NULL_HANDLE };
@@ -154,6 +158,18 @@ noexcept
 	glm::quat orientation(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z);
 
 	return glm::translate(glm::mat4(1.0f), glm::vec3(pose.position.x, pose.position.y, pose.position.z)) * glm::mat4_cast(orientation);
+}
+
+
+static XrPosef MatrixPose(const glm::mat4& m)
+noexcept
+{
+	glm::quat	orientation = glm::quat_cast(glm::mat3(m));
+	XrPosef		pose;
+
+	pose.orientation = { orientation.x, orientation.y, orientation.z, orientation.w };
+	pose.position = { m[3].x, m[3].y, m[3].z };
+	return pose;
 }
 
 
@@ -314,6 +330,7 @@ noexcept
 	if (s.appSpace != XR_NULL_HANDLE)
 		xrDestroySpace(s.appSpace);
 	s.appSpace = space;
+	s.appPose = pose;
 	return true;
 }
 
@@ -338,6 +355,16 @@ noexcept
 		return false;
 	logHandler.Print("OpenXR: reference pose set (orientation %.3f %.3f %.3f %.3f)\n", pose.orientation.x, pose.orientation.y, pose.orientation.z,
 					 pose.orientation.w);
+	return true;
+}
+
+
+static bool ApplyLocalChange(XRState& s)
+noexcept
+{
+	if (not CreateAppSpace(s, MatrixPose(glm::inverse(PoseMatrix(s.localChange)) * PoseMatrix(s.appPose))))
+		return false;
+	logHandler.Print("OpenXR: reference pose kept across the change of the local space\n");
 	return true;
 }
 
@@ -683,9 +710,16 @@ noexcept
 			case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING: {
 				const XrEventDataReferenceSpaceChangePending& changed =
 					*reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(&event);
+				const XrPosef& change = changed.poseInPreviousSpace;
 
-				if (changed.referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL)
-					s.recenterPending = true;
+				logHandler.Print("OpenXR: reference space %d change pending (pose valid %d, orientation %.3f %.3f %.3f %.3f, position %.3f %.3f %.3f)\n",
+								 int(changed.referenceSpaceType), int(changed.poseValid), change.orientation.x, change.orientation.y,
+								 change.orientation.z, change.orientation.w, change.position.x, change.position.y, change.position.z);
+				if ((changed.referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL) and changed.poseValid) {
+					s.localChange = s.localChangePending ? MatrixPose(PoseMatrix(s.localChange) * PoseMatrix(change)) : change;
+					s.localChangeTime = changed.changeTime;
+					s.localChangePending = true;
+				}
 				break;
 			}
 
@@ -942,6 +976,7 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 
 	s.sessionStopped = false;
 	s.recenterPending = true;
+	s.localChangePending = false;
 	XrGraphicsBindingVulkan2KHR		binding{ XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR };
 	XrSessionCreateInfo				sessionInfo{ XR_TYPE_SESSION_CREATE_INFO };
 
@@ -1094,6 +1129,8 @@ bool GfxXRHandler::BeginFrame(void)
 	if (not XrSucceeded(s.instance, xrBeginFrame(s.session, &beginInfo), "xrBeginFrame"))
 		return false;
 	s.frameBegun = true;
+	if (s.localChangePending and (s.frameState.predictedDisplayTime >= s.localChangeTime) and ApplyLocalChange(s))
+		s.localChangePending = false;
 	if (s.recenterPending and RecenterAppSpace(s))
 		s.recenterPending = false;
 	s.eyesRendered = false;
@@ -1252,8 +1289,10 @@ bool GfxXRHandler::EndFrame(void)
 void GfxXRHandler::Recenter(void)
 noexcept
 {
-	if (HasSession())
+	if (HasSession()) {
+		logHandler.Print("OpenXR: recenter requested\n");
 		m_state->recenterPending = true;
+	}
 }
 
 
