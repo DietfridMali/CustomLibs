@@ -186,24 +186,31 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 	int w = backBufferWidth;
 	int h = backBufferHeight;
 
-	if (xrHandler.HasSession())
-		xrHandler.WindowFit(m_screenBuffer->GetWidth(), m_screenBuffer->GetHeight(), x, y, w, h);
-	SetViewport(::Viewport(x, y, w, h), backBufferWidth, backBufferHeight);
-
-	bool isMirrored = isXR and xrHandler.RenderMirror(bFlipVertically);
-
-	if (isMirrored) {
-		gfxStates.SetBlending(1);
-		gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
-	}
 	m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
 
-	Texture* screen = m_screenBuffer->GetAsTexture({});
+	Texture*	screen = m_screenBuffer->GetAsTexture({});
+	bool		isMirrored = false;
 
-	if (not (isMirrored and xrHandler.RenderLayerMirror(screen, bFlipVertically)))
+	if (isXR and xrHandler.EyesRendered()) {
+		xrHandler.WindowFit(kMaxRenderViews * xrHandler.EyeWidth(), xrHandler.EyeHeight(), x, y, w, h);
+		for (int view = 0; view < kMaxRenderViews; ++view) {
+			SetViewport(::Viewport(x + view * w / kMaxRenderViews, y, w / kMaxRenderViews, h), backBufferWidth, backBufferHeight);
+			if (not xrHandler.RenderMirror(bFlipVertically, view))
+				continue;
+			isMirrored = true;
+			gfxStates.SetBlending(1);
+			gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
+			if (not xrHandler.RenderLayerMirror(screen, bFlipVertically, view))
+				RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically);
+			Set2DRenderStates();
+		}
+	}
+	if (not isMirrored) {
+		if (xrHandler.HasSession())
+			xrHandler.WindowFit(m_screenBuffer->GetWidth(), m_screenBuffer->GetHeight(), x, y, w, h);
+		SetViewport(::Viewport(x, y, w, h), backBufferWidth, backBufferHeight);
 		RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically);
-	if (isMirrored)
-		Set2DRenderStates();
+	}
 
 	// Transition back to PRESENT_SRC_KHR for vkQueuePresentKHR.
 	if (baseDisplayHandler.CurrentBackBuffer())

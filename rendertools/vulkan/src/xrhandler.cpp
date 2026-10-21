@@ -51,6 +51,7 @@ struct XRState {
 	bool							isRunning{ false };
 	bool							exitRequested{ false };
 	bool							sessionStopped{ false };
+	bool							recenterPending{ false };
 	XrEnvironmentBlendMode			blendMode{ XR_ENVIRONMENT_BLEND_MODE_OPAQUE };
 	XrSpace							localSpace{ XR_NULL_HANDLE };
 	XrSpace							viewSpace{ XR_NULL_HANDLE };
@@ -106,6 +107,7 @@ static const XrPosef kIdentityPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.
 
 static bool xrSessionEnabled = true;
 static bool xrDeviceCreated = false;
+static bool xrTestPattern = false;
 
 static const GfxXRHandler::ControllerState kNoController{};
 
@@ -313,6 +315,45 @@ noexcept
 		xrDestroySpace(s.appSpace);
 	s.appSpace = space;
 	return true;
+}
+
+
+static bool RecenterAppSpace(XRState& s)
+noexcept
+{
+	XrSpaceLocation	location{ XR_TYPE_SPACE_LOCATION };
+	XrTime			time = s.frameState.predictedDisplayTime;
+
+	if ((time == 0) or XR_FAILED(xrLocateSpace(s.viewSpace, s.localSpace, time, &location)))
+		return false;
+	if ((location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 0)
+		return false;
+
+	XrPosef pose = kIdentityPose;
+
+	pose.orientation = location.pose.orientation;
+	if (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)
+		pose.position = location.pose.position;
+	if (not CreateAppSpace(s, pose))
+		return false;
+	logHandler.Print("OpenXR: reference pose set (orientation %.3f %.3f %.3f %.3f)\n", pose.orientation.x, pose.orientation.y, pose.orientation.z,
+					 pose.orientation.w);
+	return true;
+}
+
+
+static void FillTestPattern(XRState& s)
+{
+	RenderTarget*	eye = s.color.targets[int32_t(s.color.imageIndex)];
+	RGBAColor		clearColor = gfxStates.GetClearColor();
+
+	if (not (eye and eye->Activate({ .clear = false })))
+		return;
+	gfxStates.SetClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+	gfxStates.ClearColorBuffers();
+	gfxStates.SetClearColor(clearColor);
+	eye->Deactivate();
+	s.eyesRendered = true;
 }
 
 
@@ -644,7 +685,7 @@ noexcept
 					*reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(&event);
 
 				if (changed.referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL)
-					CreateAppSpace(s, kIdentityPose);
+					s.recenterPending = true;
 				break;
 			}
 
@@ -900,6 +941,7 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 	XRState&						s = *m_state;
 
 	s.sessionStopped = false;
+	s.recenterPending = true;
 	XrGraphicsBindingVulkan2KHR		binding{ XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR };
 	XrSessionCreateInfo				sessionInfo{ XR_TYPE_SESSION_CREATE_INFO };
 
@@ -963,7 +1005,8 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 	int eyeHeight = 0;
 
 	RecommendedEyeSize(s, eyeWidth, eyeHeight);
-	if (not CreateSwapchain(s, s.color, colorFormat, XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT, eyeWidth,
+	if (not CreateSwapchain(s, s.color, colorFormat,
+							XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT, eyeWidth,
 							eyeHeight, kMaxRenderViews, false, "xr eye buffer")) {
 		DestroySession();
 		return false;
@@ -975,8 +1018,9 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 		s.hasDepthExtension = false;
 	}
 	if ((layerWidth > 0) and (layerHeight > 0) and
-		not CreateSwapchain(s, s.layer, colorFormat, XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT, layerWidth,
-							layerHeight, 1, false, "xr layer buffer"))
+		not CreateSwapchain(s, s.layer, colorFormat,
+							XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT,
+							layerWidth, layerHeight, 1, false, "xr layer buffer"))
 		DestroySwapchain(s.layer);
 
 	for (int i = 0; i < kMaxRenderViews; ++i) {
@@ -1050,6 +1094,8 @@ bool GfxXRHandler::BeginFrame(void)
 	if (not XrSucceeded(s.instance, xrBeginFrame(s.session, &beginInfo), "xrBeginFrame"))
 		return false;
 	s.frameBegun = true;
+	if (s.recenterPending and RecenterAppSpace(s))
+		s.recenterPending = false;
 	s.eyesRendered = false;
 	s.layerRendered = false;
 	s.depthSubmitted = false;
@@ -1099,8 +1145,12 @@ noexcept
 	if (not (m_state and m_state->frameBegun))
 		return;
 
-	XRState&		s = *m_state;
-	CommandList*	cl = commandListHandler.CreateCmdList(String("xrRelease"), true);
+	XRState& s = *m_state;
+
+	if (xrTestPattern and s.color.isAcquired and s.frameState.shouldRender)
+		FillTestPattern(s);
+
+	CommandList* cl = commandListHandler.CreateCmdList(String("xrRelease"), true);
 
 	if (not (cl and cl->Open(false)))
 		return;
@@ -1125,8 +1175,8 @@ bool GfxXRHandler::EndFrame(void)
 	XRState&	s = *m_state;
 	bool		hasColor = s.color.isAcquired and s.eyesRendered;
 	bool		hasDepth = s.depth.isAcquired and s.depthSubmitted;
-	bool		hasLayer = s.layer.isAcquired and s.layerRendered and s.layerVisible;
-	uint32_t	submit = (s.frameState.shouldRender ? 1u : 0u) | (s.color.isAcquired ? 2u : 0u) | (s.eyesRendered ? 4u : 0u) |
+	bool		hasLayer = not xrTestPattern and s.layer.isAcquired and s.layerRendered and s.layerVisible;
+	uint32_t	submit =(s.frameState.shouldRender ? 1u : 0u) | (s.color.isAcquired ? 2u : 0u) | (s.eyesRendered ? 4u : 0u) |
 		(s.layer.isAcquired ? 8u : 0u) | (s.layerRendered ? 16u : 0u) | (s.layerVisible ? 32u : 0u) | (hasDepth ? 64u : 0u);
 
 	if (submit != loggedSubmit) {
@@ -1202,28 +1252,8 @@ bool GfxXRHandler::EndFrame(void)
 void GfxXRHandler::Recenter(void)
 noexcept
 {
-	if (not HasSession())
-		return;
-
-	XRState&		s = *m_state;
-	XrSpaceLocation	location{ XR_TYPE_SPACE_LOCATION };
-	XrTime			time = s.frameState.predictedDisplayTime;
-
-	if ((time == 0) or XR_FAILED(xrLocateSpace(s.viewSpace, s.localSpace, time, &location)))
-		return;
-	if ((location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 0)
-		return;
-
-	glm::quat	orientation(location.pose.orientation.w, location.pose.orientation.x, location.pose.orientation.y, location.pose.orientation.z);
-	glm::vec3	forward = orientation * glm::vec3(0.0f, 0.0f, -1.0f);
-	float		yaw = std::atan2(-forward.x, -forward.z);
-	glm::quat	yawRotation = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
-	XrPosef		pose = kIdentityPose;
-
-	pose.orientation = XrQuaternionf{ yawRotation.x, yawRotation.y, yawRotation.z, yawRotation.w };
-	if (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)
-		pose.position = location.pose.position;
-	CreateAppSpace(s, pose);
+	if (HasSession())
+		RecenterAppSpace(*m_state);
 }
 
 
@@ -1252,6 +1282,15 @@ bool GfxXRHandler::SessionEnabled(void) const
 noexcept
 {
 	return xrSessionEnabled;
+}
+
+
+void GfxXRHandler::SetTestPattern(bool enable)
+noexcept
+{
+	xrTestPattern = enable;
+	if (enable)
+		logHandler.Print("OpenXR: test pattern on - eye images magenta, no HUD layer\n");
 }
 
 
@@ -1537,11 +1576,11 @@ noexcept
 }
 
 
-bool GfxXRHandler::RenderMirror(bool bFlipVertically)
+bool GfxXRHandler::RenderMirror(bool bFlipVertically, int view)
 {
 	RenderTarget* eye = EyeTarget();
 
-	if (not (eye and m_state->eyesRendered))
+	if (not (eye and m_state->eyesRendered and (view >= 0) and (view < kMaxRenderViews)))
 		return false;
 
 	Texture* source = eye->GetAsTexture({});
@@ -1557,6 +1596,7 @@ bool GfxXRHandler::RenderMirror(bool bFlipVertically)
 	shader->SetInt("bEncodeSRGB", IsSRGBFormat(baseDisplayHandler.CurrentBackBufferFormat()) ? 0 : 1);
 	shader->SetVector2f("tcOffset", Vector2f{ 0.0f, 0.0f });
 	shader->SetVector2f("tcScale", Vector2f{ 1.0f, 1.0f });
+	shader->SetFloat("eyeLayer", float(view));
 	baseRenderer.Set2DRenderStates();
 	baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
 	return true;
@@ -1566,10 +1606,10 @@ bool GfxXRHandler::RenderMirror(bool bFlipVertically)
 static constexpr float kMirrorZNear = 0.05f;
 static constexpr float kMirrorZFar = 100.0f;
 
-bool GfxXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically)
+bool GfxXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int view)
 {
 	if (not (source and m_state and m_state->eyesRendered and m_state->layerVisible and (m_state->layerWidth > 0.0f) and
-			 (m_state->layer.width > 0)))
+			 (m_state->layer.width > 0) and (view >= 0) and (view < kMaxRenderViews)))
 		return false;
 
 	Shader* shader = baseShaderHandler.SetupRenderShader("xrLayerMirror");
@@ -1581,7 +1621,8 @@ bool GfxXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically)
 	float		layerHeight = s.layerWidth * float(s.layer.height) / float(s.layer.width);
 	glm::mat4	layerToApp = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -s.layerDistance)),
 										glm::vec3(s.layerWidth, layerHeight, 1.0f));
-	Matrix4f	layerToClip = EyeProjection(0, kMirrorZNear, kMirrorZFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[0].pose)) * layerToApp);
+	Matrix4f	layerToClip =
+		EyeProjection(view, kMirrorZNear, kMirrorZFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[view].pose)) * layerToApp);
 
 	shader->SetMatrix4f("mLayerToClip", layerToClip.AsArray());
 	shader->SetInt("bDecodeSRGB", IsSRGBFormat(baseDisplayHandler.CurrentBackBufferFormat()) ? 1 : 0);

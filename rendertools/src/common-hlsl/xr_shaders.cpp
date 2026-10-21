@@ -113,6 +113,7 @@ const ShaderSource& XRMirrorShader()
                 int   bEncodeSRGB;
                 float2 tcOffset;
                 float2 tcScale;
+                float eyeLayer;
             };
             Texture2DArray eyeTex : register(t0);
             SamplerState s0      : register(s0);
@@ -128,7 +129,7 @@ const ShaderSource& XRMirrorShader()
             }
 
             float4 PSMain(PSInput i) : SV_Target {
-                float3 color = eyeTex.Sample(s0, float3(tcOffset + tcScale * i.fragCoord, 0.0)).rgb;
+                float3 color = eyeTex.Sample(s0, float3(tcOffset + tcScale * i.fragCoord, eyeLayer)).rgb;
                 if (bEncodeSRGB != 0)
                     color = LinearToSRGB(color);
                 return float4(color, 1.0);

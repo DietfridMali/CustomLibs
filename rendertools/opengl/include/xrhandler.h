@@ -238,15 +238,19 @@ public:
 		height = sourceHeight;
 	}
 
-	inline bool RenderMirror(bool)
+	inline bool RenderMirror(bool, int)
 	{
 		return false;
 	}
 
-	inline bool RenderLayerMirror(Texture*, bool)
+	inline bool RenderLayerMirror(Texture*, bool, int)
 	{
 		return false;
 	}
+
+	inline void SetTestPattern(bool)
+	noexcept
+	{}
 
 	inline bool HasDepthLayer(void) const
 	noexcept

@@ -143,9 +143,12 @@ public:
 	void WindowFit(int sourceWidth, int sourceHeight, int& x, int& y, int& width, int& height) const
 	noexcept;
 
-	bool RenderMirror(bool bFlipVertically);
+	bool RenderMirror(bool bFlipVertically, int view);
 
-	bool RenderLayerMirror(Texture* source, bool bFlipVertically);
+	bool RenderLayerMirror(Texture* source, bool bFlipVertically, int view);
+
+	void SetTestPattern(bool enable)
+	noexcept;
 
 	bool HasDepthLayer(void) const
 	noexcept;
