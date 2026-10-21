@@ -65,6 +65,12 @@ public:
 
 	void RecreateShaders(void);
 
+	int ShaderCount(void);
+
+	bool RecreateShader(int index);
+
+	bool RecreateShader(const String& shaderId);
+
 	void DestroyShaders(void);
 
 	Shader* SelectShader(Texture* texture);

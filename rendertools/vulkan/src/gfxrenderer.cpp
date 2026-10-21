@@ -181,8 +181,14 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 	}
 	int backBufferWidth = baseDisplayHandler.GetWidth();
 	int backBufferHeight = baseDisplayHandler.GetHeight();
+	int x = 0;
+	int y = 0;
+	int w = backBufferWidth;
+	int h = backBufferHeight;
 
-	SetViewport(::Viewport(0, 0, backBufferWidth, backBufferHeight), backBufferWidth, backBufferHeight);
+	if (xrHandler.HasSession())
+		xrHandler.WindowFit(m_screenBuffer->GetWidth(), m_screenBuffer->GetHeight(), x, y, w, h);
+	SetViewport(::Viewport(x, y, w, h), backBufferWidth, backBufferHeight);
 
 	bool isMirrored = isXR and xrHandler.RenderMirror(bFlipVertically);
 
@@ -192,18 +198,10 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 	}
 	m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
 
-	Texture*	screen = m_screenBuffer->GetAsTexture({});
-	Shader*		shader = nullptr;
+	Texture* screen = m_screenBuffer->GetAsTexture({});
 
-	if (xrHandler.HasSession() and screen) {
-		Vector2f	tcOffset{ 0.0f, 0.0f };
-		Vector2f	tcScale{ 1.0f, 1.0f };
-
-		xrHandler.WindowCrop(float(m_screenBuffer->GetWidth()) / float(m_screenBuffer->GetHeight()), tcOffset, tcScale);
-		shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White, screen->IsRenderTarget(), tcOffset, tcScale, false,
-														 screen->ColorEncoding(), screen->HasArrayView());
-	}
-	RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically, shader);
+	if (not (isMirrored and xrHandler.RenderLayerMirror(screen, bFlipVertically)))
+		RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically);
 	if (isMirrored)
 		Set2DRenderStates();
 

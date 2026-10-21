@@ -86,6 +86,26 @@ void BaseShaderHandler::RecreateShaders(void)
 }
 
 
+int BaseShaderHandler::ShaderCount(void)
+{
+	return m_shaderCode ? m_shaderCode->ShaderCount() : 0;
+}
+
+
+bool BaseShaderHandler::RecreateShader(int index)
+{
+	InvalidateActiveShader();
+	return m_shaderCode and m_shaderCode->RecreateShader(index);
+}
+
+
+bool BaseShaderHandler::RecreateShader(const String& shaderId)
+{
+	InvalidateActiveShader();
+	return m_shaderCode and m_shaderCode->RecreateShader(shaderId);
+}
+
+
 void BaseShaderHandler::DestroyShaders(void)
 {
 	InvalidateActiveShader();

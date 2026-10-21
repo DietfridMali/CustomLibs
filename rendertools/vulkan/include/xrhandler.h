@@ -140,10 +140,12 @@ public:
 
 	bool RenderLayer(Texture* source, bool bRotate, bool bFlipVertically);
 
-	void WindowCrop(float sourceAspect, Vector2f& tcOffset, Vector2f& tcScale) const
+	void WindowFit(int sourceWidth, int sourceHeight, int& x, int& y, int& width, int& height) const
 	noexcept;
 
 	bool RenderMirror(bool bFlipVertically);
+
+	bool RenderLayerMirror(Texture* source, bool bFlipVertically);
 
 	bool HasDepthLayer(void) const
 	noexcept;

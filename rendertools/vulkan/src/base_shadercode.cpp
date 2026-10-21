@@ -57,6 +57,7 @@ const ShaderSource& OceanSpectrumShader();
 const ShaderSource& OceanTransformShader();
 const ShaderSource& OceanAssembleShader();
 const ShaderSource& XRLayerCopyShader();
+const ShaderSource& XRLayerMirrorShader();
 const ShaderSource& XRMirrorShader();
 const ShaderSource& XRDepthCopyShader();
 
@@ -116,6 +117,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
 		&OceanTransformShader(),
 		&OceanAssembleShader(),
 		&XRLayerCopyShader(),
+		&XRLayerMirrorShader(),
 		&XRMirrorShader(),
 		&XRDepthCopyShader()
 	};
@@ -175,6 +177,43 @@ void BaseShaderCode::RecreateShaders(void)
 		if (entry.second and not entry.second->Recreate(m_shaderFolder))
 			logHandler.Print("recreating compute shader '%s' failed\n", static_cast<const char*>(entry.first));
 	}
+}
+
+
+bool BaseShaderCode::RecreateShader(const String& shaderId)
+{
+	Shader** shader = m_shaders.Find(shaderId);
+
+	if (not (shader and *shader))
+		return false;
+	if ((*shader)->Recreate(m_shaderFolder))
+		return true;
+	logHandler.Print("recreating shader '%s' failed\n", static_cast<const char*>(shaderId));
+	return false;
+}
+
+
+bool BaseShaderCode::RecreateShader(int index)
+{
+	for (auto& entry : m_shaders) {
+		if (index-- > 0)
+			continue;
+		if (entry.second and not entry.second->Recreate(m_shaderFolder)) {
+			logHandler.Print("recreating shader '%s' failed\n", static_cast<const char*>(entry.first));
+			return false;
+		}
+		return true;
+	}
+	for (auto& entry : m_computeShaders) {
+		if (index-- > 0)
+			continue;
+		if (entry.second and not entry.second->Recreate(m_shaderFolder)) {
+			logHandler.Print("recreating compute shader '%s' failed\n", static_cast<const char*>(entry.first));
+			return false;
+		}
+		return true;
+	}
+	return false;
 }
 
 

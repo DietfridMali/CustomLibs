@@ -229,14 +229,21 @@ public:
 		return false;
 	}
 
-	inline void WindowCrop(float, Vector2f& tcOffset, Vector2f& tcScale) const
+	inline void WindowFit(int sourceWidth, int sourceHeight, int& x, int& y, int& width, int& height) const
 	noexcept
 	{
-		tcOffset = Vector2f{ 0.0f, 0.0f };
-		tcScale = Vector2f{ 1.0f, 1.0f };
+		x = 0;
+		y = 0;
+		width = sourceWidth;
+		height = sourceHeight;
 	}
 
 	inline bool RenderMirror(bool)
+	{
+		return false;
+	}
+
+	inline bool RenderLayerMirror(Texture*, bool)
 	{
 		return false;
 	}

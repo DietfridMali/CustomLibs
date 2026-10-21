@@ -44,6 +44,64 @@ const ShaderSource& XRLayerCopyShader()
 }
 
 
+const ShaderSource& XRLayerMirrorShader()
+{
+	static const ShaderSource xrLayerMirrorShader(
+		"xrLayerMirror",
+		String(R"(
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+                FRAME_EYE_MATRICES
+            };
+            cbuffer ShaderConstants : register(b1) {
+                column_major float4x4 mLayerToClip;
+                int bDecodeSRGB;
+            };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                o.pos = mul(mViewport, mul(mLayerToClip, float4(i.pos.xy, 0.0, 1.0)));
+                o.fragCoord = i.tc;
+                return o;
+            }
+        )"),
+		String(R"(
+            cbuffer ShaderConstants : register(b1) {
+                column_major float4x4 mLayerToClip;
+                int bDecodeSRGB;
+            };
+            Texture2D surface : register(t0);
+            SamplerState s0  : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+
+            float3 SRGBToLinear(float3 c) {
+                c = saturate(c);
+                return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
+            }
+
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 c = surface.Sample(s0, i.fragCoord);
+                if (bDecodeSRGB == 0)
+                    return c;
+                if (c.a <= 0.0)
+                    return float4(0.0, 0.0, 0.0, 0.0);
+                return float4(SRGBToLinear(c.rgb / c.a) * c.a, c.a);
+            }
+        )"),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return xrLayerMirrorShader;
+}
+
+
 const ShaderSource& XRMirrorShader()
 {
 	static const ShaderSource xrMirrorShader(

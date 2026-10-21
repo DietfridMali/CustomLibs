@@ -575,6 +575,32 @@ noexcept
 }
 
 
+static const char* SessionStateName(XrSessionState state)
+noexcept
+{
+	switch (state) {
+		case XR_SESSION_STATE_IDLE:
+			return "idle";
+		case XR_SESSION_STATE_READY:
+			return "ready";
+		case XR_SESSION_STATE_SYNCHRONIZED:
+			return "synchronized";
+		case XR_SESSION_STATE_VISIBLE:
+			return "visible";
+		case XR_SESSION_STATE_FOCUSED:
+			return "focused";
+		case XR_SESSION_STATE_STOPPING:
+			return "stopping";
+		case XR_SESSION_STATE_LOSS_PENDING:
+			return "loss pending";
+		case XR_SESSION_STATE_EXITING:
+			return "exiting";
+		default:
+			return "unknown";
+	}
+}
+
+
 static void PollEvents(XRState& s)
 noexcept
 {
@@ -585,6 +611,7 @@ noexcept
 			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
 				const XrEventDataSessionStateChanged& changed = *reinterpret_cast<const XrEventDataSessionStateChanged*>(&event);
 
+				logHandler.Print("OpenXR: session state %s\n", SessionStateName(changed.state));
 				s.sessionState = changed.state;
 				if (changed.state == XR_SESSION_STATE_READY) {
 					XrSessionBeginInfo beginInfo{ XR_TYPE_SESSION_BEGIN_INFO };
@@ -606,6 +633,7 @@ noexcept
 			}
 
 			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
+				logHandler.Print("OpenXR: instance loss pending\n");
 				s.isRunning = false;
 				s.exitRequested = true;
 				s.sessionStopped = true;
@@ -991,6 +1019,7 @@ noexcept
 		if (s.isRunning)
 			xrEndSession(s.session);
 		xrDestroySession(s.session);
+		logHandler.Print("OpenXR: session destroyed\n");
 	}
 	s.session = XR_NULL_HANDLE;
 	s.isRunning = false;
@@ -1091,11 +1120,21 @@ bool GfxXRHandler::EndFrame(void)
 	if (not (m_state and m_state->frameBegun))
 		return false;
 
+	static uint32_t	loggedSubmit = 0xFFFFFFFFu;
+
 	XRState&	s = *m_state;
 	bool		hasColor = s.color.isAcquired and s.eyesRendered;
 	bool		hasDepth = s.depth.isAcquired and s.depthSubmitted;
 	bool		hasLayer = s.layer.isAcquired and s.layerRendered and s.layerVisible;
+	uint32_t	submit = (s.frameState.shouldRender ? 1u : 0u) | (s.color.isAcquired ? 2u : 0u) | (s.eyesRendered ? 4u : 0u) |
+		(s.layer.isAcquired ? 8u : 0u) | (s.layerRendered ? 16u : 0u) | (s.layerVisible ? 32u : 0u) | (hasDepth ? 64u : 0u);
 
+	if (submit != loggedSubmit) {
+		logHandler.Print("OpenXR: frame - render %d, eye image acquired %d rendered %d, hud image acquired %d rendered %d visible %d, depth %d\n",
+						 (submit & 1u) ? 1 : 0, (submit & 2u) ? 1 : 0, (submit & 4u) ? 1 : 0, (submit & 8u) ? 1 : 0, (submit & 16u) ? 1 : 0,
+						 (submit & 32u) ? 1 : 0, (submit & 64u) ? 1 : 0);
+		loggedSubmit = submit;
+	}
 	ReleaseSwapchainImage(s, s.color);
 	ReleaseSwapchainImage(s, s.depth);
 	ReleaseSwapchainImage(s, s.layer);
@@ -1479,21 +1518,22 @@ noexcept
 }
 
 
-void GfxXRHandler::WindowCrop(float sourceAspect, Vector2f& tcOffset, Vector2f& tcScale) const
+void GfxXRHandler::WindowFit(int sourceWidth, int sourceHeight, int& x, int& y, int& width, int& height) const
 noexcept
 {
-	float windowAspect = float(baseDisplayHandler.GetWidth()) / float(baseDisplayHandler.GetHeight());
+	int windowWidth = baseDisplayHandler.GetWidth();
+	int windowHeight = baseDisplayHandler.GetHeight();
 
-	tcScale = Vector2f{ 1.0f, 1.0f };
-	tcOffset = Vector2f{ 0.0f, 0.0f };
-	if (windowAspect > sourceAspect) {
-		tcScale.y = sourceAspect / windowAspect;
-		tcOffset.y = 0.5f * (1.0f - tcScale.y);
+	if ((sourceWidth <= 0) or (sourceHeight <= 0) or (int64_t(windowWidth) * sourceHeight > int64_t(windowHeight) * sourceWidth)) {
+		height = windowHeight;
+		width = (sourceHeight > 0) ? int(int64_t(windowHeight) * sourceWidth / sourceHeight) : windowWidth;
 	}
 	else {
-		tcScale.x = windowAspect / sourceAspect;
-		tcOffset.x = 0.5f * (1.0f - tcScale.x);
+		width = windowWidth;
+		height = int(int64_t(windowWidth) * sourceHeight / sourceWidth);
 	}
+	x = (windowWidth - width) / 2;
+	y = (windowHeight - height) / 2;
 }
 
 
@@ -1514,14 +1554,37 @@ bool GfxXRHandler::RenderMirror(bool bFlipVertically)
 	if (not shader)
 		return false;
 
-	Vector2f	tcScale{ 1.0f, 1.0f };
-	Vector2f	tcOffset{ 0.0f, 0.0f };
-
-	WindowCrop(float(eye->GetWidth()) / float(eye->GetHeight()), tcOffset, tcScale);
 	shader->SetInt("bEncodeSRGB", IsSRGBFormat(baseDisplayHandler.CurrentBackBufferFormat()) ? 0 : 1);
-	shader->SetVector2f("tcOffset", tcOffset);
-	shader->SetVector2f("tcScale", tcScale);
+	shader->SetVector2f("tcOffset", Vector2f{ 0.0f, 0.0f });
+	shader->SetVector2f("tcScale", Vector2f{ 1.0f, 1.0f });
 	baseRenderer.Set2DRenderStates();
+	baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
+	return true;
+}
+
+
+static constexpr float kMirrorZNear = 0.05f;
+static constexpr float kMirrorZFar = 100.0f;
+
+bool GfxXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically)
+{
+	if (not (source and m_state and m_state->eyesRendered and m_state->layerVisible and (m_state->layerWidth > 0.0f) and
+			 (m_state->layer.width > 0)))
+		return false;
+
+	Shader* shader = baseShaderHandler.SetupRenderShader("xrLayerMirror");
+
+	if (not shader)
+		return false;
+
+	XRState&	s = *m_state;
+	float		layerHeight = s.layerWidth * float(s.layer.height) / float(s.layer.width);
+	glm::mat4	layerToApp = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -s.layerDistance)),
+										glm::vec3(s.layerWidth, layerHeight, 1.0f));
+	Matrix4f	layerToClip = EyeProjection(0, kMirrorZNear, kMirrorZFar) * Matrix4f(glm::inverse(PoseMatrix(s.views[0].pose)) * layerToApp);
+
+	shader->SetMatrix4f("mLayerToClip", layerToClip.AsArray());
+	shader->SetInt("bDecodeSRGB", IsSRGBFormat(baseDisplayHandler.CurrentBackBufferFormat()) ? 1 : 0);
 	baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
 	return true;
 }

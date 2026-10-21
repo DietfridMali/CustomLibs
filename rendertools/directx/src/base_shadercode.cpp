@@ -165,6 +165,18 @@ void BaseShaderCode::RecreateShaders(void)
 }
 
 
+bool BaseShaderCode::RecreateShader(int)
+{
+	return true;
+}
+
+
+bool BaseShaderCode::RecreateShader(const String&)
+{
+	return true;
+}
+
+
 void BaseShaderCode::DestroyShaders(void)
 {
 }

@@ -233,6 +233,14 @@ public:
 
 	void RecreateShaders(void);
 
+	inline int ShaderCount(void) const {
+		return m_shaders.Size() + m_computeShaders.Size();
+	}
+
+	bool RecreateShader(int index);
+
+	bool RecreateShader(const String& shaderId);
+
 	void DestroyShaders(void);
 
 	inline bool HasPendingShaders(void) const {
