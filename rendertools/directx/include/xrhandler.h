@@ -112,6 +112,18 @@ public:
 		return false;
 	}
 
+	inline bool HeadsetReady(void)
+	noexcept
+	{
+		return false;
+	}
+
+	inline bool WaitUntilRunning(int timeout)
+	noexcept
+	{
+		return false;
+	}
+
 	inline bool IsRunning(void) const
 	noexcept
 	{

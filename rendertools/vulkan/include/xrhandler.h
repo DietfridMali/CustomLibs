@@ -82,6 +82,12 @@ public:
 	bool SystemAvailable(void)
 	noexcept;
 
+	bool HeadsetReady(void)
+	noexcept;
+
+	bool WaitUntilRunning(int timeout)
+	noexcept;
+
 	bool IsRunning(void) const
 	noexcept;
 

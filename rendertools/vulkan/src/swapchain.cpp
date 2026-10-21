@@ -57,6 +57,7 @@ noexcept
 	if (vsync) {
 		// FIFO is guaranteed to be available; matches DX12 syncInterval=1.
 		m_presentMode = VK_PRESENT_MODE_FIFO_KHR;
+		logHandler.Print("Swapchain: vertical sync on, present mode FIFO\n");
 		return true;
 	}
 
@@ -72,6 +73,8 @@ noexcept
 	m_presentMode = hasMailbox ? VK_PRESENT_MODE_MAILBOX_KHR
 		: hasImmediate			? VK_PRESENT_MODE_IMMEDIATE_KHR
 							   : VK_PRESENT_MODE_FIFO_KHR;
+	logHandler.Print("Swapchain: vertical sync off, present mode %s\n",
+					 hasMailbox ? "MAILBOX" : hasImmediate ? "IMMEDIATE" : "FIFO (no other mode available)");
 	return true;
 }
 

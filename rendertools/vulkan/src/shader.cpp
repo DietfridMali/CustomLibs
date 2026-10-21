@@ -1525,6 +1525,24 @@ noexcept
 // =================================================================================================
 // API-neutral helpers (1:1 from DX12)
 
+static AutoArray<String> missingViewShaders;
+
+static void LogMissingViewProjections(const String& name)
+noexcept
+{
+	for (int i = 0; i < missingViewShaders.Length(); ++i) {
+		if (missingViewShaders[i] == name)
+			return;
+	}
+
+	String* entry = missingViewShaders.Append();
+
+	if (entry)
+		*entry = name;
+	logHandler.Print("VR: shader '%s' draws without eye projections\n", (const char*)name);
+}
+
+
 bool Shader::UpdateMatrices(void)
 {
 	std::memcpy(m_b0Staging.mModelView, baseRenderer.ModelView().AsArray(), 16 * sizeof(float));
@@ -1535,6 +1553,8 @@ bool Shader::UpdateMatrices(void)
 	if (baseRenderer.ViewCount() > 1) {
 		const BaseRenderer::ViewProjections* views = baseRenderer.FindViewProjections(baseRenderer.Projection());
 
+		if (not views)
+			LogMissingViewProjections(m_name);
 		for (int i = 0; i < kMaxRenderViews; ++i) {
 			std::memcpy(m_b0Staging.mEyeProjection[i], views ? views->eyeProjection[i].AsArray() : baseRenderer.Projection().AsArray(),
 						16 * sizeof(float));

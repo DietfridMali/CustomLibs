@@ -1,6 +1,8 @@
 #define NOMINMAX
 
 #include <algorithm>
+#include <chrono>
+#include <thread>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -47,6 +49,7 @@ struct XRState {
 	XrInstance						instance{ XR_NULL_HANDLE };
 	XrSystemId						systemId{ XR_NULL_SYSTEM_ID };
 	XrSession						session{ XR_NULL_HANDLE };
+	XrSession						probeSession{ XR_NULL_HANDLE };
 	XrSessionState					sessionState{ XR_SESSION_STATE_UNKNOWN };
 	bool							isRunning{ false };
 	bool							exitRequested{ false };
@@ -56,6 +59,12 @@ struct XRState {
 	XrTime							localChangeTime{ 0 };
 	XrPosef							localChange{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
 	XrPosef							appPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
+	uint32_t						frameNumber{ 0 };
+	XrTime							lastDisplayTime{ 0 };
+	float							lastYaw{ 0.0f };
+	int								frameLogCount{ 0 };
+	double							waitTime{ 0.0 };
+	std::chrono::steady_clock::time_point	frameStart{};
 	XrEnvironmentBlendMode			blendMode{ XR_ENVIRONMENT_BLEND_MODE_OPAQUE };
 	XrSpace							localSpace{ XR_NULL_HANDLE };
 	XrSpace							viewSpace{ XR_NULL_HANDLE };
@@ -71,6 +80,7 @@ struct XRState {
 	bool							hasVisibilityMaskExtension{ false };
 	bool							hasPerformanceMetricsExtension{ false };
 	bool							performanceMetricsEnabled{ false };
+	XrTime							metricsTime{ 0 };
 	XRSwapchain						color;
 	XRSwapchain						depth;
 	XRSwapchain						layer;
@@ -112,6 +122,7 @@ static const XrPosef kIdentityPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.
 static bool xrSessionEnabled = true;
 static bool xrDeviceCreated = false;
 static bool xrTestPattern = false;
+static bool xrPerformanceMetrics = false;
 
 static const GfxXRHandler::ControllerState kNoController{};
 
@@ -359,6 +370,16 @@ noexcept
 }
 
 
+static void DestroyProbeSession(XRState& s)
+noexcept
+{
+	if (s.probeSession == XR_NULL_HANDLE)
+		return;
+	xrDestroySession(s.probeSession);
+	s.probeSession = XR_NULL_HANDLE;
+}
+
+
 static bool ApplyLocalChange(XRState& s)
 noexcept
 {
@@ -366,6 +387,37 @@ noexcept
 		return false;
 	logHandler.Print("OpenXR: reference pose kept across the change of the local space\n");
 	return true;
+}
+
+
+static constexpr float	kFrameLogTurn = 1.5f;
+static constexpr int	kFrameLogFrames = 90;
+
+static void LogFrame(XRState& s)
+noexcept
+{
+	glm::quat	q(s.headPose.orientation.w, s.headPose.orientation.x, s.headPose.orientation.y, s.headPose.orientation.z);
+	glm::vec3	f = q * glm::vec3(0.0f, 0.0f, -1.0f);
+	float		yaw = glm::degrees(std::atan2(-f.x, -f.z));
+	float		pitch = glm::degrees(std::asin(std::clamp(f.y, -1.0f, 1.0f)));
+	float		turn = std::fabs(yaw - s.lastYaw);
+
+	if (turn > 180.0f)
+		turn = 360.0f - turn;
+	++s.frameNumber;
+	if (turn > kFrameLogTurn)
+		s.frameLogCount = kFrameLogFrames;
+	if (s.frameLogCount > 0) {
+		double appTime = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - s.frameStart).count();
+
+		--s.frameLogCount;
+		logHandler.Print("OpenXR frame %u: display %+.2f ms (period %.2f ms), wait %.2f ms, app %.2f ms, render %d, eye image %u acquired %d rendered %d, head yaw %.2f pitch %.2f\n",
+						 s.frameNumber, double(s.frameState.predictedDisplayTime - s.lastDisplayTime) * 1.0e-6,
+						 double(s.frameState.predictedDisplayPeriod) * 1.0e-6, s.waitTime, appTime, s.frameState.shouldRender ? 1 : 0,
+						 s.color.imageIndex, s.color.isAcquired ? 1 : 0, s.eyesRendered ? 1 : 0, yaw, pitch);
+	}
+	s.lastYaw = yaw;
+	s.lastDisplayTime = s.frameState.predictedDisplayTime;
 }
 
 
@@ -679,6 +731,8 @@ noexcept
 			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
 				const XrEventDataSessionStateChanged& changed = *reinterpret_cast<const XrEventDataSessionStateChanged*>(&event);
 
+				if (changed.session != s.session)
+					break;
 				logHandler.Print("OpenXR: session state %s\n", SessionStateName(changed.state));
 				s.sessionState = changed.state;
 				if (changed.state == XR_SESSION_STATE_READY) {
@@ -894,6 +948,7 @@ noexcept
 	if (not m_state)
 		return;
 	DestroySession();
+	DestroyProbeSession(*m_state);
 	if (m_state->instance != XR_NULL_HANDLE)
 		xrDestroyInstance(m_state->instance);
 	delete m_state;
@@ -974,6 +1029,7 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 
 	XRState&						s = *m_state;
 
+	DestroyProbeSession(s);
 	s.sessionStopped = false;
 	s.recenterPending = true;
 	s.localChangePending = false;
@@ -1067,7 +1123,7 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 	if (not CreateActions(s))
 		logHandler.Print("OpenXR: controller input is not available\n");
 	UpdateVisibilityMasks(s);
-	if (s.performanceMetricsEnabled)
+	if (xrPerformanceMetrics)
 		EnablePerformanceMetrics(true);
 	logHandler.Print("OpenXR: session created, eye buffers %d x %d (format %lld), depth layer %s, visibility mask %s\n", eyeWidth, eyeHeight,
 					 static_cast<long long>(colorFormat), s.hasDepthExtension ? "on" : "off", s.hasVisibilityMaskExtension ? "on" : "off");
@@ -1118,11 +1174,13 @@ bool GfxXRHandler::BeginFrame(void)
 	if (not s.isRunning)
 		return false;
 
-	XrFrameWaitInfo waitInfo{ XR_TYPE_FRAME_WAIT_INFO };
+	XrFrameWaitInfo							waitInfo{ XR_TYPE_FRAME_WAIT_INFO };
+	std::chrono::steady_clock::time_point	waitStart = std::chrono::steady_clock::now();
 
 	s.frameState = XrFrameState{ XR_TYPE_FRAME_STATE };
 	if (not XrSucceeded(s.instance, xrWaitFrame(s.session, &waitInfo, &s.frameState), "xrWaitFrame"))
 		return false;
+	s.waitTime = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - waitStart).count();
 
 	XrFrameBeginInfo beginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
 
@@ -1172,6 +1230,7 @@ bool GfxXRHandler::BeginFrame(void)
 			AcquireSwapchainImage(s, s.depth, "xrAcquireSwapchainImage (depth)");
 		AcquireSwapchainImage(s, s.layer, "xrAcquireSwapchainImage (layer)");
 	}
+	s.frameStart = std::chrono::steady_clock::now();
 	return true;
 }
 
@@ -1221,6 +1280,11 @@ bool GfxXRHandler::EndFrame(void)
 						 (submit & 1u) ? 1 : 0, (submit & 2u) ? 1 : 0, (submit & 4u) ? 1 : 0, (submit & 8u) ? 1 : 0, (submit & 16u) ? 1 : 0,
 						 (submit & 32u) ? 1 : 0, (submit & 64u) ? 1 : 0);
 		loggedSubmit = submit;
+	}
+	LogFrame(s);
+	if (s.performanceMetricsEnabled and (s.frameState.predictedDisplayTime - s.metricsTime >= 1000000000)) {
+		s.metricsTime = s.frameState.predictedDisplayTime;
+		LogPerformanceMetrics();
 	}
 	ReleaseSwapchainImage(s, s.color);
 	ReleaseSwapchainImage(s, s.depth);
@@ -1362,6 +1426,74 @@ noexcept
 	if (XR_FAILED(xrGetSystem(m_state->instance, &systemInfo, &systemId)))
 		return false;
 	return systemId == m_state->systemId;
+}
+
+
+bool GfxXRHandler::WaitUntilRunning(int timeout)
+noexcept
+{
+	if (not HasSession())
+		return false;
+
+	XRState&								s = *m_state;
+	std::chrono::steady_clock::time_point	end = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
+
+	for (;;) {
+		PollEvents(s);
+		if (s.isRunning)
+			return true;
+		if (s.exitRequested or s.sessionStopped or (std::chrono::steady_clock::now() >= end))
+			return false;
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+}
+
+
+bool GfxXRHandler::HeadsetReady(void)
+noexcept
+{
+	if (not IsAvailable() or HasSession() or not xrDeviceCreated)
+		return false;
+
+	XRState& s = *m_state;
+
+	if (s.probeSession == XR_NULL_HANDLE) {
+		XrGraphicsBindingVulkan2KHR	binding{ XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR };
+		XrSessionCreateInfo			sessionInfo{ XR_TYPE_SESSION_CREATE_INFO };
+
+		binding.instance = vkContext.m_instance;
+		binding.physicalDevice = vkContext.PhysicalDevice();
+		binding.device = vkContext.Device();
+		binding.queueFamilyIndex = vkContext.GraphicsFamily();
+		binding.queueIndex = 0;
+		sessionInfo.next = &binding;
+		sessionInfo.systemId = s.systemId;
+		if (not XrSucceeded(s.instance, xrCreateSession(s.instance, &sessionInfo, &s.probeSession), "xrCreateSession (probe)")) {
+			s.probeSession = XR_NULL_HANDLE;
+			return false;
+		}
+		logHandler.Print("OpenXR: waiting for the headset\n");
+	}
+
+	XrEventDataBuffer	event{ XR_TYPE_EVENT_DATA_BUFFER };
+	bool				ready = false;
+
+	while (xrPollEvent(s.instance, &event) == XR_SUCCESS) {
+		if (event.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
+			const XrEventDataSessionStateChanged& changed = *reinterpret_cast<const XrEventDataSessionStateChanged*>(&event);
+
+			if ((changed.session == s.probeSession) and (changed.state == XR_SESSION_STATE_READY))
+				ready = true;
+		}
+		else if (event.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)
+			s.exitRequested = true;
+		event = XrEventDataBuffer{ XR_TYPE_EVENT_DATA_BUFFER };
+	}
+	if (not ready)
+		return false;
+	DestroyProbeSession(s);
+	logHandler.Print("OpenXR: headset ready again\n");
+	return true;
 }
 
 
@@ -1714,14 +1846,20 @@ noexcept
 void GfxXRHandler::EnablePerformanceMetrics(bool enable)
 noexcept
 {
+	xrPerformanceMetrics = enable;
 	if (not m_state)
 		return;
 
 	XRState& s = *m_state;
 
 	s.performanceMetricsEnabled = enable;
-	if (not (HasSession() and s.hasPerformanceMetricsExtension))
+	if (not HasSession())
 		return;
+	if (not s.hasPerformanceMetricsExtension) {
+		if (enable)
+			logHandler.Print("OpenXR: the runtime offers no performance metrics\n");
+		return;
+	}
 
 	XrPerformanceMetricsStateMETA state{ XR_TYPE_PERFORMANCE_METRICS_STATE_META };
 
@@ -1739,6 +1877,7 @@ noexcept
 	s.metricPaths.Resize(int32_t(pathCount));
 	if (XR_FAILED(s.pfnEnumeratePerformanceMetricsCounterPaths(s.instance, pathCount, &pathCount, s.metricPaths.Data())))
 		s.metricPaths.Reset();
+	logHandler.Print("OpenXR: performance metrics on, %d counters\n", s.metricPaths.Length());
 }
 
 
@@ -1748,9 +1887,13 @@ noexcept
 	if (not (HasSession() and m_state->performanceMetricsEnabled and (m_state->metricPaths.Length() > 0)))
 		return;
 
-	XRState& s = *m_state;
+	static const char	prefix[] = "/perfmetrics_meta/";
 
-	for (int i = 0; i < s.metricPaths.Length(); ++i) {
+	XRState&	s = *m_state;
+	char		line[2048];
+	int			length = snprintf(line, sizeof(line), "OpenXR metrics:");
+
+	for (int i = 0; (i < s.metricPaths.Length()) and (length < int(sizeof(line)) - 1); ++i) {
 		XrPerformanceMetricsCounterMETA	counter{ XR_TYPE_PERFORMANCE_METRICS_COUNTER_META };
 		char							name[XR_MAX_PATH_LENGTH]{};
 		uint32_t						nameLength = 0;
@@ -1759,11 +1902,15 @@ noexcept
 			continue;
 		if (XR_FAILED(xrPathToString(s.instance, s.metricPaths[i], uint32_t(sizeof(name)), &nameLength, name)))
 			continue;
+
+		const char* shortName = (std::strncmp(name, prefix, sizeof(prefix) - 1) == 0) ? name + sizeof(prefix) - 1 : name;
+
 		if (counter.counterFlags & XR_PERFORMANCE_METRICS_COUNTER_FLOAT_VALUE_VALID_BIT_META)
-			logHandler.Print("OpenXR metric %s: %.3f\n", name, counter.floatValue);
+			length += snprintf(line + length, sizeof(line) - size_t(length), " %s %.2f", shortName, counter.floatValue);
 		else if (counter.counterFlags & XR_PERFORMANCE_METRICS_COUNTER_UINT_VALUE_VALID_BIT_META)
-			logHandler.Print("OpenXR metric %s: %u\n", name, counter.uintValue);
+			length += snprintf(line + length, sizeof(line) - size_t(length), " %s %u", shortName, counter.uintValue);
 	}
+	logHandler.Print("%s\n", line);
 }
 
 // =================================================================================================
