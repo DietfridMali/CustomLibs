@@ -67,6 +67,9 @@ public:
 				bool mirrored = false, uint32_t extraDescriptors = 0)
 	noexcept;
 
+	void Destroy(void)
+	noexcept;
+
 	void Publish(uint32_t index, uint32_t count = 1)
 	noexcept;
 
@@ -171,6 +174,9 @@ public:
 	noexcept;
 
 	bool CreateDefaultTextures(ID3D12Device* device)
+	noexcept;
+
+	void Destroy(void)
 	noexcept;
 
 	inline uint32_t DefaultSrv(uint8_t viewType) const

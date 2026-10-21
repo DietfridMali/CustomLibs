@@ -89,6 +89,7 @@ struct RenderStates {
 	DXGI_FORMAT	depthFormat{ DXGI_FORMAT_D32_FLOAT };
 	DXGI_FORMAT	mrtFormats[kColorTargets - 1]{};
 	uint8_t		colorTargetCount{ 1 };
+	uint8_t		viewCount{ 1 };
 
 	bool operator==(const RenderStates& o) const
 	noexcept
@@ -207,6 +208,11 @@ public:
 	static bool LoadPipelineLibrary(const String& shaderFolder);
 
 	static bool SavePipelineLibrary(void);
+
+	static void DestroyPipelines(void)
+	noexcept;
+
+	static bool RestorePipelineLibrary(void);
 
 	static void PrecreatePSOs(void (*progress)(int, int) = nullptr)
 	noexcept;

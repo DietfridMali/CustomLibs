@@ -286,7 +286,7 @@ public:
 		return m_coverageAlpha;
 	}
 
-	void PrepareExternalRelease(VkCommandBuffer cb)
+	void PrepareExternalRelease(CommandList* cl)
 	noexcept;
 
 	void SetName(const String& name)

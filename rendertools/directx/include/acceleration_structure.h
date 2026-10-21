@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dx12framework.h"
+#include "gpuregistry.h"
 
 #include <cstdint>
 
@@ -45,7 +46,8 @@ struct AccelBuildItem {
 };
 
 
-class AccelerationStructure {
+class AccelerationStructure
+	: public GpuResource {
 public:
 	static constexpr uint32_t kFrameSlots = 2;
 
@@ -63,7 +65,13 @@ public:
 	uint32_t					m_primitives{ 0 };
 
 	AccelerationStructure(void)
-	noexcept = default;
+	{
+		GpuRegistry::Register(this);
+	}
+
+	~AccelerationStructure() {
+		GpuRegistry::Unregister(this);
+	}
 
 	AccelerationStructure(const AccelerationStructure&) = delete;
 	AccelerationStructure& operator=(const AccelerationStructure&) = delete;
@@ -71,7 +79,19 @@ public:
 	AccelerationStructure(AccelerationStructure&& other)
 	noexcept
 	{
+		GpuRegistry::Register(this);
 		Move(other);
+	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override
+	{
+		Destroy();
+	}
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
 	}
 
 	AccelerationStructure& operator=(AccelerationStructure&& other)

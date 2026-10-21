@@ -4,6 +4,7 @@
 #include "base_shaderhandler.h"
 #include "commandlist.h"
 #include "dx12context.h"
+#include "xrhandler.h"
 #include "tracy_wrapper.h"
 
 #pragma warning(push)
@@ -123,7 +124,7 @@ void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool 
 	ComputeDimensions(width, height, useFullscreen);
 	m_aspectRatio = float(m_width) / float(m_height);
 	m_isLandscape = m_width > m_height;
-	m_vSync = vSync;
+	m_vSync = vSync and not (xrHandler.IsAvailable() and xrHandler.SessionEnabled());
 	SetupDisplay(windowTitle);
 }
 
@@ -349,6 +350,28 @@ noexcept
 }
 
 
+bool BaseDisplayHandler::SetupSwapchain(void)
+{
+	return CreateSwapChain();
+}
+
+
+void BaseDisplayHandler::DestroySwapchain(void)
+noexcept
+{
+	ReleaseBackBuffers();
+	for (UINT i = 0; i < BACK_BUFFER_COUNT; ++i) {
+		if (m_rtvs[i].IsValid())
+			m_rtvs[i].Free();
+		m_backBufferStates[i] = D3D12_RESOURCE_STATE_PRESENT;
+	}
+	m_swapChain.Reset();
+	m_backBufferIndex = 0;
+	m_backBufferList = nullptr;
+	m_restoreRenderStates = false;
+}
+
+
 void BaseDisplayHandler::EndFrame(void)
 {
 	ZoneScoped;
@@ -357,9 +380,12 @@ void BaseDisplayHandler::EndFrame(void)
 	// The back buffer goes to the present from here, whoever drew on it last - not only the callers
 	// that went through DrawScreen (). A no-op for an already presentable back buffer.
 	CloseBackBufferList();
+	if (xrHandler.HasSession())
+		xrHandler.PrepareRelease();
 	// Close the main renderer list — registers it for submission.
 	// Submit all registered lists (RenderTarget lists first, main list last — registration order).
 	commandListHandler.ExecuteAll();
+	xrHandler.EndFrame();
 	commandListHandler.EndFrame();
 	UINT	syncInterval = m_vSync ? 1 : 0;
 	UINT	presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
@@ -382,6 +408,7 @@ void BaseDisplayHandler::BeginFrame(void)
 	// Advance frame slot, wait fence, drain that slot's deferred resources, reset CBV allocator.
 	// Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
 	WaitWhileMinimized();
+	xrHandler.BeginFrame();
 	commandListHandler.BeginFrame();
 	commandListHandler.ResetBindings();
 	baseShaderHandler.InvalidateActiveShader();
@@ -390,7 +417,7 @@ void BaseDisplayHandler::BeginFrame(void)
 
 void BaseDisplayHandler::WaitWhileMinimized(void)
 {
-	if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) == 0)
+	if (xrHandler.HasSession() or not IsMinimized())
 		return;
 	OnMinimized();
 	bool restoreRequested = false;

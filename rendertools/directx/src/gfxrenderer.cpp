@@ -19,6 +19,10 @@
 #include "renderstates.h"
 #include "bindless_texture_heap.h"
 #include "gfxrenderer.h"
+#include "xrhandler.h"
+#include "sampler_cache.h"
+#include "gfxdatalayout.h"
+#include "gpuregistry.h"
 #include "loghandler.h"
 
 #ifdef _DEBUG
@@ -46,6 +50,8 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 		available &= ~GfxFeatureBit(GfxFeature::BindlessTextures);
 	if (not dx12Context.HasRayTracing())
 		available &= ~GfxFeatureBit(GfxFeature::RayTracing);
+	if (not dx12Context.HasMultiview())
+		available &= ~GfxFeatureBit(GfxFeature::Multiview);
 	if (not ApplyFeatures(request, available))
 		return false;
 	gfxStates.Init();
@@ -71,6 +77,12 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 	}
 	if (not descriptorHeaps.CreateDefaultTextures(dx12Context.Device()))
 		return false;
+	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled()) {
+		if (not HasFeature(GfxFeature::Multiview))
+			logHandler.Print("The graphics device has no view instancing with shader model 6.1 - VR is off.\n");
+		else if (not xrHandler.CreateSession(xrHandler.EyeWidth(), xrHandler.EyeHeight()))
+			logHandler.Print("OpenXR session could not be created - VR is off.\n");
+	}
 	return true;
 }
 
@@ -159,6 +171,7 @@ noexcept
 	// inert — RenderTargets destroyed later (incl. at static destruction) must not touch the
 	// deferred mechanism, whose singletons may already be gone.
 	commandListHandler.CmdQueue().WaitIdle();
+	xrHandler.DestroySession();
 	SavePipelineCache();
 	gfxResourceHandler.CleanupAll();
 	GfxResourceHandler::BeginShutdown();
@@ -167,6 +180,50 @@ noexcept
 	Shader::DestroyRootSignature();
 	bindlessTextureHeap.Destroy();
 	commandListHandler.Destroy();
+	xrHandler.Destroy();
+}
+
+
+void GfxRenderer::ShutdownGraphics(void)
+noexcept
+{
+	FlushResources();
+	xrHandler.DestroySession();
+	SavePipelineCache();
+	GfxDataLayout::DestroyDefaultStreams();
+	GfxDataLayout::activeLayout = nullptr;
+	GfxDataLayout::layoutStack.Clear();
+	meshHandler.Destroy();
+	GpuRegistry::ReleaseAll();
+	baseShaderHandler.DestroyShaders();
+	PSO::DestroyPipelines();
+	Shader::DestroyRootSignature();
+	commandListHandler.CmdQueue().WaitIdle();
+	gfxResourceHandler.CleanupAll();
+	bindlessTextureHeap.Destroy();
+	samplerCache.Destroy();
+	baseDisplayHandler.DestroySwapchain();
+	RenderTarget::ResetNullRTV();
+	gfxResourceHandler.CleanupAll();
+	descriptorHeaps.Destroy();
+	commandListHandler.Destroy();
+	m_cmdList = nullptr;
+	m_temporaryList = nullptr;
+	dx12Context.Destroy();
+}
+
+
+bool GfxRenderer::RestartGraphics(const GfxFeatureRequest& request)
+{
+	ShutdownGraphics();
+	if (not (InitGraphics(request) and baseDisplayHandler.SetupSwapchain()))
+		return false;
+	PSO::RestorePipelineLibrary();
+	SetViewCount(xrHandler.HasSession() ? kMaxRenderViews : 1);
+	baseShaderHandler.RecreateShaders();
+	GpuRegistry::RestoreAll();
+	xrHandler.BeginFrame();
+	return true;
 }
 
 
@@ -207,6 +264,11 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 
 	Set2DRenderStates();
 
+	bool isXR = xrHandler.IsRunning();
+
+	if (isXR)
+		xrHandler.RenderLayer(m_screenBuffer->GetAsTexture({}), bRotate, bFlipVertically);
+
 	void* cl = StartOperation("DrawScreen", false);
 
 	// Ensure the screen RenderTarget color buffer is in PSR state.
@@ -217,10 +279,38 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 		gfxStates.ClearBackBuffer();
 	}
 	// Set viewport after the list is open so RSSetViewports is actually recorded.
-	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+	int backBufferWidth = baseDisplayHandler.GetWidth();
+	int backBufferHeight = baseDisplayHandler.GetHeight();
+	int x = 0;
+	int y = 0;
+	int w = backBufferWidth;
+	int h = backBufferHeight;
 
 	m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-	RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
+
+	Texture*	screen = m_screenBuffer->GetAsTexture({});
+	bool		isMirrored = false;
+
+	if (isXR and xrHandler.EyesRendered()) {
+		xrHandler.WindowFit(kMaxRenderViews * xrHandler.EyeWidth(), xrHandler.EyeHeight(), x, y, w, h);
+		for (int view = 0; view < kMaxRenderViews; ++view) {
+			SetViewport(::Viewport(x + view * w / kMaxRenderViews, y, w / kMaxRenderViews, h), backBufferWidth, backBufferHeight);
+			if (not xrHandler.RenderMirror(bFlipVertically, view))
+				continue;
+			isMirrored = true;
+			gfxStates.SetBlending(1);
+			gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
+			if (not xrHandler.RenderLayerMirror(screen, bFlipVertically, view))
+				RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically);
+			Set2DRenderStates();
+		}
+	}
+	if (not isMirrored) {
+		if (xrHandler.HasSession())
+			xrHandler.WindowFit(m_screenBuffer->GetWidth(), m_screenBuffer->GetHeight(), x, y, w, h);
+		SetViewport(::Viewport(x, y, w, h), backBufferWidth, backBufferHeight);
+		RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically);
+	}
 
 	// Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
 	// No-op in the normal game loop where DrawScreen() was already called explicitly.

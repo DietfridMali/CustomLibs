@@ -9,9 +9,9 @@
 
 #include <cstdio>
 #include <cstring>
-#if VK_STALL_DIAG
 #include <cstdarg>
 #include <chrono>
+#if VK_STALL_DIAG
 #include <string>
 #include <vector>
 #endif
@@ -21,6 +21,15 @@
 // first VK_ERROR_DEVICE_LOST ends the program with a message. Defined below, behind the second include
 // block; vkupload.cpp declares it extern.
 void HandleDeviceLost(VkResult res, const char* where)
+noexcept;
+
+static void VkGpuFrameResolve(VkDevice device, uint32_t slotIndex, uint64_t frameNumber)
+noexcept;
+
+static void VkGpuFrameAdvance(uint32_t slotIndex)
+noexcept;
+
+static void VkGpuFrameDestroy(VkDevice device)
 noexcept;
 
 #if VK_STALL_DIAG
@@ -371,6 +380,7 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassDestroy(m_device);
 #endif
+	VkGpuFrameDestroy(m_device);
 	DestroySyncObjects();
 	m_swapchain = VK_NULL_HANDLE;
 	m_graphicsQueue = VK_NULL_HANDLE;
@@ -409,6 +419,7 @@ noexcept
 	}
 	// The slot's resources hang on its fence alone, so they are reset before the image is acquired -
 	// a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
+	VkGpuFrameResolve(m_device, m_frameIndex, m_frameNumber);
 #if VK_STALL_DIAG
 	VkGpuPassResolve(m_device, m_frameIndex, m_frameNumber);
 	stallStart = VkStallClock();
@@ -455,6 +466,7 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassAdvance(m_frameIndex);
 #endif
+	VkGpuFrameAdvance(m_frameIndex);
 }
 
 
@@ -638,6 +650,7 @@ noexcept
 #include "pipeline_cache.h"
 #include "rendertarget.h"
 #include "base_displayhandler.h"
+#include "xrhandler.h"
 
 #include <cstdlib>
 
@@ -1185,9 +1198,497 @@ noexcept
 
 #endif
 
+static constexpr uint32_t	kGpuFrameSlotSize = 256;
+static constexpr uint32_t	kGpuFrameCycleMax = kGpuFrameSlotSize / 2;
+static constexpr uint32_t	kGpuFrameStageMax = 128;
+static constexpr uint32_t	kGpuFrameViewMax = 2;
+static constexpr uint32_t	kGpuFrameQueries = (2 + kGpuFrameStageMax) * kGpuFrameViewMax;
+static constexpr size_t		kGpuFrameNameSize = 48;
+static constexpr uint32_t	kGpuFrameEntryMax = 128;
+static constexpr uint16_t	kGpuFrameOtherLists = 0;
+static constexpr uint16_t	kGpuFrameOtherStages = 1;
+static constexpr double		kGpuFrameMinMs = 0.1;
+static constexpr double		kGpuFrameSummaryMs = 1000.0;
+static constexpr size_t		kGpuFrameTextSize = 8192;
+
+struct VkGpuFrameRecord {
+	const CommandList*	list;
+	VkCommandBuffer		cb;
+	bool				isEnded;
+	uint16_t			entry;
+	uint32_t			stageCount;
+	uint32_t			stagesDropped;
+	uint16_t			stageEntries[kGpuFrameStageMax];
+};
+
+struct VkGpuFrameSlot {
+	uint32_t			first{ 0 };
+	uint32_t			count{ 0 };
+	uint32_t			dropped{ 0 };
+	uint64_t			frameNumber{ 0 };
+	uint32_t			previousFirst{ 0 };
+	uint32_t			previousCount{ 0 };
+	uint32_t			previousDropped{ 0 };
+	uint64_t			previousFrameNumber{ 0 };
+	VkGpuFrameRecord	records[kGpuFrameSlotSize]{};
+};
+
+struct VkGpuFrameEntry {
+	char	name[kGpuFrameNameSize];
+	bool	isStage;
+	double	frameMs;
+	double	totalMs;
+	double	maxMs;
+};
+
+struct VkGpuFrameSummary {
+	double			startMs{ 0.0 };
+	uint32_t		frames{ 0 };
+	uint32_t		overPeriod{ 0 };
+	uint32_t		listsDropped{ 0 };
+	uint32_t		stagesDropped{ 0 };
+	double			spanTotalMs{ 0.0 };
+	double			spanMaxMs{ 0.0 };
+	double			busyTotalMs{ 0.0 };
+	double			busyMaxMs{ 0.0 };
+	double			periodMs{ 0.0 };
+	uint32_t		entryCount{ 0 };
+	VkGpuFrameEntry	entries[kGpuFrameEntryMax]{};
+};
+
+static bool					vkGpuFrameOn = false;
+static VkQueryPool			vkGpuFramePool = VK_NULL_HANDLE;
+static bool					vkGpuFrameUnavailable = false;
+static double				vkGpuFrameTickMs = 0.0;
+static VkGpuFrameSlot		vkGpuFrameSlots[CommandQueue::FRAME_COUNT];
+static uint64_t				vkGpuFrameData[kGpuFrameQueries * 2];
+static VkGpuFrameSummary	vkGpuFrameSummary;
+static char					vkGpuFrameText[kGpuFrameTextSize];
+
+
+static double VkGpuFrameClock(void)
+noexcept
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+
+static inline uint32_t VkGpuFrameQuery(uint32_t slotIndex, uint32_t index)
+noexcept
+{
+	return (slotIndex * kGpuFrameSlotSize + index) * kGpuFrameQueries;
+}
+
+
+static inline const uint64_t* VkGpuFrameStamp(uint32_t stamp)
+noexcept
+{
+	return vkGpuFrameData + stamp * kGpuFrameViewMax * 2;
+}
+
+
+static void VkGpuFrameSetEntry(VkGpuFrameEntry& entry, const char* name, bool isStage)
+noexcept
+{
+	snprintf(entry.name, sizeof(entry.name), "%s", name);
+	entry.isStage = isStage;
+	entry.frameMs = 0.0;
+	entry.totalMs = 0.0;
+	entry.maxMs = 0.0;
+}
+
+
+static uint16_t VkGpuFrameEntryIndex(const char* name, bool isStage)
+noexcept
+{
+	VkGpuFrameSummary&	summary = vkGpuFrameSummary;
+	char				key[kGpuFrameNameSize];
+	size_t				length = 0;
+
+	if (summary.entryCount == 0) {
+		VkGpuFrameSetEntry(summary.entries[kGpuFrameOtherLists], "(other lists)", false);
+		VkGpuFrameSetEntry(summary.entries[kGpuFrameOtherStages], "(other stages)", true);
+		summary.entryCount = 2;
+	}
+	while ((name[length] != '\0') and (length < sizeof(key) - 1) and ((name[length] < '0') or (name[length] > '9'))) {
+		key[length] = name[length];
+		++length;
+	}
+	while ((length > 0) and ((key[length - 1] == ' ') or (key[length - 1] == ':')))
+		--length;
+	key[length] = '\0';
+	if (length == 0)
+		snprintf(key, sizeof(key), "%s", name);
+	for (uint32_t i = 2; i < summary.entryCount; ++i) {
+		if ((summary.entries[i].isStage == isStage) and (std::strcmp(summary.entries[i].name, key) == 0))
+			return uint16_t(i);
+	}
+	if (summary.entryCount >= kGpuFrameEntryMax)
+		return isStage ? kGpuFrameOtherStages : kGpuFrameOtherLists;
+	VkGpuFrameSetEntry(summary.entries[summary.entryCount], key, isStage);
+	return uint16_t(summary.entryCount++);
+}
+
+
+static VkGpuFrameRecord* VkGpuFrameFind(VkGpuFrameSlot& slot, const CommandList* list, uint32_t& index)
+noexcept
+{
+	for (uint32_t i = slot.count; i > 0; --i) {
+		index = (slot.first + i - 1) % kGpuFrameSlotSize;
+		VkGpuFrameRecord& record = slot.records[index];
+		if ((record.list == list) and not record.isEnded)
+			return &record;
+	}
+	return nullptr;
+}
+
+
+static bool VkGpuFrameCreate(void)
+noexcept
+{
+	if (vkGpuFramePool != VK_NULL_HANDLE)
+		return true;
+	if (vkGpuFrameUnavailable)
+		return false;
+	VkPhysicalDevice	physicalDevice = vkContext.PhysicalDevice();
+	uint32_t			familyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, nullptr);
+	AutoArray<VkQueueFamilyProperties> families(static_cast<int32_t>(familyCount));
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, families.Data());
+	uint32_t family = vkContext.GraphicsFamily();
+	if ((family >= familyCount) or (families[int32_t(family)].timestampValidBits == 0)) {
+		logHandler.Print("GPU frame timing: the graphics queue has no timestamps\n");
+		vkGpuFrameUnavailable = true;
+		return false;
+	}
+	VkQueryPoolCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+	info.queryCount = CommandQueue::FRAME_COUNT * kGpuFrameSlotSize * kGpuFrameQueries;
+	VkResult res = vkCreateQueryPool(vkContext.Device(), &info, nullptr, &vkGpuFramePool);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("GPU frame timing: vkCreateQueryPool failed (%d)\n", int(res));
+		vkGpuFramePool = VK_NULL_HANDLE;
+		vkGpuFrameUnavailable = true;
+		return false;
+	}
+	vkGpuFrameTickMs = double(vkContext.DeviceProps().limits.timestampPeriod) * 1e-6;
+	return true;
+}
+
+
+static void VkGpuFrameBegin(const CommandList* list, const char* name, VkCommandBuffer cb, uint32_t slotIndex)
+noexcept
+{
+	if (not (vkGpuFrameOn and VkGpuFrameCreate()))
+		return;
+	VkGpuFrameSlot& slot = vkGpuFrameSlots[slotIndex];
+	if (slot.count >= kGpuFrameCycleMax) {
+		++slot.dropped;
+		return;
+	}
+	uint32_t index = (slot.first + slot.count) % kGpuFrameSlotSize;
+	++slot.count;
+	VkGpuFrameRecord& record = slot.records[index];
+	record.list = list;
+	record.cb = cb;
+	record.isEnded = false;
+	record.entry = VkGpuFrameEntryIndex(name, false);
+	record.stageCount = 0;
+	record.stagesDropped = 0;
+	uint32_t query = VkGpuFrameQuery(slotIndex, index);
+	vkCmdResetQueryPool(cb, vkGpuFramePool, query, kGpuFrameQueries);
+	vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuFramePool, query);
+}
+
+
+static void VkGpuFrameStage(VkCommandBuffer cb, const char* name)
+noexcept
+{
+	if ((vkGpuFramePool == VK_NULL_HANDLE) or (cb == VK_NULL_HANDLE))
+		return;
+	for (uint32_t slotIndex = 0; slotIndex < CommandQueue::FRAME_COUNT; ++slotIndex) {
+		VkGpuFrameSlot& slot = vkGpuFrameSlots[slotIndex];
+		for (uint32_t i = slot.count; i > 0; --i) {
+			uint32_t			index = (slot.first + i - 1) % kGpuFrameSlotSize;
+			VkGpuFrameRecord&	record = slot.records[index];
+			if ((record.cb != cb) or record.isEnded)
+				continue;
+			if (record.stageCount >= kGpuFrameStageMax) {
+				++record.stagesDropped;
+				return;
+			}
+			record.stageEntries[record.stageCount] = VkGpuFrameEntryIndex(name, true);
+			vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuFramePool,
+								VkGpuFrameQuery(slotIndex, index) + (2 + record.stageCount) * kGpuFrameViewMax);
+			++record.stageCount;
+			return;
+		}
+	}
+}
+
+
+static void VkGpuFrameEnd(const CommandList* list, VkCommandBuffer cb, uint32_t slotIndex)
+noexcept
+{
+	if (vkGpuFramePool == VK_NULL_HANDLE)
+		return;
+	uint32_t			index = 0;
+	VkGpuFrameRecord*	record = VkGpuFrameFind(vkGpuFrameSlots[slotIndex], list, index);
+	if (record == nullptr)
+		return;
+	record->isEnded = true;
+	vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuFramePool, VkGpuFrameQuery(slotIndex, index) + kGpuFrameViewMax);
+}
+
+
+static void VkGpuFrameAdvance(uint32_t slotIndex)
+noexcept
+{
+	VkGpuFrameSlot& slot = vkGpuFrameSlots[slotIndex];
+	slot.previousFirst = slot.first;
+	slot.previousCount = slot.count;
+	slot.previousDropped = slot.dropped;
+	slot.previousFrameNumber = slot.frameNumber;
+	slot.first = (slot.first + slot.count) % kGpuFrameSlotSize;
+	slot.count = 0;
+	slot.dropped = 0;
+}
+
+
+static void VkGpuFrameAppend(int& length, const char* format, ...)
+noexcept
+{
+	if (length >= int(kGpuFrameTextSize) - 1)
+		return;
+	va_list	args;
+	va_start(args, format);
+	int written = vsnprintf(vkGpuFrameText + length, kGpuFrameTextSize - size_t(length), format, args);
+	va_end(args);
+	if (written <= 0)
+		return;
+	length += written;
+	if (length > int(kGpuFrameTextSize) - 1)
+		length = int(kGpuFrameTextSize) - 1;
+}
+
+
+static void VkGpuFrameAppendEntries(int& length, bool isStage, bool isSummary)
+noexcept
+{
+	const VkGpuFrameSummary&	summary = vkGpuFrameSummary;
+	bool						isListed[kGpuFrameEntryMax]{};
+	const char*					separator = isStage ? "; stages:" : "; lists:";
+
+	for (;;) {
+		int		best = -1;
+		double	bestMs = kGpuFrameMinMs;
+		for (uint32_t i = 0; i < summary.entryCount; ++i) {
+			const VkGpuFrameEntry&	entry = summary.entries[i];
+			double					ms = isSummary ? entry.totalMs / double(summary.frames) : entry.frameMs;
+			if (isListed[i] or (entry.isStage != isStage) or (ms < bestMs))
+				continue;
+			best = int(i);
+			bestMs = ms;
+		}
+		if (best < 0)
+			return;
+		isListed[best] = true;
+		if (isSummary)
+			VkGpuFrameAppend(length, "%s %s %.2f/%.2f", separator, summary.entries[best].name, bestMs, summary.entries[best].maxMs);
+		else
+			VkGpuFrameAppend(length, "%s %s %.2f", separator, summary.entries[best].name, bestMs);
+		separator = ",";
+	}
+}
+
+
+static void VkGpuFrameLogFrame(uint64_t frameNumber, double periodMs, double busyMs, double spanMs, uint32_t timed, uint32_t count,
+							   uint32_t dropped, uint32_t stagesDropped)
+noexcept
+{
+	int length = 0;
+	VkGpuFrameAppend(length, "GPU frame %llu over the display period of %.2f ms: busy %.2f ms, span %.2f ms, %u of %u lists timed, %u lists and %u stages not recorded",
+					 static_cast<unsigned long long>(frameNumber), periodMs, busyMs, spanMs, timed, count, dropped, stagesDropped);
+	VkGpuFrameAppendEntries(length, false, false);
+	VkGpuFrameAppendEntries(length, true, false);
+	logHandler.Print("%s\n", vkGpuFrameText);
+}
+
+
+static void VkGpuFrameLogSummary(double elapsedMs)
+noexcept
+{
+	const VkGpuFrameSummary&	summary = vkGpuFrameSummary;
+	double						frames = double(summary.frames);
+	int							length = 0;
+	VkGpuFrameAppend(length, "GPU %u frames in %.2f s, display period %.2f ms: busy avg %.2f max %.2f ms, span avg %.2f max %.2f ms, %u frames busy longer than the period, %u lists and %u stages not recorded",
+					 summary.frames, elapsedMs * 0.001, summary.periodMs, summary.busyTotalMs / frames, summary.busyMaxMs, summary.spanTotalMs / frames,
+					 summary.spanMaxMs, summary.overPeriod, summary.listsDropped, summary.stagesDropped);
+	VkGpuFrameAppendEntries(length, false, true);
+	VkGpuFrameAppendEntries(length, true, true);
+	logHandler.Print("%s\n", vkGpuFrameText);
+}
+
+
+static void VkGpuFrameResetSummary(double startMs)
+noexcept
+{
+	VkGpuFrameSummary& summary = vkGpuFrameSummary;
+	summary.startMs = startMs;
+	summary.frames = 0;
+	summary.overPeriod = 0;
+	summary.listsDropped = 0;
+	summary.stagesDropped = 0;
+	summary.spanTotalMs = 0.0;
+	summary.spanMaxMs = 0.0;
+	summary.busyTotalMs = 0.0;
+	summary.busyMaxMs = 0.0;
+	for (uint32_t i = 0; i < summary.entryCount; ++i) {
+		summary.entries[i].frameMs = 0.0;
+		summary.entries[i].totalMs = 0.0;
+		summary.entries[i].maxMs = 0.0;
+	}
+}
+
+
+static void VkGpuFrameMeasure(VkDevice device, uint32_t slotIndex, uint32_t first, uint32_t count, uint32_t dropped, uint64_t frameNumber)
+noexcept
+{
+	const VkGpuFrameSlot&	slot = vkGpuFrameSlots[slotIndex];
+	VkGpuFrameSummary&		summary = vkGpuFrameSummary;
+	uint64_t				firstBegin = UINT64_MAX;
+	uint64_t				lastEnd = 0;
+	double					busyMs = 0.0;
+	uint32_t				timed = 0;
+	uint32_t				stagesDropped = 0;
+
+	for (uint32_t i = 0; i < count; ++i) {
+		uint32_t				index = (first + i) % kGpuFrameSlotSize;
+		const VkGpuFrameRecord&	record = slot.records[index];
+		if (not record.isEnded)
+			continue;
+		std::memset(vkGpuFrameData, 0, sizeof(vkGpuFrameData));
+		VkResult res = vkGetQueryPoolResults(device, vkGpuFramePool, VkGpuFrameQuery(slotIndex, index), (2 + record.stageCount) * kGpuFrameViewMax,
+											 sizeof(vkGpuFrameData), vkGpuFrameData, 2 * sizeof(uint64_t),
+											 VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+		const uint64_t*	begin = VkGpuFrameStamp(0);
+		const uint64_t*	end = VkGpuFrameStamp(1);
+		if (((res != VK_SUCCESS) and (res != VK_NOT_READY)) or (begin[1] == 0) or (end[1] == 0) or (end[0] < begin[0]))
+			continue;
+		double listMs = double(end[0] - begin[0]) * vkGpuFrameTickMs;
+		summary.entries[record.entry].frameMs += listMs;
+		busyMs += listMs;
+		++timed;
+		if (firstBegin > begin[0])
+			firstBegin = begin[0];
+		if (lastEnd < end[0])
+			lastEnd = end[0];
+		stagesDropped += record.stagesDropped;
+		for (uint32_t j = 0; j < record.stageCount; ++j) {
+			const uint64_t* stage = VkGpuFrameStamp(2 + j);
+			if (stage[1] == 0)
+				continue;
+			uint64_t stageEnd = end[0];
+			for (uint32_t k = j + 1; k < record.stageCount; ++k) {
+				const uint64_t* next = VkGpuFrameStamp(2 + k);
+				if (next[1] != 0) {
+					stageEnd = next[0];
+					break;
+				}
+			}
+			if (stageEnd >= stage[0])
+				summary.entries[record.stageEntries[j]].frameMs += double(stageEnd - stage[0]) * vkGpuFrameTickMs;
+		}
+	}
+	if (timed == 0)
+		return;
+	double	spanMs = double(lastEnd - firstBegin) * vkGpuFrameTickMs;
+	double	periodMs = xrHandler.DisplayPeriod();
+	if ((periodMs > 0.0) and (busyMs > periodMs)) {
+		++summary.overPeriod;
+		VkGpuFrameLogFrame(frameNumber, periodMs, busyMs, spanMs, timed, count, dropped, stagesDropped);
+	}
+	if (periodMs > 0.0)
+		summary.periodMs = periodMs;
+	++summary.frames;
+	summary.listsDropped += dropped;
+	summary.stagesDropped += stagesDropped;
+	summary.spanTotalMs += spanMs;
+	if (summary.spanMaxMs < spanMs)
+		summary.spanMaxMs = spanMs;
+	summary.busyTotalMs += busyMs;
+	if (summary.busyMaxMs < busyMs)
+		summary.busyMaxMs = busyMs;
+	for (uint32_t i = 0; i < summary.entryCount; ++i) {
+		VkGpuFrameEntry& entry = summary.entries[i];
+		entry.totalMs += entry.frameMs;
+		if (entry.maxMs < entry.frameMs)
+			entry.maxMs = entry.frameMs;
+		entry.frameMs = 0.0;
+	}
+	double now = VkGpuFrameClock();
+	if (summary.startMs == 0.0)
+		summary.startMs = now;
+	else if (now - summary.startMs >= kGpuFrameSummaryMs) {
+		VkGpuFrameLogSummary(now - summary.startMs);
+		VkGpuFrameResetSummary(now);
+	}
+}
+
+
+static void VkGpuFrameSwitch(bool isOn)
+noexcept
+{
+	if (isOn == vkGpuFrameOn)
+		return;
+	vkGpuFrameOn = isOn;
+	if (isOn)
+		VkGpuFrameResetSummary(0.0);
+	logHandler.Print("GPU frame timing %s\n", isOn ? "on" : "off");
+}
+
+
+static void VkGpuFrameResolve(VkDevice device, uint32_t slotIndex, uint64_t frameNumber)
+noexcept
+{
+	VkGpuFrameSlot&	slot = vkGpuFrameSlots[slotIndex];
+	uint32_t		first = slot.previousFirst;
+	uint32_t		count = slot.previousCount;
+	uint32_t		dropped = slot.previousDropped;
+	uint64_t		recordFrame = slot.previousFrameNumber;
+	slot.previousCount = 0;
+	slot.previousDropped = 0;
+	slot.frameNumber = frameNumber;
+	if ((vkGpuFramePool != VK_NULL_HANDLE) and (count > 0))
+		VkGpuFrameMeasure(device, slotIndex, first, count, dropped, recordFrame);
+	VkGpuFrameSwitch(xrHandler.IsRunning());
+}
+
+
+static void VkGpuFrameDestroy(VkDevice device)
+noexcept
+{
+	if ((vkGpuFramePool != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
+		vkDestroyQueryPool(device, vkGpuFramePool, nullptr);
+	vkGpuFramePool = VK_NULL_HANDLE;
+	for (VkGpuFrameSlot& slot : vkGpuFrameSlots) {
+		slot.first = 0;
+		slot.count = 0;
+		slot.dropped = 0;
+		slot.frameNumber = 0;
+		slot.previousFirst = 0;
+		slot.previousCount = 0;
+		slot.previousDropped = 0;
+		slot.previousFrameNumber = 0;
+	}
+}
+
+
 void GfxStageMark(const char* name)
 noexcept
 {
+	VkGpuFrameStage(commandListHandler.CurrentGfxList(), name);
 #if VK_STALL_DIAG
 	++vkStalls.stageMarks;
 	if (vkGpuPassPool == VK_NULL_HANDLE)
@@ -1359,6 +1860,7 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassBegin(this, static_cast<const char*>(m_name), m_cmdBuffers[fi], fi);
 #endif
+	VkGpuFrameBegin(this, static_cast<const char*>(m_name), m_cmdBuffers[fi], fi);
 	m_isRecording = true;
 	m_isFlushed = false;
 	m_usesBackBuffer = false;
@@ -1406,6 +1908,7 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassEnd(this, m_cmdBuffers[fi], fi);
 #endif
+	VkGpuFrameEnd(this, m_cmdBuffers[fi], fi);
 	VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
 	if (res != VK_SUCCESS)
 		logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);

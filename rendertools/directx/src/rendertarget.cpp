@@ -68,16 +68,25 @@ void BufferInfo::Init(void)
 	for (int face = 0; face < 6; ++face)
 		m_cubeRtv[face].Handle() = {};
 	SRV().Handle() = {};
+	m_flatSrv.Handle() = {};
+	m_arraySrv.Handle() = {};
 	DSV().Handle() = {};
 	m_dsvReadOnly.Handle() = {};
 	m_uav.Handle() = {};
 	for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
 		m_arrayRtv[layer].Handle() = {};
 	m_arrayRtv.Destroy();
+	for (int group = 0; group < m_arrayDsv.Length(); ++group)
+		m_arrayDsv[group].Handle() = {};
+	m_arrayDsv.Destroy();
+	for (int group = 0; group < m_arrayDsvReadOnly.Length(); ++group)
+		m_arrayDsvReadOnly[group].Handle() = {};
+	m_arrayDsvReadOnly.Destroy();
 	m_state = kShaderReadState;
 	m_type = btColor;
 	m_hasStencil = false;
 	m_isArray = false;
+	m_isExternal = false;
 }
 
 
@@ -211,8 +220,18 @@ void BufferInfo::Release(bool immediate)
 	else
 		release(m_rtv.Handle());
 	release(m_srv.Handle());
-	release(m_dsv.Handle());
-	release(m_dsvReadOnly.Handle());
+	release(m_flatSrv.Handle());
+	release(m_arraySrv.Handle());
+	if (m_arrayDsv.Length() > 0) {
+		for (int group = 0; group < m_arrayDsv.Length(); ++group)
+			release(m_arrayDsv[group].Handle());
+		for (int group = 0; group < m_arrayDsvReadOnly.Length(); ++group)
+			release(m_arrayDsvReadOnly[group].Handle());
+	}
+	else {
+		release(m_dsv.Handle());
+		release(m_dsvReadOnly.Handle());
+	}
 	release(m_uav.Handle());
 	if (not immediate)
 		gfxResourceHandler.Track(m_resource);
@@ -224,6 +243,28 @@ void BufferInfo::Release(bool immediate)
 RenderTarget::RenderTarget()
 {
 	Init();
+	GpuRegistry::Register(this);
+}
+
+
+void RenderTarget::ReleaseGpu(void)
+noexcept
+{
+	m_restoreGpu = m_isAvailable and not m_isExternal;
+	if (m_restoreGpu)
+		Destroy();
+}
+
+
+bool RenderTarget::RestoreGpu(void)
+{
+	if (not m_restoreGpu)
+		return true;
+	m_restoreGpu = false;
+
+	RTCreationParams params = m_creationParams;
+
+	return Create(m_width, m_height, m_scale, params);
 }
 
 
@@ -242,6 +283,9 @@ void RenderTarget::Init(void)
 	m_computeBufferCount = 0;
 	m_arrayLayerCount = 0;
 	m_arrayLayer = 0;
+	m_viewCount = 1;
+	m_externalDepthFormat = DXGI_FORMAT_UNKNOWN;
+	m_isExternal = false;
 	m_mipLevels = 1;
 	m_activeBufferIndex = 0;
 	m_lastDestination = -1;
@@ -260,13 +304,27 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 	cv.Format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
 	cv.DepthStencil.Depth = 1.0f;
 	cv.DepthStencil.Stencil = 0;
+	int layerCount = (m_viewCount > 1) ? LayerGroupCount() * m_viewCount : 1;
+
 	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h,
 									   m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
-									   D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
+									   D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type), layerCount);
 	if (not info.m_resource)
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
+	if (m_viewCount > 1) {
+		if (not info.AllocArrayDSVs(LayerGroupCount(), m_viewCount)) {
+			logHandler.Print("RenderTarget '%s': depth view creation failed\n", static_cast<const char*>(m_name));
+			return false;
+		}
+		if (not (info.m_srv.CreateArray(info.m_resource, info.ViewFormat(), 1) and
+				 info.m_arraySrv.CreateArray(info.m_resource, info.ViewFormat(), layerCount))) {
+			logHandler.Print("RenderTarget '%s': depth-sample view creation failed\n", static_cast<const char*>(m_name));
+			return false;
+		}
+		return true;
+	}
 	if (not info.AllocDSV()) {
 		logHandler.Print("RenderTarget '%s': depth view creation failed\n", static_cast<const char*>(m_name));
 		return false;
@@ -278,6 +336,10 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 		return false;
 	}
 	if (not info.AllocSRV()) {
+		logHandler.Print("RenderTarget '%s': depth-sample view creation failed\n", static_cast<const char*>(m_name));
+		return false;
+	}
+	if ((baseRenderer.ViewCount() > 1) and not info.m_arraySrv.CreateArray(info.m_resource, info.ViewFormat(), 1)) {
 		logHandler.Print("RenderTarget '%s': depth-sample view creation failed\n", static_cast<const char*>(m_name));
 		return false;
 	}
@@ -296,15 +358,42 @@ bool BufferInfo::AllocCubeViews(void)
 }
 
 
-bool BufferInfo::AllocArrayViews(int layerCount)
+bool BufferInfo::AllocArrayViews(int layerCount, int viewCount)
 {
 	m_arrayRtv.Resize(layerCount);
 	for (int layer = 0; layer < layerCount; ++layer)
-		if (not m_arrayRtv[layer].Create(m_resource, ViewFormat(), layer))
+		if (not m_arrayRtv[layer].Create(m_resource, ViewFormat(), layer * viewCount, viewCount))
 			return false;
 	// The layer selected first is layer 0 - RenderTarget::SelectArrayLayer () moves m_rtv along.
 	m_rtv = m_arrayRtv[0];
-	return m_srv.CreateArray(m_resource, ViewFormat(), layerCount);
+	return m_srv.CreateArray(m_resource, ViewFormat(), layerCount * viewCount) and m_flatSrv.CreateArray(m_resource, ViewFormat(), 1);
+}
+
+
+bool BufferInfo::AllocArrayDSVs(int groupCount, int viewCount)
+{
+	DXGI_FORMAT		format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
+	D3D12_DSV_FLAGS	readOnly = m_hasStencil ? (D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL) : D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+
+	m_arrayDsv.Resize(groupCount);
+	m_arrayDsvReadOnly.Resize(groupCount);
+	for (int group = 0; group < groupCount; ++group) {
+		if (not (m_arrayDsv[group].CreateArray(m_resource, format, D3D12_DSV_FLAG_NONE, group * viewCount, viewCount) and
+				 m_arrayDsvReadOnly[group].CreateArray(m_resource, format, readOnly, group * viewCount, viewCount)))
+			return false;
+	}
+	m_dsv = m_arrayDsv[0];
+	m_dsvReadOnly = m_arrayDsvReadOnly[0];
+	return true;
+}
+
+
+void BufferInfo::UnbindViews(void)
+noexcept
+{
+	commandListHandler.UnbindImage(m_srv.GetIndex());
+	commandListHandler.UnbindImage(m_flatSrv.GetIndex());
+	commandListHandler.UnbindImage(m_arraySrv.GetIndex());
 }
 
 
@@ -337,10 +426,13 @@ bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, i
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
 	info.m_colorFormat = m_colorFormat;
-	info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
+
+	bool isAttachment = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btId);
+
+	info.m_isArray = ((info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0)) or ((m_viewCount > 1) and isAttachment);
 	D3D12_CLEAR_VALUE cv{};
 	cv.Format = info.ViewFormat();
-	int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
+	int arraySize = info.m_isArray ? LayerGroupCount() * m_viewCount : 1;
 	int mipLevels = (info.m_type == BufferInfo::btColor) ? m_mipLevels : 1;
 	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h, cv.Format,
 									   D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), arraySize,
@@ -352,12 +444,16 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 	// An array buffer takes its views here - one RTV per layer plus an array SRV - instead of the
 	// plain SRV (and the RTV that AllocRTV () makes for a single 2D resource) below.
 	if (info.m_isArray) {
-		if (not info.AllocArrayViews(m_arrayLayerCount)) {
+		if (not info.AllocArrayViews(LayerGroupCount(), m_viewCount)) {
 			logHandler.Print("RenderTarget '%s': array view creation failed\n", static_cast<const char*>(m_name));
 			return false;
 		}
 	}
 	else if (not (info.AllocSRV(mipLevels) and info.AllocRTV())) {
+		logHandler.Print("RenderTarget '%s': color view creation failed\n", static_cast<const char*>(m_name));
+		return false;
+	}
+	else if ((baseRenderer.ViewCount() > 1) and isAttachment and not info.m_arraySrv.CreateArray(info.m_resource, info.ViewFormat(), 1)) {
 		logHandler.Print("RenderTarget '%s': color view creation failed\n", static_cast<const char*>(m_name));
 		return false;
 	}
@@ -427,6 +523,12 @@ bool RenderTarget::SelectArrayLayer(int layer)
 	for (int i = 0; i < m_colorBufferCount; ++i)
 		if (m_bufferInfo[i].m_isArray and (layer < m_bufferInfo[i].m_arrayRtv.Length()))
 			m_bufferInfo[i].m_rtv = m_bufferInfo[i].m_arrayRtv[layer];
+	if ((m_depthBufferIndex >= 0) and (layer < m_bufferInfo[m_depthBufferIndex].m_arrayDsv.Length())) {
+		BufferInfo& depthInfo = m_bufferInfo[m_depthBufferIndex];
+
+		depthInfo.m_dsv = depthInfo.m_arrayDsv[layer];
+		depthInfo.m_dsvReadOnly = depthInfo.m_arrayDsvReadOnly[layer];
+	}
 	if (IsEnabled())
 		return SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex,
 								   .drawBufferGroup = m_drawBufferGroup,
@@ -497,6 +599,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	if (not device)
 		return false;
 
+	m_creationParams = params;
 	m_name = params.name;
 	m_width = width;
 	m_height = height;
@@ -511,7 +614,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	// allocate, and SelectArrayLayer () bounds against it.
 	m_arrayLayerCount = params.arrayLayerCount;
 	m_arrayLayer = 0;
-	m_mipLevels = (m_arrayLayerCount > 0) ? 1 : std::clamp(params.mipLevels, 1, CalcMipLevels(width * scale, height * scale, 1));
+	m_viewCount = std::clamp(params.viewCount, 1, kMaxRenderViews);
+	m_externalDepthFormat = DXGI_FORMAT_UNKNOWN;
+	m_isExternal = false;
+	m_mipLevels = ((m_arrayLayerCount > 0) or (m_viewCount > 1)) ? 1
+																  : std::clamp(params.mipLevels, 1, CalcMipLevels(width * scale, height * scale, 1));
 	// Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
 	// for stencil without depth still yields one combined buffer.
 	m_hasStencil = params.stencilBufferCount > 0;
@@ -572,6 +679,136 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 }
 
 
+static bool FormatHasStencil(DXGI_FORMAT format)
+noexcept
+{
+	return (format == DXGI_FORMAT_D24_UNORM_S8_UINT) or (format == DXGI_FORMAT_D32_FLOAT_S8X24_UINT);
+}
+
+
+bool RenderTarget::CreateExternal(int width, int height, const String& name, int viewCount, ID3D12Resource* colorResource,
+								  DXGI_FORMAT colorFormat, ID3D12Resource* depthResource, DXGI_FORMAT depthFormat)
+{
+	Destroy();
+
+	if ((dx12Context.Device() == nullptr) or ((colorResource == nullptr) and (depthResource == nullptr)))
+		return false;
+
+	m_name = name;
+	m_width = width;
+	m_height = height;
+	m_scale = 1;
+	m_viewCount = std::clamp(viewCount, 1, kMaxRenderViews);
+	m_arrayLayerCount = 0;
+	m_arrayLayer = 0;
+	m_mipLevels = 1;
+	m_isExternal = true;
+	m_colorBufferCount = (colorResource != nullptr) ? 1 : 0;
+	if (colorResource != nullptr)
+		m_colorFormat = colorFormat;
+	m_hasStencil = (depthResource != nullptr) and FormatHasStencil(depthFormat);
+	m_externalDepthFormat = (depthResource != nullptr) ? depthFormat : DXGI_FORMAT_UNKNOWN;
+	m_bufferInfo.Resize(m_colorBufferCount + ((depthResource != nullptr) ? 1 : 0));
+	m_renderTextures.Resize(m_colorBufferCount);
+	for (int i = 0; i < m_renderTextures.Length(); i++) {
+		m_renderTextures[i].m_filtering = m_filtering;
+		m_renderTextures[i].m_useMipMaps = false;
+		if (m_renderTextures[i].m_hasParams)
+			m_renderTextures[i].SetParams(true);
+	}
+	m_pingPong = false;
+	m_isScreenBuffer = false;
+	m_cmdList = nullptr;
+
+	if (colorResource != nullptr) {
+		BufferInfo& info = m_bufferInfo[m_bufferCount];
+
+		info.Init();
+		info.m_type = BufferInfo::btColor;
+		info.m_colorFormat = colorFormat;
+		info.m_isExternal = true;
+		info.m_resource = colorResource;
+		info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+		bool ok;
+
+		if (m_viewCount > 1) {
+			info.m_isArray = true;
+			ok = info.AllocArrayViews(1, m_viewCount);
+		}
+		else
+			ok = info.AllocSRV() and info.AllocRTV() and
+				((baseRenderer.ViewCount() <= 1) or info.m_arraySrv.CreateArray(info.m_resource, info.ViewFormat(), 1));
+		if (not ok) {
+			logHandler.Print("RenderTarget '%s': views of the external colour image could not be created\n", static_cast<const char*>(m_name));
+			Destroy();
+			return false;
+		}
+		++m_bufferCount;
+	}
+
+	m_depthBufferIndex = -1;
+	m_stencilBufferIndex = -1;
+	if (depthResource != nullptr) {
+		BufferInfo& info = m_bufferInfo[m_bufferCount];
+
+		info.Init();
+		info.m_type = BufferInfo::btDepth;
+		info.m_isExternal = true;
+		info.m_hasStencil = m_hasStencil;
+		info.m_resource = depthResource;
+		info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+		bool ok;
+
+		if (m_viewCount > 1) {
+			info.m_arrayDsv.Resize(1);
+			ok = info.m_arrayDsv[0].CreateArray(info.m_resource, depthFormat, D3D12_DSV_FLAG_NONE, 0, m_viewCount);
+			if (ok)
+				info.m_dsv = info.m_arrayDsv[0];
+		}
+		else
+			ok = info.m_dsv.Create(info.m_resource, depthFormat);
+		if (not ok) {
+			logHandler.Print("RenderTarget '%s': views of the external depth image could not be created\n", static_cast<const char*>(m_name));
+			Destroy();
+			return false;
+		}
+		m_depthBufferIndex = m_bufferCount;
+		m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
+		++m_bufferCount;
+	}
+
+	m_vertexBufferCount = 0;
+	m_extraBufferIndex = -1;
+	m_idBufferCount = 0;
+	m_idBufferIndex = -1;
+	m_computeBufferIndex = -1;
+	m_computeBufferCount = 0;
+	m_cubeMapIndex = -1;
+	m_cubeMapCount = 0;
+	m_cubeFace = 0;
+	m_viewport = Viewport(0, 0, width, height);
+	CreateRenderArea();
+	m_isAvailable = true;
+	return true;
+}
+
+
+void RenderTarget::PrepareExternalRelease(CommandList* cl)
+noexcept
+{
+	if (not (cl and cl->GfxList()))
+		return;
+	for (int i = 0; i < m_bufferCount; ++i) {
+		BufferInfo& info = m_bufferInfo[i];
+
+		if (info.m_isExternal)
+			info.SetState(cl, (info.m_type == BufferInfo::btDepth) ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+}
+
+
 bool RenderTarget::AttachBuffer(int bufferIndex)
 {
 	if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
@@ -584,7 +821,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
 		if (not info.AllocRTV())
 			return false;
 	info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	commandListHandler.UnbindImage(info.SRVIndex());
+	info.UnbindViews();
 	return true;
 }
 
@@ -621,7 +858,12 @@ void RenderTarget::Destroy(bool immediate)
 		const uint32_t srvIndex = m_bufferInfo[i].SRVIndex();
 		if (srvIndex != UINT32_MAX)
 			gfxStates.ReleaseTexture(GL_TEXTURE_2D, srvIndex);
-		commandListHandler.UnbindImage(srvIndex);
+
+		const uint32_t flatSrvIndex = m_bufferInfo[i].m_flatSrv.GetIndex();
+
+		if (flatSrvIndex != UINT32_MAX)
+			gfxStates.ReleaseTexture(GL_TEXTURE_2D, flatSrvIndex);
+		m_bufferInfo[i].UnbindViews();
 		m_bufferInfo[i].Release(immediate);
 		gfxStates.CheckError();
 	}
@@ -640,9 +882,10 @@ void RenderTarget::Destroy(bool immediate)
 // A render-target slot that a custom draw-buffer setup leaves unused still has to occupy its position in
 // the OMSetRenderTargets array, or every later fragment output would shift down by one slot. D3D12 rejects
 // a zeroed handle there, so one null RTV descriptor is created on first use and shared from then on.
+static DescriptorHandle nullHandle;
+
 D3D12_CPU_DESCRIPTOR_HANDLE RenderTarget::NullRTV(void)
 {
-	static DescriptorHandle nullHandle;
 	if (not nullHandle.IsValid()) {
 		ID3D12Device* device = dx12Context.Device();
 		if (not device)
@@ -656,6 +899,13 @@ D3D12_CPU_DESCRIPTOR_HANDLE RenderTarget::NullRTV(void)
 		device->CreateRenderTargetView(nullptr, &desc, descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index));
 	}
 	return descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index);
+}
+
+
+void RenderTarget::ResetNullRTV(void)
+noexcept
+{
+	nullHandle = DescriptorHandle();
 }
 
 
@@ -774,7 +1024,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 		}
 		else {
 			di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-			commandListHandler.UnbindImage(di.SRVIndex());
+			di.UnbindViews();
 			commandListHandler.UnbindImage(depthOwner->m_shadowTexture.m_handle);
 		}
 	}
@@ -801,6 +1051,7 @@ noexcept
 	for (int i = 1; i < RenderStates::kColorTargets; ++i)
 		states.mrtFormats[i - 1] = ((i < m_boundColorCount) and (i < RT_MAX_COLOR_BUFFERS)) ? m_boundColorFormats[i] : DXGI_FORMAT_UNKNOWN;
 	states.depthFormat = m_boundDepthFormat;
+	states.viewCount = uint8_t(m_viewCount);
 }
 
 
@@ -1001,7 +1252,12 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
 		filtering = GfxFilterMode::Nearest;
 	if (tmuIndex >= Shader::kSrvSlots)
 		return false;
-	commandListHandler.BindSampledImage(uint32_t(tmuIndex), info.SRVIndex());
+
+	uint32_t srvIndex = UINT32_MAX;
+	uint32_t arraySrvIndex = UINT32_MAX;
+
+	ViewIndices(info, srvIndex, arraySrvIndex);
+	commandListHandler.BindSampledImage(uint32_t(tmuIndex), srvIndex, arraySrvIndex);
 
 	// Bind the matching sampler from the buffer's own sampling configuration.
 	// Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets the
@@ -1109,10 +1365,31 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 	RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
 	if (texture == nullptr)
 		texture = &m_externalTexture;
-	texture->m_handle = info.SRVIndex();
+	SetTextureViews(info, *texture);
 	texture->m_resource = info.m_resource;
 	texture->Validate();
 	return texture;
+}
+
+
+void RenderTarget::ViewIndices(BufferInfo& info, uint32_t& srvIndex, uint32_t& arraySrvIndex)
+noexcept
+{
+	if (info.m_isArray) {
+		srvIndex = ((baseRenderer.ViewCount() > 1) and info.m_flatSrv.IsValid()) ? info.m_flatSrv.GetIndex() : info.SRVIndex();
+		arraySrvIndex = info.SRVIndex();
+	}
+	else {
+		srvIndex = info.SRVIndex();
+		arraySrvIndex = info.m_arraySrv.GetIndex();
+	}
+}
+
+
+void RenderTarget::SetTextureViews(BufferInfo& info, Texture& texture)
+noexcept
+{
+	ViewIndices(info, texture.m_handle, texture.m_arrayHandle);
 }
 
 
@@ -1190,6 +1467,7 @@ Texture* RenderTarget::GetDepthAsTexture(void)
 	if (not info.m_resource)
 		return nullptr;
 	m_depthTexture.m_handle = info.SRVIndex();
+	m_depthTexture.m_arrayHandle = info.m_arraySrv.GetIndex();
 	m_depthTexture.m_resource = info.m_resource;
 	m_depthTexture.Validate();
 	return &m_depthTexture;
@@ -1225,10 +1503,19 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 	srvDesc.Format = info.ViewFormat();
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MipLevels = 1;
+	if (info.m_resource->GetDesc().DepthOrArraySize > 1) {
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+		srvDesc.Texture2DArray.MipLevels = 1;
+		srvDesc.Texture2DArray.FirstArraySlice = 0;
+		srvDesc.Texture2DArray.ArraySize = 1;
+	}
+	else {
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+	}
 	device->CreateShaderResourceView(info.m_resource.Get(), &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_shadowTexture.m_handle));
 	descriptorHeaps.m_srvHeap.Publish(m_shadowTexture.m_handle);
+	m_shadowTexture.m_arrayHandle = info.m_arraySrv.GetIndex();
 	m_shadowTexture.m_resource = info.m_resource;
 	m_shadowTexture.Validate();
 	return &m_shadowTexture;

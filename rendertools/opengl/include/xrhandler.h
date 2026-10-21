@@ -221,9 +221,15 @@ public:
 		return false;
 	}
 
-	inline void SetLayer(float, float, bool)
+	inline void SetLayer(float, float, bool, bool, float)
 	noexcept
 	{}
+
+	inline bool HasCurvedLayer(void) const
+	noexcept
+	{
+		return false;
+	}
 
 	inline bool SubmitDepth(Texture*, float, float)
 	{

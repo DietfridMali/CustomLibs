@@ -13,7 +13,7 @@
 
 #include <cwchar>
 
-static constexpr uint32_t kPipelineRecordVersion = 2;
+static constexpr uint32_t kPipelineRecordVersion = 3;
 
 namespace {
 
@@ -256,6 +256,26 @@ int PSO::CompareShaders(void* context, const PSOKey& key1, const PSOKey& key2)
 }
 
 
+static void ApplyCoverageAlpha(RenderStates& states)
+noexcept
+{
+	using BlendFactor = GfxOperations::BlendFactor;
+
+	for (int i = 0; i < RenderStates::kColorTargets; ++i) {
+		if (not states.blendEnable[i])
+			continue;
+		if (states.blendDstRGB[i] == BlendFactor::InvSrcAlpha) {
+			states.blendSrcAlpha[i] = BlendFactor::One;
+			states.blendDstAlpha[i] = BlendFactor::InvSrcAlpha;
+		}
+		else if (states.blendDstRGB[i] == BlendFactor::One) {
+			states.blendSrcAlpha[i] = BlendFactor::Zero;
+			states.blendDstAlpha[i] = BlendFactor::One;
+		}
+	}
+}
+
+
 PSO::psoPtr_t PSO::GetPSO(Shader* shader)
 noexcept
 {
@@ -263,8 +283,11 @@ noexcept
 		return nullptr;
 
 	PSOKey key{ shader, baseRenderer.RenderStates() };
-	if (RenderTarget* renderTarget = baseRenderer.GetActiveBuffer())
+	if (RenderTarget* renderTarget = baseRenderer.GetActiveBuffer()) {
 		renderTarget->FillPipelineFormats(key.states);
+		if (renderTarget->CoverageAlpha())
+			ApplyCoverageAlpha(key.states);
+	}
 	else {
 		key.states.colorTargetCount = 1;
 		key.states.colorFormat = BaseDisplayHandler::BACK_BUFFER_FORMAT;
@@ -528,6 +551,24 @@ bool PSO::SavePipelineLibrary(void)
 }
 
 
+void PSO::DestroyPipelines(void)
+noexcept
+{
+	PipelineLibrary& lib = GetLibrary();
+
+	GetCache(ComparePSOs).Clear();
+	lib.library.Reset();
+	lib.data.clear();
+	lib.dirty = false;
+}
+
+
+bool PSO::RestorePipelineLibrary(void)
+{
+	return LoadPipelineLibrary(String(GetLibrary().folder));
+}
+
+
 bool PSO::CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc, const String& shaderName,
 								ID3DBlob* rootSignatureBlob, PSOComPtr& pso)
 {
@@ -544,6 +585,62 @@ bool PSO::CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELI
 		return false;
 	StorePipeline(name, pso.Get());
 	return true;
+}
+
+
+template <D3D12_PIPELINE_STATE_SUBOBJECT_TYPE TYPE, typename T>
+struct alignas(void*) PipelineSubobject {
+	D3D12_PIPELINE_STATE_SUBOBJECT_TYPE	type{ TYPE };
+	T									desc{};
+};
+
+
+struct ViewInstancedPipelineStream {
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*>				rootSignature;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, D3D12_SHADER_BYTECODE>						vs;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, D3D12_SHADER_BYTECODE>						ps;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, D3D12_SHADER_BYTECODE>						gs;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, D3D12_SHADER_BYTECODE>						hs;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, D3D12_SHADER_BYTECODE>						ds;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, D3D12_BLEND_DESC>							blend;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK, UINT>								sampleMask;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, D3D12_RASTERIZER_DESC>				rasterizer;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, D3D12_DEPTH_STENCIL_DESC>			depthStencil;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT, D3D12_INPUT_LAYOUT_DESC>			inputLayout;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY, D3D12_PRIMITIVE_TOPOLOGY_TYPE>	topology;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, D3D12_RT_FORMAT_ARRAY>		renderTargetFormats;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, DXGI_FORMAT>				depthStencilFormat;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC, DXGI_SAMPLE_DESC>					sampleDesc;
+	PipelineSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING, D3D12_VIEW_INSTANCING_DESC>		viewInstancing;
+};
+
+
+static const D3D12_VIEW_INSTANCE_LOCATION kViewInstanceLocations[kMaxRenderViews] = { { 0, 0 }, { 0, 1 } };
+
+
+static void FillViewInstancedStream(ViewInstancedPipelineStream& stream, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc, UINT viewCount)
+noexcept
+{
+	stream.rootSignature.desc = desc.pRootSignature;
+	stream.vs.desc = desc.VS;
+	stream.ps.desc = desc.PS;
+	stream.gs.desc = desc.GS;
+	stream.hs.desc = desc.HS;
+	stream.ds.desc = desc.DS;
+	stream.blend.desc = desc.BlendState;
+	stream.sampleMask.desc = desc.SampleMask;
+	stream.rasterizer.desc = desc.RasterizerState;
+	stream.depthStencil.desc = desc.DepthStencilState;
+	stream.inputLayout.desc = desc.InputLayout;
+	stream.topology.desc = desc.PrimitiveTopologyType;
+	stream.renderTargetFormats.desc.NumRenderTargets = desc.NumRenderTargets;
+	for (int i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+		stream.renderTargetFormats.desc.RTFormats[i] = desc.RTVFormats[i];
+	stream.depthStencilFormat.desc = desc.DSVFormat;
+	stream.sampleDesc.desc = desc.SampleDesc;
+	stream.viewInstancing.desc.ViewInstanceCount = viewCount;
+	stream.viewInstancing.desc.pViewInstanceLocations = kViewInstanceLocations;
+	stream.viewInstancing.desc.Flags = D3D12_VIEW_INSTANCING_FLAG_NONE;
 }
 
 
@@ -614,6 +711,32 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader, const RenderStates& states)
 	PipelineLibrary&	lib = GetLibrary();
 	std::wstring		name;
 	BuildContext		context("shader '%s': pipeline state", shader->m_name);
+	if (psoStates.viewCount > 1) {
+		ViewInstancedPipelineStream		stream;
+		D3D12_PIPELINE_STATE_STREAM_DESC	streamDesc{ sizeof(stream), &stream };
+		ComPtr<ID3D12PipelineLibrary1>		library1;
+		ComPtr<ID3D12Device2>				device2;
+
+		FillViewInstancedStream(stream, psoDesc, UINT(psoStates.viewCount));
+		if (lib.library) {
+			name = PipelineName(shader->m_name, PipelineKey(shader, psoStates, psoDesc));
+			if (SUCCEEDED(lib.library.As(&library1)) and SUCCEEDED(library1->LoadPipeline(name.c_str(), &streamDesc, IID_PPV_ARGS(&psoComPtr))))
+				return psoComPtr;
+		}
+
+		HRESULT hr = device->QueryInterface(IID_PPV_ARGS(&device2));
+
+		if (SUCCEEDED(hr))
+			hr = device2->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&psoComPtr));
+		if (FAILED(hr)) {
+			logHandler.Print("RenderStates::CreatePSO '%s': view instanced PSO creation failed (hr=0x%08X)\n",
+							 static_cast<const char*>(shader->m_name), unsigned(hr));
+			return nullptr;
+		}
+		if (lib.library)
+			StorePipeline(name, psoComPtr.Get());
+		return psoComPtr;
+	}
 	if (lib.library) {
 		name = PipelineName(shader->m_name, PipelineKey(shader, psoStates, psoDesc));
 		if (SUCCEEDED(lib.library->LoadGraphicsPipeline(name.c_str(), &psoDesc, IID_PPV_ARGS(&psoComPtr))))

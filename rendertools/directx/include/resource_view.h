@@ -90,7 +90,7 @@ public:
 	// One SLICE of a texture array as the render target. A render target view always addresses a single
 	// slice, so a cube map needs six of these, one per face - there is no RTV dimension for a cube map.
 	// Additive: the two argument form above is untouched and keeps producing a plain TEXTURE2D view.
-	bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arraySlice);
+	bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arraySlice, int sliceCount = 1);
 };
 
 
@@ -105,7 +105,7 @@ public:
 
 	// The whole stack of a texture ARRAY as one view, sampled by layer index (Texture2DArray in HLSL,
 	// sampler2DArray in GLSL). The RTVs address the slices one at a time, this reads all of them.
-	bool CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int layerCount);
+	bool CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int layerCount, int firstLayer = 0);
 
 	bool CreateMipMapped(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int mipLevels);
 };
@@ -119,6 +119,8 @@ public:
 	// Read-only / sampleable variant: pass D3D12_DSV_FLAG_READ_ONLY_DEPTH to bind the depth as a
 	// read-only DSV (compare, no write) so the same resource may be sampled as an SRV in the same pass.
 	bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_FLAGS flags);
+
+	bool CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_FLAGS flags, int firstSlice, int sliceCount);
 };
 
 

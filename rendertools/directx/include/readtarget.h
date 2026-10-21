@@ -3,9 +3,11 @@
 #include "dx12framework.h"
 #include "array.hpp"
 #include "base_readtarget.h"
+#include "gpuregistry.h"
 
 class GfxReadTarget
-	: public BaseReadTarget {
+	: public BaseReadTarget,
+	  public GpuResource {
 private:
 	ComPtr<ID3D12Resource>				m_resource;
 	uint8_t*							m_mapped{ nullptr };
@@ -20,10 +22,24 @@ private:
 public:
 	GfxReadTarget(String name = "")
 		: BaseReadTarget(name)
-	{}
+	{
+		GpuRegistry::Register(this);
+	}
 
 	virtual ~GfxReadTarget() {
+		GpuRegistry::Unregister(this);
 		Destroy();
+	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override
+	{
+		Destroy();
+	}
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
 	}
 
 	virtual bool Request(RenderTarget& renderTarget, int bufferIndex, int arraySlice = 0) override;

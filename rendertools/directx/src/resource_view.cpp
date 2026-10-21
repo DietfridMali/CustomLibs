@@ -30,7 +30,7 @@ noexcept
 }
 
 
-bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arraySlice)
+bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arraySlice, int sliceCount)
 {
 	Handle() = descriptorHeaps.AllocRTV();
 	if (not IsValid())
@@ -42,7 +42,7 @@ bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arrayS
 	rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
 	rtvd.Texture2DArray.MipSlice = 0;
 	rtvd.Texture2DArray.FirstArraySlice = UINT(arraySlice);
-	rtvd.Texture2DArray.ArraySize = 1;
+	rtvd.Texture2DArray.ArraySize = UINT(sliceCount);
 	rtvd.Texture2DArray.PlaneSlice = 0;
 	dx12Context.Device()->CreateRenderTargetView(resource.Get(), &rtvd, CPUHandle());
 	++rtvCount;
@@ -68,7 +68,7 @@ bool SRV::CreateCube(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 }
 
 
-bool SRV::CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int layerCount)
+bool SRV::CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int layerCount, int firstLayer)
 {
 	Handle() = descriptorHeaps.AllocSRV();
 	if (not IsValid())
@@ -79,7 +79,7 @@ bool SRV::CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int l
 	srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvd.Texture2DArray.MostDetailedMip = 0;
 	srvd.Texture2DArray.MipLevels = 1;
-	srvd.Texture2DArray.FirstArraySlice = 0;
+	srvd.Texture2DArray.FirstArraySlice = UINT(firstLayer);
 	srvd.Texture2DArray.ArraySize = UINT(layerCount);
 	srvd.Texture2DArray.PlaneSlice = 0;
 	srvd.Texture2DArray.ResourceMinLODClamp = 0.0f;
@@ -146,6 +146,23 @@ bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_
 	dsvd.Format = format;
 	dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	dsvd.Flags = flags;
+	dx12Context.Device()->CreateDepthStencilView(resource.Get(), &dsvd, CPUHandle());
+	return true;
+}
+
+
+bool DSV::CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_FLAGS flags, int firstSlice, int sliceCount)
+{
+	Handle() = descriptorHeaps.AllocDSV();
+	if (not IsValid())
+		return false;
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
+	dsvd.Format = format;
+	dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+	dsvd.Flags = flags;
+	dsvd.Texture2DArray.MipSlice = 0;
+	dsvd.Texture2DArray.FirstArraySlice = UINT(firstSlice);
+	dsvd.Texture2DArray.ArraySize = UINT(sliceCount);
 	dx12Context.Device()->CreateDepthStencilView(resource.Get(), &dsvd, CPUHandle());
 	return true;
 }

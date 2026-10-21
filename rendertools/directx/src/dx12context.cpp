@@ -2,6 +2,7 @@
 #include "commandlist.h"
 #include "shader.h"
 #include "acceleration_structure.h"
+#include "xrhandler.h"
 #include "loghandler.h"
 
 #include <cstdio>
@@ -241,6 +242,16 @@ noexcept
 bool DX12Context::SelectAdapter(void)
 noexcept
 {
+	if (xrHandler.IsAvailable()) {
+		D3D_FEATURE_LEVEL minFeatureLevel = m_featureLevel;
+
+		if (not xrHandler.GetD3D12Adapter(m_factory.Get(), m_adapter, minFeatureLevel))
+			return false;
+		if (minFeatureLevel > m_featureLevel)
+			m_featureLevel = minFeatureLevel;
+		return true;
+	}
+
 	UINT					adapterIndex = 0;
 	ComPtr<IDXGIAdapter1>	adapter;
 	SIZE_T					maxVRAM = 0;
@@ -265,13 +276,16 @@ bool DX12Context::Create(bool enableDebugLayer, const GfxFeatureRequest& request
 noexcept
 {
 #if USE_AFTERMATH
-	GFSDK_Aftermath_Result aftermathResult =
-		GFSDK_Aftermath_EnableGpuCrashDumps(GFSDK_Aftermath_Version_API, GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX,
-											GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks, GpuCrashDumpCallback,
-											ShaderDebugInfoCallback, nullptr, nullptr, nullptr);
+	GFSDK_Aftermath_Result aftermathResult;
 
-	g_gpuCrashDumpsEnabled = GFSDK_Aftermath_SUCCEED(aftermathResult);
-	logHandler.Print("Aftermath: GPU crash dumps %s (0x%08X)\n", g_gpuCrashDumpsEnabled ? "enabled" : "not enabled", unsigned(aftermathResult));
+	if (not g_gpuCrashDumpsEnabled) {
+		aftermathResult = GFSDK_Aftermath_EnableGpuCrashDumps(GFSDK_Aftermath_Version_API, GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX,
+															  GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks, GpuCrashDumpCallback,
+															  ShaderDebugInfoCallback, nullptr, nullptr, nullptr);
+		g_gpuCrashDumpsEnabled = GFSDK_Aftermath_SUCCEED(aftermathResult);
+		logHandler.Print("Aftermath: GPU crash dumps %s (0x%08X)\n", g_gpuCrashDumpsEnabled ? "enabled" : "not enabled",
+						 unsigned(aftermathResult));
+	}
 #endif
 #if DBG_DIRECTX
 	if (enableDebugLayer) {
@@ -298,7 +312,8 @@ noexcept
 		return false;
 	}
 
-	hr = D3D12CreateDevice(m_adapter.Get(), m_featureLevel, IID_PPV_ARGS(&m_device));
+	hr = xrHandler.IsAvailable() ? (xrHandler.CreateD3D12Device(m_adapter.Get(), m_featureLevel, m_device) ? S_OK : E_FAIL)
+								 : D3D12CreateDevice(m_adapter.Get(), m_featureLevel, IID_PPV_ARGS(&m_device));
 	if (FAILED(hr)) {
 		logHandler.Print("DX12Context: Failed to create D3D12 device (hr=0x%08X)\n", (unsigned)hr);
 		return false;
@@ -337,7 +352,25 @@ noexcept
 #ifdef _DEBUG
 	logHandler.Print("DirectX bindless textures: %s\n", m_hasBindlessTextures ? "available" : "not available");
 #endif
+	m_hasMultiview = SupportsMultiview();
 	return true;
+}
+
+
+void DX12Context::Destroy(void)
+noexcept
+{
+#if DBG_DIRECTX
+	m_infoQueue.Reset();
+	m_debugController.Reset();
+#endif
+	m_device.Reset();
+	m_adapter.Reset();
+	m_factory.Reset();
+	m_featureLevel = D3D_FEATURE_LEVEL_12_0;
+	m_hasRayTracing = false;
+	m_hasBindlessTextures = false;
+	m_hasMultiview = false;
 }
 
 
@@ -364,6 +397,22 @@ noexcept
 	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
 		return false;
 	return options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_2;
+}
+
+
+bool DX12Context::SupportsMultiview(void)
+noexcept
+{
+	D3D12_FEATURE_DATA_D3D12_OPTIONS3 options3{};
+	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS3, &options3, sizeof(options3))))
+		return false;
+	if (options3.ViewInstancingTier < D3D12_VIEW_INSTANCING_TIER_1)
+		return false;
+
+	D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{ D3D_SHADER_MODEL_6_1 };
+	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel))))
+		return false;
+	return shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_1;
 }
 
 // =================================================================================================

@@ -85,7 +85,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir);$(ExternalLibs)NsightAftermath\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir);$(ExternalLibs)NsightAftermath\include;$(ExternalLibs)OpenXR-SDK\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
@@ -109,7 +109,7 @@
       <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir);$(ExternalLibs)OpenXR-SDK\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>
@@ -123,6 +123,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\base_renderer.h" />
+    <ClInclude Include="..\..\include\base_xrhandler.h" />
+    <ClInclude Include="..\..\include\xrstate.h" />
+    <ClInclude Include="..\..\include\multiview_hlsl.h" />
+    <ClInclude Include="..\include\xrhandler.h" />
     <ClInclude Include="..\..\include\base_shadercode.h" />
     <ClInclude Include="..\..\include\billboard.h" />
     <ClInclude Include="..\..\include\colordata.h" />
@@ -212,6 +216,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
+    <ClCompile Include="..\..\src\base_xrhandler.cpp" />
+    <ClCompile Include="..\..\src\common-hlsl\xr_shaders.cpp" />
+    <ClCompile Include="..\src\xrhandler.cpp" />
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\shadowmap.cpp" />

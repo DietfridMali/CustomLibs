@@ -34,7 +34,7 @@
 class Texture;
 
 // -------------------------------------------------------------------------------------------------
-// FrameConstants — layout of the b0 constant buffer (256 bytes, register b0)
+// FrameConstants - layout of the b0 constant buffer (512 bytes, register b0)
 
 #pragma pack(push, 4)
 struct FrameConstants {
@@ -42,9 +42,19 @@ struct FrameConstants {
 	float mProjection[16]{};
 	float mViewport[16]{};
 	float mLightTransform[16]{};
+	float mEyeProjection[kMaxRenderViews][16]{};
+	float mEyeView[kMaxRenderViews][16]{};
 };
-static_assert(sizeof(FrameConstants) == 256, "FrameConstants must be 256 bytes");
+static_assert(sizeof(FrameConstants) == 512, "FrameConstants must be 512 bytes");
 #pragma pack(pop)
+
+inline constexpr uint32_t kMonoFrameConstantsSize = 256;
+
+inline constexpr uint32_t FrameConstantsSize(int viewCount)
+noexcept
+{
+	return (viewCount > 1) ? uint32_t(sizeof(FrameConstants)) : kMonoFrameConstantsSize;
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -71,6 +81,8 @@ public:
 	String m_vs; // VS source (for reference / reload)
 	String m_fs; // PS source (for reference / reload)
 	String m_gs; // GS source (optional)
+	String m_tcs;
+	String m_tes;
 
 	// HLSL bytecodes
 	ComPtr<ID3DBlob> m_vsBlob;
@@ -149,6 +161,7 @@ public:
 
 	uint8_t		m_srvDefaults[kSrvSlots]{};
 	uint64_t	m_srvDefaultKey{ 0 };
+	uint32_t	m_srvArrayMask{ 0 };
 	bool		m_usesAccelStructure{ false };
 	bool		m_usesBindless{ false };
 
@@ -218,6 +231,8 @@ public:
 	// reflect b1 fields. gsCode is optional.
 	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
 				const String& shaderFolder);
+
+	bool Recreate(const String& shaderFolder);
 
 	void Destroy(void)
 	noexcept;

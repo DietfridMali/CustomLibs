@@ -81,6 +81,7 @@ COMMON_FILES := \
  base_texturearray \
  base_renderer \
  base_shaderhandler \
+ base_xrhandler \
  billboard \
  cube \
  drawbufferhandler \

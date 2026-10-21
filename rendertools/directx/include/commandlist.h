@@ -293,6 +293,7 @@ public:
 	ComPtr<ID3D12CommandSignature>	m_drawIndexedSignature;
 
 	uint32_t					m_boundSrvs[CommandList::kSrvSlots]{};
+	uint32_t					m_boundSrvArrays[CommandList::kSrvSlots]{};
 	uint32_t					m_boundSamplers[CommandList::kSamplerSlots]{};
 	uint32_t					m_boundStorageBuffers[CommandList::kUavSlots]{};
 	uint32_t					m_boundReadOnlyBuffers[CommandList::kSsboSlots]{};
@@ -300,6 +301,7 @@ public:
 	uint64_t					m_bindingVersions[CommandList::kTableCount]{};
 	uint64_t					m_bindingVersionCounter{ 0 };
 	uint64_t					m_srvDefaultKey{ 0 };
+	uint32_t					m_srvArrayMask{ 0 };
 	BuiltTable					m_builtTables[CommandList::kTableCount];
 
 	bool Create(ID3D12Device* device)
@@ -311,7 +313,7 @@ public:
 	void BindAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS accelStructure)
 	noexcept;
 
-	void BindSampledImage(uint32_t slot, uint32_t srvIndex)
+	void BindSampledImage(uint32_t slot, uint32_t srvIndex, uint32_t arraySrvIndex = UINT32_MAX)
 	noexcept;
 
 	void BindSampler(uint32_t slot, uint32_t samplerSlot)

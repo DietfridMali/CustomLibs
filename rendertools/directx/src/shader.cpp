@@ -612,20 +612,27 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 		logHandler.Print("Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
 		return false;
 	}
-	if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob, shaderFolder))
+	const bool multiview = baseRenderer.ViewCount() > 1;
+
+	if (not Compile(static_cast<const char*>(vsCode), "VSMain", multiview ? "vs_6_1" : "vs_6_0", m_vsBlob, shaderFolder))
 		return false;
-	if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob, shaderFolder))
+	if (not Compile(static_cast<const char*>(fsCode), "PSMain", multiview ? "ps_6_1" : "ps_6_0", m_psBlob, shaderFolder))
 		return false;
 	if (gsCode.Length() > 0) {
-		if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob, shaderFolder))
+		if (not Compile(static_cast<const char*>(gsCode), "GSMain", multiview ? "gs_6_1" : "gs_6_0", m_gsBlob, shaderFolder))
 			return false;
 	}
 	if (not tcsCode.IsEmpty()) {
-		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsBlob, shaderFolder))
+		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", multiview ? "hs_6_1" : "hs_6_0", m_hsBlob, shaderFolder))
 			return false;
-		if (not Compile(static_cast<const char*>(tesCode), "DSMain", "ds_6_0", m_dsBlob, shaderFolder))
+		if (not Compile(static_cast<const char*>(tesCode), "DSMain", multiview ? "ds_6_1" : "ds_6_0", m_dsBlob, shaderFolder))
 			return false;
 	}
+	m_vs = vsCode;
+	m_fs = fsCode;
+	m_gs = gsCode;
+	m_tcs = tcsCode;
+	m_tes = tesCode;
 
 #if USE_AFTERMATH
 	const char*	stageNames[] = { "vertex", "pixel", "geometry", "hull", "domain" };
@@ -697,6 +704,8 @@ noexcept
 			continue;
 		if ((bd.Type != D3D_SIT_TEXTURE) or (bd.Space != 0) or (bd.BindPoint >= UINT(kSrvSlots)))
 			continue;
+		if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2DARRAY)
+			m_srvArrayMask |= 1u << bd.BindPoint;
 		if (bd.ReturnType != D3D_RETURN_TYPE_FLOAT)
 			continue;
 		uint8_t viewType = dvNone;
@@ -753,6 +762,19 @@ noexcept
 }
 
 
+bool Shader::Recreate(const String& shaderFolder)
+{
+	String vs = m_vs;
+	String fs = m_fs;
+	String gs = m_gs;
+	String tcs = m_tcs;
+	String tes = m_tes;
+
+	Destroy();
+	return Create(vs, fs, gs, tcs, tes, shaderFolder);
+}
+
+
 void Shader::Destroy(void)
 noexcept
 {
@@ -773,6 +795,7 @@ noexcept
 	m_vsInputLayout.clear();
 	std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
 	m_srvDefaultKey = 0;
+	m_srvArrayMask = 0;
 	m_usesAccelStructure = false;
 	m_usesBindless = false;
 	m_rootSignature.Reset();
@@ -805,6 +828,8 @@ noexcept
 		m_vs = std::move(other.m_vs);
 		m_fs = std::move(other.m_fs);
 		m_gs = std::move(other.m_gs);
+		m_tcs = std::move(other.m_tcs);
+		m_tes = std::move(other.m_tes);
 		m_vsBlob = std::move(other.m_vsBlob);
 		m_psBlob = std::move(other.m_psBlob);
 		m_gsBlob = std::move(other.m_gsBlob);
@@ -823,6 +848,7 @@ noexcept
 		for (int i = 0; i < kSrvSlots; ++i)
 			m_srvDefaults[i] = other.m_srvDefaults[i];
 		m_srvDefaultKey = other.m_srvDefaultKey;
+		m_srvArrayMask = other.m_srvArrayMask;
 		m_usesAccelStructure = other.m_usesAccelStructure;
 		m_usesBindless = other.m_usesBindless;
 	}
@@ -839,24 +865,25 @@ noexcept
 	if (not list)
 		return false;
 
+	const uint32_t b0Size = FrameConstantsSize(baseRenderer.ViewCount());
 #if OPTIMIZE_SHADER_LOADING
 	const uint64_t generation = cbvAllocator.Generation();
 	if ((m_b0Generation != generation) or (std::memcmp(&m_b0Uploaded, &m_b0Staging, sizeof(FrameConstants)) != 0)) {
-		CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+		CbAlloc a = cbvAllocator.Allocate(b0Size);
 		if (not a.IsValid())
 			return false;
-		std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+		std::memcpy(a.cpu, &m_b0Staging, b0Size);
 		m_rootCbvAddresses[0] = a.gpu;
 		m_b0Uploaded = m_b0Staging;
 		m_b0Generation = generation;
 	}
 	list->SetGraphicsRootConstantBufferView(0, m_rootCbvAddresses[0]);
 #else
-	CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+	CbAlloc a = cbvAllocator.Allocate(b0Size);
 	if (not a.IsValid())
 		return false;
 
-	std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+	std::memcpy(a.cpu, &m_b0Staging, b0Size);
 	list->SetGraphicsRootConstantBufferView(0, a.gpu);
 #endif
 	return true;
@@ -957,6 +984,24 @@ bool Shader::Activate(void)
 }
 
 
+static AutoArray<String> missingViewShaders;
+
+static void LogMissingViewProjections(const String& name)
+noexcept
+{
+	for (int i = 0; i < missingViewShaders.Length(); ++i) {
+		if (missingViewShaders[i] == name)
+			return;
+	}
+
+	String* entry = missingViewShaders.Append();
+
+	if (entry)
+		*entry = name;
+	logHandler.Print("VR: shader '%s' draws without eye projections\n", static_cast<const char*>(name));
+}
+
+
 bool Shader::UpdateMatrices(void)
 {
 	std::memcpy(m_b0Staging.mModelView, baseRenderer.ModelView().AsArray(), 16 * sizeof(float));
@@ -964,6 +1009,17 @@ bool Shader::UpdateMatrices(void)
 	std::memcpy(m_b0Staging.mViewport, baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
 	if (shadowMap.IsReady())
 		std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(), 16 * sizeof(float));
+	if (baseRenderer.ViewCount() > 1) {
+		const BaseRenderer::ViewProjections* views = baseRenderer.FindViewProjections(baseRenderer.Projection());
+
+		if (not views)
+			LogMissingViewProjections(m_name);
+		for (int i = 0; i < kMaxRenderViews; ++i) {
+			std::memcpy(m_b0Staging.mEyeProjection[i], views ? views->eyeProjection[i].AsArray() : baseRenderer.Projection().AsArray(),
+						16 * sizeof(float));
+			std::memcpy(m_b0Staging.mEyeView[i], views ? views->eyeView[i].AsArray() : Matrix4f::IDENTITY.AsArray(), 16 * sizeof(float));
+		}
+	}
 	return true;
 }
 

@@ -113,7 +113,18 @@ public:
 	// Recreates the back buffers for the current dimensions and vertical sync setting.
 	bool ResizeSwapChain(void);
 
+	bool SetupSwapchain(void);
+
+	void DestroySwapchain(void)
+	noexcept;
+
 	void WaitWhileMinimized(void);
+
+	inline bool IsMinimized(void) const
+	noexcept
+	{
+		return m_window and ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0);
+	}
 
 	virtual void OnMinimized(void) {}
 

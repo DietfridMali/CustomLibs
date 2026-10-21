@@ -99,6 +99,11 @@ noexcept
 		CloseHandle(m_fenceEvent);
 		m_fenceEvent = nullptr;
 	}
+	m_fence.Reset();
+	m_queue.Reset();
+	for (UINT i = 0; i < FRAME_COUNT; ++i)
+		m_fenceValues[i] = 0;
+	m_fenceCounter = 0;
 }
 
 
@@ -459,6 +464,7 @@ struct PipelineTarget {
 	DXGI_FORMAT	colorFormats[RenderStates::kColorTargets]{};
 	uint8_t		colorFormatCount{ 0 };
 	DXGI_FORMAT	depthFormat{ DXGI_FORMAT_UNKNOWN };
+	uint8_t		viewCount{ 1 };
 
 	bool operator==(const PipelineTarget& other) const
 	noexcept = default;
@@ -498,6 +504,7 @@ noexcept
 		target.colorFormats[i] = states.mrtFormats[i - 1];
 	target.colorFormatCount = states.colorTargetCount;
 	target.depthFormat = states.depthFormat;
+	target.viewCount = states.viewCount;
 	return target;
 }
 #endif
@@ -596,8 +603,10 @@ noexcept
 void CommandListHandler::ResetBindings(void)
 noexcept
 {
-	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
+	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i) {
 		m_boundSrvs[i] = UINT32_MAX;
+		m_boundSrvArrays[i] = UINT32_MAX;
+	}
 	for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i)
 		m_boundSamplers[i] = UINT32_MAX;
 	for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
@@ -623,11 +632,12 @@ noexcept
 }
 
 
-void CommandListHandler::BindSampledImage(uint32_t slot, uint32_t srvIndex)
+void CommandListHandler::BindSampledImage(uint32_t slot, uint32_t srvIndex, uint32_t arraySrvIndex)
 noexcept
 {
-	if ((slot < CommandList::kSrvSlots) and (m_boundSrvs[slot] != srvIndex)) {
+	if ((slot < CommandList::kSrvSlots) and ((m_boundSrvs[slot] != srvIndex) or (m_boundSrvArrays[slot] != arraySrvIndex))) {
 		m_boundSrvs[slot] = srvIndex;
+		m_boundSrvArrays[slot] = arraySrvIndex;
 		m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
 	}
 }
@@ -729,7 +739,7 @@ noexcept
 	if (srvIndex == UINT32_MAX)
 		return;
 	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i) {
-		if (m_boundSrvs[i] == srvIndex)
+		if ((m_boundSrvs[i] == srvIndex) or (m_boundSrvArrays[i] == srvIndex))
 			BindSampledImage(i, UINT32_MAX);
 	}
 }
@@ -795,18 +805,24 @@ noexcept
 	TransitionBoundBuffers(list);
 
 	uint64_t srvDefaultKey = shader ? shader->m_srvDefaultKey : 0;
+	uint32_t srvArrayMask = shader ? shader->m_srvArrayMask : 0;
 
-	if (srvDefaultKey != m_srvDefaultKey) {
+	if ((srvDefaultKey != m_srvDefaultKey) or (srvArrayMask != m_srvArrayMask)) {
 		m_srvDefaultKey = srvDefaultKey;
+		m_srvArrayMask = srvArrayMask;
 		m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
 	}
 
 	uint32_t srvs[CommandList::kSrvSlots];
 
-	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
-		srvs[i] = (m_boundSrvs[i] != UINT32_MAX)
-			? m_boundSrvs[i]
-			: descriptorHeaps.DefaultSrv(shader ? shader->m_srvDefaults[i] : uint8_t(Shader::dvNone));
+	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i) {
+		if (((srvArrayMask & (1u << i)) != 0) and (m_boundSrvArrays[i] != UINT32_MAX))
+			srvs[i] = m_boundSrvArrays[i];
+		else
+			srvs[i] = (m_boundSrvs[i] != UINT32_MAX)
+				? m_boundSrvs[i]
+				: descriptorHeaps.DefaultSrv(shader ? shader->m_srvDefaults[i] : uint8_t(Shader::dvNone));
+	}
 
 	const UINT		tableParams[CommandList::kTableCount] = { UINT(Shader::kSrvBase), UINT(Shader::kUavBase), UINT(Shader::kSsboBase) };
 	const uint32_t*	tableSlots[CommandList::kTableCount] = { srvs, m_boundStorageBuffers, m_boundReadOnlyBuffers };
@@ -980,6 +996,14 @@ noexcept
 		delete cl;
 	}
 	m_recycledLists.Clear();
+	m_pendingLists.Clear();
+	m_cmdListStack.Clear();
+	m_recordingLists.Clear();
+	m_currentListData = CommandListData();
+	m_uploadList = nullptr;
+	m_frameIndex = 0;
+	for (int i = 0; i < CommandList::kTableCount; ++i)
+		m_builtTables[i] = BuiltTable();
 	m_drawIndexedSignature.Reset();
 	m_cmdQueue.Destroy();
 }

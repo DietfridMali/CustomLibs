@@ -437,6 +437,16 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 }
 
 
+bool ComputeShader::Recreate(const String& shaderFolder)
+{
+	String							cs = m_cs;
+	AutoArray<ComputeBindingDesc>	bindings = m_bindings;
+
+	Destroy();
+	return Create(cs, bindings, shaderFolder);
+}
+
+
 void ComputeShader::ReflectB1Fields(void)
 noexcept
 {
@@ -566,14 +576,14 @@ bool ComputeShader::Record(CommandList* cmdList, uint32_t groupCountX, uint32_t 
 	cmdList->m_activePSO = nullptr;
 
 	if (m_cbvRootIndex[0] >= 0) {
-		CbAlloc b0a = cbvAllocator.Allocate(UINT(sizeof(FrameConstants)));
+		CbAlloc b0a = cbvAllocator.Allocate(kMonoFrameConstantsSize);
 		if (not b0a.IsValid())
 			return false;
 		FrameConstants fc{};
 		std::memcpy(fc.mModelView, baseRenderer.ModelView().AsArray(), 64);
 		std::memcpy(fc.mProjection, baseRenderer.Projection().AsArray(), 64);
 		std::memcpy(fc.mViewport, baseRenderer.ViewportTransformation().AsArray(), 64);
-		std::memcpy(b0a.cpu, &fc, sizeof(FrameConstants));
+		std::memcpy(b0a.cpu, &fc, kMonoFrameConstantsSize);
 		list->SetComputeRootConstantBufferView(UINT(m_cbvRootIndex[0]), b0a.gpu);
 	}
 

@@ -266,6 +266,18 @@
     <ClInclude Include="..\..\include\base_renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\base_xrhandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\xrstate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\multiview_hlsl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\xrhandler.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\drawbufferhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -476,6 +488,15 @@
     </ClCompile>
     <ClCompile Include="..\..\src\base_renderer.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\base_xrhandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\common-hlsl\xr_shaders.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\xrhandler.cpp">
+      <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\drawbufferhandler.cpp">
       <Filter>Source Files</Filter>

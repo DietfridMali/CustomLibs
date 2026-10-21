@@ -73,14 +73,10 @@ public:
 	virtual void Cleanup(void)
 	noexcept override;
 
-	inline void ShutdownGraphics(void)
-	noexcept
-	{}
+	void ShutdownGraphics(void)
+	noexcept;
 
-	inline bool RestartGraphics(const GfxFeatureRequest&)
-	{
-		return false;
-	}
+	bool RestartGraphics(const GfxFeatureRequest& request);
 
 	virtual void LoadPipelineCache(const String& shaderFolder) override;
 

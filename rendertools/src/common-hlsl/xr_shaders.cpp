@@ -58,6 +58,12 @@ const ShaderSource& XRLayerMirrorShader()
             cbuffer ShaderConstants : register(b1) {
                 column_major float4x4 mLayerToClip;
                 int bDecodeSRGB;
+                float fCentralAngle;
+                float fRadius;
+                float fCenterDistance;
+                float fLayerHeight;
+                float fStripStart;
+                float fStripWidth;
             };
             struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
             struct PSInput {
@@ -66,8 +72,16 @@ const ShaderSource& XRLayerMirrorShader()
             };
             PSInput VSMain(VSInput i) {
                 PSInput o;
-                o.pos = mul(mViewport, mul(mLayerToClip, float4(i.pos.xy, 0.0, 1.0)));
-                o.fragCoord = i.tc;
+                if (fCentralAngle > 0.0) {
+                    float u = fStripStart + (i.pos.x + 0.5) * fStripWidth;
+                    float a = (u - 0.5) * fCentralAngle;
+                    o.pos = mul(mViewport, mul(mLayerToClip, float4(fRadius * sin(a), i.pos.y * fLayerHeight, -fCenterDistance - fRadius * cos(a), 1.0)));
+                    o.fragCoord = float2(u, i.tc.y);
+                }
+                else {
+                    o.pos = mul(mViewport, mul(mLayerToClip, float4(i.pos.xy, 0.0, 1.0)));
+                    o.fragCoord = i.tc;
+                }
                 return o;
             }
         )"),

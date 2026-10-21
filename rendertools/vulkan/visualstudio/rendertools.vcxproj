@@ -126,6 +126,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\base_renderer.h" />
+    <ClInclude Include="..\..\include\base_xrhandler.h" />
+    <ClInclude Include="..\..\include\xrstate.h" />
     <ClInclude Include="..\..\include\base_shadercode.h" />
     <ClInclude Include="..\..\include\billboard.h" />
     <ClInclude Include="..\..\include\colordata.h" />
@@ -222,6 +224,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
+    <ClCompile Include="..\..\src\base_xrhandler.cpp" />
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\shadowmap.cpp" />

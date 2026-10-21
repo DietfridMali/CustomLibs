@@ -14,6 +14,7 @@
 #include "avltree.hpp"
 #include "gfxstates.h"
 #include "texturebuffer.h"
+#include "gpuregistry.h"
 
 #pragma warning(push)
 #pragma warning(disable : 26819)
@@ -77,12 +78,14 @@ struct RenderOffsets {
 // =================================================================================================
 
 class Texture
-	: public AbstractTexture {
+	: public AbstractTexture,
+	  public GpuResource {
 public:
 	// m_handle stores the SRV descriptor-heap index (UINT32_MAX = invalid).
 	// Named m_handle for source-level compatibility with existing assignment sites
 	// (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
 	uint32_t m_handle{ UINT32_MAX };
+	uint32_t m_arrayHandle{ UINT32_MAX };
 	uint32_t m_ownedHandle{ UINT32_MAX };
 	uint32_t m_bindlessIndex{ UINT32_MAX };
 
@@ -103,6 +106,8 @@ public:
 	bool					m_isDeployed{ false };
 	bool					m_isRenderTarget{ false };
 	bool					m_isDisposable{ false };
+	bool					m_restoreGpu{ false };
+	bool					m_restoreBindless{ false };
 	TextureSampling			m_sampling;
 
 	static uint32_t nullHandle; // UINT32_MAX — matches OGL Texture::nullHandle usage
@@ -145,12 +150,14 @@ public:
 	}
 
 	Texture(const Texture& other) {
+		GpuRegistry::Register(this);
 		Copy(other);
 	}
 
 	Texture(Texture&& other)
 	noexcept
 	{
+		GpuRegistry::Register(this);
 		Move(other);
 	}
 
@@ -197,6 +204,14 @@ public:
 	}
 
 	virtual void Destroy(void) override;
+
+	void ReleaseImage(void)
+	noexcept;
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override;
 
 	virtual bool IsAvailable(void) override;
 
@@ -340,7 +355,7 @@ public:
 	inline bool HasArrayView(void) const
 	noexcept
 	{
-		return false;
+		return m_arrayHandle != UINT32_MAX;
 	}
 
 	inline bool IsDeployed(void) const
@@ -416,6 +431,14 @@ public:
 	// functionally redundant in DX12 (refcount-shared resource is released safely
 	// either way), but the pattern is kept symmetric to the Vulkan / OpenGL paths.
 	virtual void Destroy(void) override;
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
+	}
 };
 
 // =================================================================================================
@@ -428,6 +451,14 @@ public:
 
 	// Same lifetime semantics as RenderTargetTexture.
 	virtual void Destroy(void) override;
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
+	}
 };
 
 // =================================================================================================

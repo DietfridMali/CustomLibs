@@ -843,9 +843,11 @@ bool RenderTarget::CreateExternal(int width, int height, const String& name, int
 }
 
 
-void RenderTarget::PrepareExternalRelease(VkCommandBuffer cb)
+void RenderTarget::PrepareExternalRelease(CommandList* cl)
 noexcept
 {
+	VkCommandBuffer cb = cl ? cl->GfxList() : VK_NULL_HANDLE;
+
 	if (cb == VK_NULL_HANDLE)
 		return;
 	for (int i = 0; i < m_bufferCount; ++i) {

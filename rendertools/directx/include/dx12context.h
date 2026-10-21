@@ -18,6 +18,7 @@ public:
 	D3D_FEATURE_LEVEL		m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
 	bool					m_hasRayTracing{ false };
 	bool					m_hasBindlessTextures{ false };
+	bool					m_hasMultiview{ false };
 
 #if DBG_DIRECTX
 	ComPtr<ID3D12Debug>		m_debugController;
@@ -27,6 +28,9 @@ public:
 	// Creates the DXGI factory, selects the best adapter (highest VRAM, non-software),
 	// and creates the D3D12 device. Returns false on any failure.
 	bool Create(bool enableDebugLayer = false, const GfxFeatureRequest& request = {})
+	noexcept;
+
+	void Destroy(void)
 	noexcept;
 
 	inline ID3D12Device* Device(void) const
@@ -45,6 +49,12 @@ public:
 	noexcept
 	{
 		return m_hasBindlessTextures;
+	}
+
+	inline bool HasMultiview(void) const
+	noexcept
+	{
+		return m_hasMultiview;
 	}
 
 #if DBG_DIRECTX
@@ -79,6 +89,8 @@ private:
 	bool SupportsRayTracing(void)
 	noexcept;
 	bool SupportsBindlessTextures(void)
+	noexcept;
+	bool SupportsMultiview(void)
 	noexcept;
 };
 

@@ -9,6 +9,7 @@
 #include "array.hpp"
 #include "gfxtypes.h"
 #include "readtarget.h"
+#include "gpuregistry.h"
 
 #include <type_traits>
 #include <cstdio>
@@ -25,7 +26,9 @@ public:
 };
 
 template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
-class GfxArray : public BaseGfxArray {
+class GfxArray
+	: public BaseGfxArray,
+	  public GpuResource {
 public:
 	static constexpr bool isBuffer = std::is_same_v<STORAGE_T, GfxTypes::StructuredBuffer> or
 		std::is_same_v<STORAGE_T, GfxTypes::InstanceBuffer> or std::is_same_v<STORAGE_T, GfxTypes::IndirectBuffer>;
@@ -51,15 +54,46 @@ public:
 	D3D12_RESOURCE_STATES			m_state{ D3D12_RESOURCE_STATE_COMMON };
 	UINT							m_width{ 0 };
 	UINT							m_height{ 0 };
+	bool							m_pinned{ false };
+	bool							m_restoreGpu{ false };
 
-	GfxArray() = default;
+	GfxArray() {
+		GpuRegistry::Register(this);
+	}
 
 	GfxArray(const GfxArray&) = delete;
 
 	GfxArray& operator=(const GfxArray&) = delete;
 
 	~GfxArray() {
+		GpuRegistry::Unregister(this);
 		Destroy();
+	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override
+	{
+		m_restoreGpu = m_resource != nullptr;
+		ReleaseResources();
+	}
+
+	virtual bool RestoreGpu(void) override
+	{
+		if (not m_restoreGpu)
+			return true;
+		m_restoreGpu = false;
+
+		bool ok;
+
+		if constexpr (isBuffer)
+			ok = AllocateBuffer();
+		else
+			ok = AllocateTexture();
+		if (not ok)
+			return false;
+		if (m_pinned)
+			Pin();
+		return m_data.IsEmpty() or Upload();
 	}
 
 	inline DATA_T* Data(void) {
@@ -102,6 +136,7 @@ public:
 			ok = CreateBuffer(width, height);
 		else
 			ok = CreateTexture(width, height);
+		m_pinned = pinned;
 		if (ok and pinned)
 			Pin();
 		return ok;
@@ -121,6 +156,16 @@ public:
 	}
 
 	void Destroy(void)
+	{
+		ReleaseResources();
+		m_data.Reset();
+		m_width = m_height = 0;
+		m_appendFrame = UINT64_MAX;
+		m_appendBase = 0;
+	}
+
+	void ReleaseResources(void)
+	noexcept
 	{
 		if (not GfxResourceHandler::IsShuttingDown())
 			commandListHandler.UnbindBuffer(&m_state);
@@ -160,10 +205,6 @@ public:
 				upload.Reset();
 			m_readback.Reset();
 		}
-		m_data.Reset();
-		m_width = m_height = 0;
-		m_appendFrame = UINT64_MAX;
-		m_appendBase = 0;
 	}
 
 	int AppendBase(void)
@@ -433,9 +474,14 @@ private:
 		Destroy();
 		m_width = UINT(width);
 		m_height = UINT(height);
-		int size = width * height;
-		m_data.Resize(size);
-		ID3D12Device* device = dx12Context.Device();
+		m_data.Resize(width * height);
+		return AllocateTexture();
+	}
+
+	bool AllocateTexture(void)
+	{
+		int				size = int(m_width * m_height);
+		ID3D12Device*	device = dx12Context.Device();
 		if (not device or (size == 0))
 			return false;
 
@@ -490,9 +536,14 @@ private:
 		Destroy();
 		m_width = UINT(width);
 		m_height = UINT(height);
-		int size = width * height;
-		m_data.Resize(size);
-		ID3D12Device* device = dx12Context.Device();
+		m_data.Resize(width * height);
+		return AllocateBuffer();
+	}
+
+	bool AllocateBuffer(void)
+	{
+		int				size = int(m_width * m_height);
+		ID3D12Device*	device = dx12Context.Device();
 		if (not device or (size == 0))
 			return false;
 

@@ -20,6 +20,7 @@ noexcept
 	m_capacity = capacity;
 	m_count = 0;
 	m_gpuVisible = gpuVisible;
+	m_freeList.Reset();
 	m_owners.Resize(capacity);
 
 	D3D12_DESCRIPTOR_HEAP_DESC desc{};
@@ -49,6 +50,18 @@ noexcept
 		}
 	}
 	return true;
+}
+
+
+void DescriptorHeap::Destroy(void)
+noexcept
+{
+	m_heap.Reset();
+	m_mirror.Reset();
+	m_capacity = 0;
+	m_count = 0;
+	m_descriptorSize = 0;
+	m_freeList.Reset();
 }
 
 
@@ -252,6 +265,29 @@ noexcept
 
 	ResetTables(0);
 	return true;
+}
+
+
+void DescriptorHeapHandler::Destroy(void)
+noexcept
+{
+	m_rtvHeap.Destroy();
+	m_dsvHeap.Destroy();
+	m_srvHeap.Destroy();
+	m_samplerHeap.Destroy();
+	m_nullTextureSrv = UINT32_MAX;
+	m_nullBufferSrv = UINT32_MAX;
+	m_nullUav = UINT32_MAX;
+	m_defaultSampler = UINT32_MAX;
+	for (int i = 0; i < kDefaultViewTypes; ++i)
+		m_defaultSrvs[i] = UINT32_MAX;
+	m_defaultFlat.Reset();
+	m_defaultCube.Reset();
+	m_defaultVolume.Reset();
+	m_tableCapacity = TABLE_CAPACITY;
+	m_tableOffset = 0;
+	++m_tableGeneration;
+	++m_heapVersion;
 }
 
 

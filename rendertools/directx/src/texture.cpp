@@ -49,6 +49,7 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 	, m_name("")
 {
 	SetupLUT();
+	GpuRegistry::Register(this);
 }
 
 
@@ -59,6 +60,7 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 Texture::~Texture()
 noexcept
 {
+	GpuRegistry::Unregister(this);
 	if (UpdateLUT() and (m_name.Length() > 0)) {
 		textureLUT.Remove(m_name);
 		m_name = "";
@@ -74,6 +76,7 @@ Texture& Texture::Copy(const Texture& other)
 	if (this != &other) {
 		Destroy();
 		m_handle = UINT32_MAX;
+		m_arrayHandle = UINT32_MAX;
 		m_ownedHandle = UINT32_MAX;
 		m_resource.Reset();
 		m_name = other.m_name;
@@ -98,6 +101,7 @@ noexcept
 	if (this != &other) {
 		Destroy();
 		m_handle = std::exchange(other.m_handle, UINT32_MAX);
+		m_arrayHandle = std::exchange(other.m_arrayHandle, UINT32_MAX);
 		m_ownedHandle = std::exchange(other.m_ownedHandle, UINT32_MAX);
 		m_bindlessIndex = std::exchange(other.m_bindlessIndex, UINT32_MAX);
 		m_resource = std::move(other.m_resource);
@@ -161,29 +165,12 @@ void Texture::Destroy(void)
 	ReleaseBindless();
 	if (m_isValid) {
 		m_isValid = false;
-		// OUT of the texture slot bookkeeping BEFORE the descriptor index goes back. GfxStates keys
-		// a slot on that index, and the heap hands freed indices out again (DescriptorHeap::m_freeList,
-		// fed by BufferInfo::Release ()). Left standing, the entry claims the next texture that gets
-		// this index is already sitting on that slot - BoundTMU () and GetBoundTexture () then answer
-		// for a texture that is long gone. 1:1 to the OpenGL path.
-		// Only for a handle that is one: Texture::Release () writes UINT32_MAX into a slot as its
-		// "nothing here" marker, so releasing UINT32_MAX would sweep every already empty slot.
-		if (m_handle != UINT32_MAX)
-			gfxStates.ReleaseTexture(TextureTypeToGLenum(m_type), m_handle);
 		m_isDeployed = false;
 		// The sampler/filter state belongs to the resource that is going away, not to this object.
 		// Left standing, SetParams () returns at once for the NEXT texture created here and that one
 		// never gets its sampler set up. 1:1 to the OpenGL path.
 		m_hasParams = false;
-		if (m_ownedHandle != UINT32_MAX) {
-			DescriptorHandle handle;
-			handle.index = m_ownedHandle;
-			handle.m_heap = &descriptorHeaps.m_srvHeap;
-			gfxResourceHandler.Track(handle);
-			m_ownedHandle = UINT32_MAX;
-		}
-		m_handle = UINT32_MAX;
-		ReleaseResource();
+		ReleaseImage();
 		for (auto* p : m_buffers) {
 			if (p->m_refCount)
 				--p->m_refCount;
@@ -192,6 +179,60 @@ void Texture::Destroy(void)
 		}
 		m_buffers.Clear();
 	}
+}
+
+
+void Texture::ReleaseImage(void)
+noexcept
+{
+	// OUT of the texture slot bookkeeping BEFORE the descriptor index goes back. GfxStates keys
+	// a slot on that index, and the heap hands freed indices out again (DescriptorHeap::m_freeList,
+	// fed by BufferInfo::Release ()). Left standing, the entry claims the next texture that gets
+	// this index is already sitting on that slot - BoundTMU () and GetBoundTexture () then answer
+	// for a texture that is long gone. 1:1 to the OpenGL path.
+	// Only for a handle that is one: Texture::Release () writes UINT32_MAX into a slot as its
+	// "nothing here" marker, so releasing UINT32_MAX would sweep every already empty slot.
+	if (m_handle != UINT32_MAX)
+		gfxStates.ReleaseTexture(TextureTypeToGLenum(m_type), m_handle);
+	if (m_ownedHandle != UINT32_MAX) {
+		DescriptorHandle handle;
+		handle.index = m_ownedHandle;
+		handle.m_heap = &descriptorHeaps.m_srvHeap;
+		gfxResourceHandler.Track(handle);
+		m_ownedHandle = UINT32_MAX;
+	}
+	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
+	ReleaseResource();
+}
+
+
+void Texture::ReleaseGpu(void)
+noexcept
+{
+	m_restoreGpu = false;
+	if (not (m_isValid and m_isDeployed))
+		return;
+	m_restoreBindless = m_bindlessIndex != UINT32_MAX;
+	ReleaseBindless();
+	ReleaseImage();
+	m_isDeployed = false;
+	m_restoreGpu = true;
+}
+
+
+bool Texture::RestoreGpu(void)
+{
+	if (not m_restoreGpu)
+		return true;
+	m_restoreGpu = false;
+	if (not Deploy(0)) {
+		Destroy();
+		return false;
+	}
+	if (m_restoreBindless)
+		EnableBindless();
+	return true;
 }
 
 
@@ -219,7 +260,7 @@ bool Texture::Bind(int tmuIndex, bool)
 		SetParams(false);
 
 	if ((tmuIndex >= 0) and (tmuIndex < Shader::kSrvSlots) and (m_handle != UINT32_MAX)) {
-		commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_handle);
+		commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_handle, m_arrayHandle);
 		commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(m_sampling));
 	}
 	return true;
@@ -617,6 +658,7 @@ void ShadowTexture::SetParams(bool forceUpdate)
 void RenderTargetTexture::Destroy(void)
 {
 	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
 	m_resource.Reset();
 	Texture::Destroy();
 }
@@ -625,6 +667,17 @@ void RenderTargetTexture::Destroy(void)
 RenderTargetTexture::~RenderTargetTexture()
 {
 	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
+	m_resource.Reset();
+}
+
+
+void RenderTargetTexture::ReleaseGpu(void)
+noexcept
+{
+	ReleaseBindless();
+	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
 	m_resource.Reset();
 }
 
@@ -632,6 +685,7 @@ RenderTargetTexture::~RenderTargetTexture()
 void ShadowTexture::Destroy(void)
 {
 	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
 	m_resource.Reset();
 	Texture::Destroy();
 }
@@ -640,6 +694,24 @@ void ShadowTexture::Destroy(void)
 ShadowTexture::~ShadowTexture()
 {
 	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
+	m_resource.Reset();
+}
+
+
+void ShadowTexture::ReleaseGpu(void)
+noexcept
+{
+	ReleaseBindless();
+	if (m_ownedHandle != UINT32_MAX) {
+		DescriptorHandle handle;
+		handle.index = m_ownedHandle;
+		handle.m_heap = &descriptorHeaps.m_srvHeap;
+		gfxResourceHandler.Track(handle);
+		m_ownedHandle = UINT32_MAX;
+	}
+	m_handle = UINT32_MAX;
+	m_arrayHandle = UINT32_MAX;
 	m_resource.Reset();
 }
 

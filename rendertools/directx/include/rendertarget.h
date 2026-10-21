@@ -11,6 +11,7 @@
 #include "drawbufferhandler.h"
 #include "resource_view.h"
 #include "renderstates.h"
+#include "gpuregistry.h"
 #include "gfxpixelformat_dx.h" // ToNativeColorFormat () for RTCreationParams::colorFormat - backend neutral
 #ifdef _DEBUG
 #include <source_location>
@@ -67,8 +68,12 @@ public:
 	// (RenderTarget::SelectArrayLayer), so everything that binds render targets goes on working.
 	AutoArray<RTV>			m_arrayRtv;
 	SRV						m_srv;
+	SRV						m_flatSrv;
+	SRV						m_arraySrv;
 	DSV						m_dsv;
 	DSV						m_dsvReadOnly; // read-only depth view (compare, no write) for simultaneous SRV sampling
+	AutoArray<::DSV>		m_arrayDsv;
+	AutoArray<::DSV>		m_arrayDsvReadOnly;
 	UAV						m_uav;
 	D3D12_RESOURCE_STATES	m_state{ kShaderReadState };
 	eBufferType				m_type{ btColor };
@@ -80,6 +85,7 @@ public:
 	// than a buffer type of its own, because such a buffer IS a colour buffer - it takes part in MRT,
 	// in the RTV list and in every count, and only its views differ.
 	bool m_isArray{ false };
+	bool m_isExternal{ false };
 
 	void Init(void);
 
@@ -93,7 +99,12 @@ public:
 
 	// One render target view per LAYER, plus an array SRV to sample the whole stack by layer index.
 	// Only meaningful on a colour buffer with m_isArray set.
-	bool AllocArrayViews(int layerCount);
+	bool AllocArrayViews(int layerCount, int viewCount = 1);
+
+	bool AllocArrayDSVs(int groupCount, int viewCount);
+
+	void UnbindViews(void)
+	noexcept;
 
 	void FreeRTV(void);
 
@@ -150,7 +161,8 @@ public:
 
 class GfxReadTarget;
 
-class RenderTarget {
+class RenderTarget
+	: public GpuResource {
 public:
 	using DrawBufferList = DrawBufferHandler::DrawBufferList;
 	using CustomDrawBufferList = DrawBufferHandler::CustomDrawBufferList; // required for high level compatibility
@@ -254,6 +266,10 @@ public:
 	// this target a texture array of that many layers, of which m_arrayLayer is the one selected.
 	int					m_arrayLayerCount{ 0 };
 	int					m_arrayLayer{ 0 }; // layer currently selected, see SelectArrayLayer
+	int					m_viewCount{ 1 };
+	DXGI_FORMAT			m_externalDepthFormat{ DXGI_FORMAT_UNKNOWN };
+	bool				m_coverageAlpha{ false };
+	bool				m_isExternal{ false };
 	int					m_mipLevels{ 1 };
 	int					m_activeBufferIndex{ 0 };
 	int					m_lastDestination{ -1 };
@@ -297,19 +313,34 @@ public:
 	CommandList*	m_cmdList{ nullptr };
 	uint64_t		m_cmdListExecution{ 0 };
 
+	RTCreationParams	m_creationParams{};
+	bool				m_restoreGpu{ false };
+
 	// -------------------------------------------------------------------------
 
 	RenderTarget();
 
 	~RenderTarget() {
+		GpuRegistry::Unregister(this);
 		Destroy();
 	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override;
 
 	void Init(void);
 
 	bool Create(int width, int height, int scale, const RTCreationParams& params);
 
+	bool CreateExternal(int width, int height, const String& name, int viewCount, ID3D12Resource* colorResource, DXGI_FORMAT colorFormat,
+						ID3D12Resource* depthResource = nullptr, DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN);
+
 	void Destroy(bool immediate = false);
+
+	void PrepareExternalRelease(CommandList* cl)
+	noexcept;
 
 	void SetName(const String& name)
 	noexcept
@@ -582,6 +613,9 @@ public:
 
 	static D3D12_CPU_DESCRIPTOR_HANDLE NullRTV(void);
 
+	static void ResetNullRTV(void)
+	noexcept;
+
 	bool AttachBuffer(int bufferIndex);
 
 	bool DetachBuffer(int bufferIndex);
@@ -633,17 +667,25 @@ public:
 	inline int ViewCount(void) const
 	noexcept
 	{
-		return 1;
+		return m_viewCount;
 	}
 
-	inline void SetCoverageAlpha(bool)
+	inline int LayerGroupCount(void) const
 	noexcept
-	{}
+	{
+		return (m_arrayLayerCount > 0) ? m_arrayLayerCount : 1;
+	}
+
+	inline void SetCoverageAlpha(bool coverageAlpha)
+	noexcept
+	{
+		m_coverageAlpha = coverageAlpha;
+	}
 
 	inline bool CoverageAlpha(void) const
 	noexcept
 	{
-		return false;
+		return m_coverageAlpha;
 	}
 
 	inline int MipLevels(void)
@@ -705,6 +747,12 @@ private:
 
 	void CreateRenderArea(void);
 
+	static void ViewIndices(BufferInfo& info, uint32_t& srvIndex, uint32_t& arraySrvIndex)
+	noexcept;
+
+	void SetTextureViews(BufferInfo& info, Texture& texture)
+	noexcept;
+
 public:
 	inline bool HaveDepthBuffer(bool checkHandle = true)
 	noexcept
@@ -757,6 +805,8 @@ private:
 	noexcept
 	{
 		RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;
+		if (owner->m_externalDepthFormat != DXGI_FORMAT_UNKNOWN)
+			return owner->m_externalDepthFormat;
 		return owner->m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
 	}
 
