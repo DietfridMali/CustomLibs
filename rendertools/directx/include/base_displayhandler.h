@@ -262,6 +262,8 @@ public:
 
 	bool UpdateDisplayMode(int displayMode, bool useFullscreen);
 
+	bool UpdateWindowSize(int width, int height);
+
 	virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
 
 private:

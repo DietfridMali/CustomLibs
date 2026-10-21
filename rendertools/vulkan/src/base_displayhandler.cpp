@@ -402,6 +402,22 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen)
 }
 
 
+bool BaseDisplayHandler::UpdateWindowSize(int width, int height)
+{
+	if ((width <= 0) or (height <= 0))
+		return false;
+	m_isFullscreen = false;
+	m_width = std::min(width, m_maxWidth);
+	m_height = std::min(height, m_maxHeight);
+	m_aspectRatio = float(m_width) / float(m_height);
+	m_activeDisplayMode = FindDisplayMode(m_width, m_height);
+	SDL_SetWindowFullscreen(m_window, 0);
+	SDL_SetWindowSize(m_window, m_width, m_height);
+	SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+	return RecreateSwapchain();
+}
+
+
 bool BaseDisplayHandler::RecreateSwapchain(void)
 {
 	if (m_swapchain.Handle() == VK_NULL_HANDLE)
