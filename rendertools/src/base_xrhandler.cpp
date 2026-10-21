@@ -34,6 +34,7 @@ static bool xrSessionEnabled = true;
 static bool xrDeviceCreated = false;
 static bool xrTestPattern = false;
 static bool xrPerformanceMetrics = false;
+static float xrViewPitch = 0.0f;
 
 static const BaseXRHandler::ControllerState kNoController{};
 
@@ -83,6 +84,18 @@ noexcept
 	pose.orientation = { orientation.x, orientation.y, orientation.z, orientation.w };
 	pose.position = { m[3].x, m[3].y, m[3].z };
 	return pose;
+}
+
+
+static XrPosef PitchedPose(const XrPosef& pose, float degrees)
+noexcept
+{
+	glm::quat	orientation(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z);
+	glm::quat	pitched = orientation * glm::angleAxis(glm::radians(degrees), glm::vec3(1.0f, 0.0f, 0.0f));
+	XrPosef		result = pose;
+
+	result.orientation = { pitched.x, pitched.y, pitched.z, pitched.w };
+	return result;
 }
 
 
@@ -229,15 +242,20 @@ noexcept
 	if ((location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) == 0)
 		return false;
 
-	XrPosef pose = kIdentityPose;
+	const XrQuaternionf&	head = location.pose.orientation;
+	glm::vec3				forward = glm::quat(head.w, head.x, head.y, head.z) * glm::vec3(0.0f, 0.0f, -1.0f);
+	float					yaw = std::atan2(-forward.x, -forward.z);
+	glm::quat				level = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+	XrPosef					pose = kIdentityPose;
 
-	pose.orientation = location.pose.orientation;
+	pose.orientation = { level.x, level.y, level.z, level.w };
 	if (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)
 		pose.position = location.pose.position;
-	if (not CreateAppSpace(s, pose))
+	if (not CreateAppSpace(s, PitchedPose(pose, xrViewPitch)))
 		return false;
-	logHandler.Print("OpenXR: reference pose set (orientation %.3f %.3f %.3f %.3f)\n", pose.orientation.x, pose.orientation.y, pose.orientation.z,
-					 pose.orientation.w);
+	s.appliedViewPitch = xrViewPitch;
+	logHandler.Print("OpenXR: reference pose set (head orientation %.3f %.3f %.3f %.3f, yaw %.1f, view pitch %+.0f)\n", head.x, head.y, head.z,
+					 head.w, glm::degrees(yaw), xrViewPitch);
 	return true;
 }
 
@@ -976,6 +994,9 @@ bool BaseXRHandler::BeginFrame(void)
 		s.localChangePending = false;
 	if (s.recenterPending and RecenterAppSpace(s))
 		s.recenterPending = false;
+	if ((s.appliedViewPitch != xrViewPitch) and (s.appSpace != XR_NULL_HANDLE) and
+		CreateAppSpace(s, PitchedPose(s.appPose, xrViewPitch - s.appliedViewPitch)))
+		s.appliedViewPitch = xrViewPitch;
 	s.eyesRendered = false;
 	s.layerRendered = false;
 	s.depthSubmitted = false;
@@ -1155,6 +1176,13 @@ noexcept
 		logHandler.Print("OpenXR: recenter requested\n");
 		m_state->recenterPending = true;
 	}
+}
+
+
+void BaseXRHandler::SetViewPitch(float degrees)
+noexcept
+{
+	xrViewPitch = degrees;
 }
 
 

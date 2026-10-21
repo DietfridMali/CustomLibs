@@ -72,6 +72,10 @@ public:
 	noexcept
 	{}
 
+	inline void SetViewPitch(float)
+	noexcept
+	{}
+
 	inline bool IsAvailable(void) const
 	noexcept
 	{

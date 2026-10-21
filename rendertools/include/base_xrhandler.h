@@ -60,6 +60,9 @@ public:
 	void Recenter(void)
 	noexcept;
 
+	void SetViewPitch(float degrees)
+	noexcept;
+
 	bool IsAvailable(void) const
 	noexcept;
 
