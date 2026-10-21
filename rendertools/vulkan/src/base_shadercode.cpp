@@ -165,6 +165,32 @@ void BaseShaderCode::CreateShaders(const AutoArray<String>& shaderIds)
 }
 
 
+void BaseShaderCode::RecreateShaders(void)
+{
+	for (auto& entry : m_shaders) {
+		if (entry.second and not entry.second->Recreate(m_shaderFolder))
+			logHandler.Print("recreating shader '%s' failed\n", static_cast<const char*>(entry.first));
+	}
+	for (auto& entry : m_computeShaders) {
+		if (entry.second and not entry.second->Recreate(m_shaderFolder))
+			logHandler.Print("recreating compute shader '%s' failed\n", static_cast<const char*>(entry.first));
+	}
+}
+
+
+void BaseShaderCode::DestroyShaders(void)
+{
+	for (auto& entry : m_shaders) {
+		if (entry.second)
+			entry.second->Destroy();
+	}
+	for (auto& entry : m_computeShaders) {
+		if (entry.second)
+			entry.second->Destroy();
+	}
+}
+
+
 void BaseShaderCode::CreateShader(const ShaderSource* source)
 {
 	String prefix = FormatCompilerArgs(source->m_compilerArgs);

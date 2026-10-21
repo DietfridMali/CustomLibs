@@ -160,6 +160,16 @@ void BaseShaderCode::CreateShaders(const AutoArray<String>& shaderIds)
 }
 
 
+void BaseShaderCode::RecreateShaders(void)
+{
+}
+
+
+void BaseShaderCode::DestroyShaders(void)
+{
+}
+
+
 void BaseShaderCode::CreateShader(const ShaderSource* source)
 {
 	String prefix = FormatCompilerArgs(source->m_compilerArgs);

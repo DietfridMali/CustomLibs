@@ -2,6 +2,7 @@
 
 #include "vkframework.h"
 #include "gfx_buffer.h"
+#include "gpuregistry.h"
 
 #include <cstdint>
 
@@ -75,7 +76,8 @@ struct AccelBuildItem {
 };
 
 
-class AccelerationStructure {
+class AccelerationStructure
+	: public GpuResource {
 public:
 	// TWO of everything a rebuild touches, used in turn. A top level structure is rebuilt every
 	// frame while the frame before it is still tracing against the previous one, so neither the
@@ -100,7 +102,13 @@ public:
 	uint32_t		m_primitives{ 0 };
 
 	AccelerationStructure(void)
-	noexcept = default;
+	{
+		GpuRegistry::Register(this);
+	}
+
+	~AccelerationStructure() {
+		GpuRegistry::Unregister(this);
+	}
 
 	// Owns a VkAccelerationStructureKHR and its buffers, so a copy would free them twice. Moving
 	// is allowed - that is what lets a caller keep them in a growing array (one per submodel).
@@ -110,7 +118,19 @@ public:
 	AccelerationStructure(AccelerationStructure&& other)
 	noexcept
 	{
+		GpuRegistry::Register(this);
 		Move(other);
+	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override
+	{
+		Destroy();
+	}
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
 	}
 
 	AccelerationStructure& operator=(AccelerationStructure&& other)

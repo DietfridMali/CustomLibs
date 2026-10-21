@@ -592,6 +592,16 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 }
 
 
+bool ComputeShader::Recreate(const String& shaderFolder)
+{
+	String							cs = m_cs;
+	AutoArray<ComputeBindingDesc>	bindings = m_bindings;
+
+	Destroy();
+	return Create(cs, bindings, shaderFolder);
+}
+
+
 void ComputeShader::ReflectB1Fields(void)
 noexcept
 {

@@ -11,6 +11,7 @@
 #include "texture.h"
 #include "gfxdatalayout.h"
 #include "vertexdatabuffers.h"
+#include "gpuregistry.h"
 
 // =================================================================================================
 // Mesh class definitions for basic mesh information, allowing to pass child classes to functions
@@ -59,7 +60,8 @@ public:
 // =================================================================================================
 
 class Mesh
-	: public AbstractMesh {
+	: public AbstractMesh,
+	  public GpuResource {
 public:
 	// Buffer-composition bitmask: one bit per potential mesh data buffer, ordered as Mesh::UpdateData
 	// processes them (mbOffset4 and mbOffset5 are appended at the end, so the older bits keep their
@@ -130,6 +132,7 @@ public:
 	Vector3f						m_vMax{ Vector3f::ZERO };
 	uint32_t						m_dynamicBuffers{ 0 }; // eMeshBufferBits: buffers needing dynamic treatment
 	uint32_t						m_meshBufferMask{ 0 }; // eMeshBufferBits, rebuilt in UpdateData
+	bool							m_restoreGpu{ false };
 
 	static uint32_t quadTriangleIndices[6];
 
@@ -162,6 +165,11 @@ public:
 	}
 
 	virtual void Destroy(void);
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override;
 
 	inline void SetDynamic(uint32_t dynamicBuffers) {
 		m_dynamicBuffers = dynamicBuffers;

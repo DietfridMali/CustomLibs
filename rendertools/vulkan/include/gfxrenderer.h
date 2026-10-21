@@ -29,6 +29,7 @@ class GfxRenderer
 private:
 	CommandList* m_cmdList{ nullptr };
 	CommandList* m_temporaryList{ nullptr };
+	bool m_isRestarting{ false };
 
 protected:
 	::RenderStates m_renderStates;
@@ -70,6 +71,11 @@ public:
 
 	virtual void Cleanup(void)
 	noexcept override;
+
+	void ShutdownGraphics(void)
+	noexcept;
+
+	bool RestartGraphics(const GfxFeatureRequest& request);
 
 	virtual void LoadPipelineCache(const String& shaderFolder) override;
 

@@ -92,6 +92,8 @@ public:
 	// gfxRenderer::InitGraphics once the device + surface exist.
 	bool SetupSwapchain(void);
 
+	void DestroySwapchain(void);
+
 	static BaseDisplayHandler& Instance(void) {
 		return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance());
 	}

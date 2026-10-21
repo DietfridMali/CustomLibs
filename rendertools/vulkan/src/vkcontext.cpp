@@ -154,6 +154,7 @@ noexcept
 		return false;
 	if (not CreateAllocator())
 		return false;
+	++m_generation;
 	return true;
 }
 

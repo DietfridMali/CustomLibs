@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vkframework.h"
+#include "vkcontext.h"
 
 // =================================================================================================
 // GfxBuffer — RAII wrapper around VkBuffer + VmaAllocation.
@@ -21,6 +22,7 @@ public:
 	VmaAllocation	m_allocation{ VK_NULL_HANDLE };
 	VkDeviceSize	m_size{ 0 };
 	void*			m_mapped{ nullptr }; // non-null only for persistent-mapped allocations
+	uint32_t		m_generation{ 0 };
 
 	// Generic create. Returns false on any vmaCreateBuffer failure.
 	//   size       — buffer size in bytes
@@ -63,7 +65,7 @@ public:
 	inline bool IsValid(void) const
 	noexcept
 	{
-		return m_buffer != VK_NULL_HANDLE;
+		return (m_buffer != VK_NULL_HANDLE) and (m_generation == vkContext.Generation());
 	}
 };
 

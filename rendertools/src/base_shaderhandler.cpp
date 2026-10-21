@@ -78,6 +78,22 @@ void BaseShaderHandler::CreateShaders(const String& shaderFolder, const AutoArra
 }
 
 
+void BaseShaderHandler::RecreateShaders(void)
+{
+	InvalidateActiveShader();
+	if (m_shaderCode)
+		m_shaderCode->RecreateShaders();
+}
+
+
+void BaseShaderHandler::DestroyShaders(void)
+{
+	InvalidateActiveShader();
+	if (m_shaderCode)
+		m_shaderCode->DestroyShaders();
+}
+
+
 void BaseShaderHandler::ComputeGaussKernels(void)
 {
 	for (int radius = 1; radius <= 16; radius++)

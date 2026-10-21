@@ -14,6 +14,7 @@
 #include "avltree.hpp"
 #include "gfxstates.h"
 #include "texturebuffer.h"
+#include "gpuregistry.h"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -84,7 +85,8 @@ struct RenderOffsets {
 // =================================================================================================
 
 class Texture
-	: public AbstractTexture {
+	: public AbstractTexture,
+	  public GpuResource {
 public:
 	// m_handle is a logical id only (no GPU-side meaning in Vulkan). Kept for source
 	// compatibility with sites that assign from RenderTarget::BufferHandle etc.
@@ -114,6 +116,8 @@ public:
 	bool					m_isDeployed{ false };
 	bool					m_isRenderTarget{ false };
 	bool					m_isDisposable{ false };
+	bool					m_restoreGpu{ false };
+	bool					m_restoreBindless{ false };
 	TextureSampling			m_sampling;
 
 	static inline AVLTree<String, Texture*> textureLUT;
@@ -154,12 +158,14 @@ public:
 	}
 
 	Texture(const Texture& other) {
+		GpuRegistry::Register(this);
 		Copy(other);
 	}
 
 	Texture(Texture&& other)
 	noexcept
 	{
+		GpuRegistry::Register(this);
 		Move(other);
 	}
 
@@ -203,6 +209,14 @@ public:
 	}
 
 	virtual void Destroy(void) override;
+
+	void ReleaseImage(void)
+	noexcept;
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override;
 
 	virtual bool IsAvailable(void) override;
 
@@ -420,6 +434,14 @@ public:
 	// not by the texture wrapper. Destroy must NOT call vkDestroyImageView /
 	// vmaDestroyImage on them — that would yank them from under the RT.
 	virtual void Destroy(void) override;
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
+	}
 };
 
 // =================================================================================================
@@ -433,6 +455,14 @@ public:
 	// Same lifetime semantics as RenderTargetTexture: the shadow image view is owned by
 	// the source RenderTarget (depth / sample view), not by this wrapper.
 	virtual void Destroy(void) override;
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override
+	{
+		return true;
+	}
 };
 
 // =================================================================================================

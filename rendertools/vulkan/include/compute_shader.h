@@ -86,6 +86,8 @@ public:
 
 	bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
+	bool Recreate(const String& shaderFolder);
+
 	void Destroy(void)
 	noexcept;
 

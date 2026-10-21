@@ -93,6 +93,8 @@ public:
 	String m_vs; // VS HLSL source (for reference / reload)
 	String m_fs; // PS HLSL source
 	String m_gs; // GS HLSL source (optional)
+	String m_tcs;
+	String m_tes;
 
 	// SPIR-V bytecode per stage (raw bytes; stays alive for VkShaderModule lifetime is not
 	// required, but we keep it for reload / debug).
@@ -323,6 +325,8 @@ public:
 	// m_dataLayout, reflect b1 fields. gsCode is optional.
 	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
 				const String& shaderFolder);
+
+	bool Recreate(const String& shaderFolder);
 
 	void Destroy(void)
 	noexcept;

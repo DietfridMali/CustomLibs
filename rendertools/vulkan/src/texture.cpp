@@ -65,6 +65,7 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 	, m_name("")
 {
 	SetupLUT();
+	GpuRegistry::Register(this);
 }
 
 
@@ -75,6 +76,7 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 Texture::~Texture()
 noexcept
 {
+	GpuRegistry::Unregister(this);
 	if (UpdateLUT() and (m_name.Length() > 0)) {
 		textureLUT.Remove(m_name);
 		m_name = "";
@@ -162,7 +164,21 @@ void Texture::Destroy(void)
 	// standing, SetParams () returns at once for the NEXT texture created here and that one never
 	// gets its sampler set up. 1:1 to the OpenGL path.
 	m_hasParams = false;
+	ReleaseImage();
 
+	for (auto* p : m_buffers) {
+		if (p->m_refCount)
+			--p->m_refCount;
+		else
+			delete p;
+	}
+	m_buffers.Clear();
+}
+
+
+void Texture::ReleaseImage(void)
+noexcept
+{
 	VkDevice		device = vkContext.Device();
 	VmaAllocator	allocator = vkContext.Allocator();
 
@@ -200,14 +216,35 @@ void Texture::Destroy(void)
 	m_arrayView = VK_NULL_HANDLE;
 	m_layoutTracker = ImageLayoutTracker{};
 	m_handle = UINT32_MAX;
+}
 
-	for (auto* p : m_buffers) {
-		if (p->m_refCount)
-			--p->m_refCount;
-		else
-			delete p;
+
+void Texture::ReleaseGpu(void)
+noexcept
+{
+	m_restoreGpu = false;
+	if (not (m_isValid and m_isDeployed))
+		return;
+	m_restoreBindless = m_bindlessIndex != UINT32_MAX;
+	ReleaseBindless();
+	ReleaseImage();
+	m_isDeployed = false;
+	m_restoreGpu = true;
+}
+
+
+bool Texture::RestoreGpu(void)
+{
+	if (not m_restoreGpu)
+		return true;
+	m_restoreGpu = false;
+	if (not Deploy(0)) {
+		Destroy();
+		return false;
 	}
-	m_buffers.Clear();
+	if (m_restoreBindless)
+		EnableBindless();
+	return true;
 }
 
 
@@ -669,6 +706,18 @@ RenderTargetTexture::~RenderTargetTexture()
 }
 
 
+void RenderTargetTexture::ReleaseGpu(void)
+noexcept
+{
+	ReleaseBindless();
+	m_imageView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
+	m_image = VK_NULL_HANDLE;
+	m_allocation = VK_NULL_HANDLE;
+	m_layoutTracker = ImageLayoutTracker{};
+}
+
+
 void ShadowTexture::Destroy(void)
 {
 	m_imageView = VK_NULL_HANDLE;
@@ -685,6 +734,18 @@ ShadowTexture::~ShadowTexture()
 	m_arrayView = VK_NULL_HANDLE;
 	m_image = VK_NULL_HANDLE;
 	m_allocation = VK_NULL_HANDLE;
+}
+
+
+void ShadowTexture::ReleaseGpu(void)
+noexcept
+{
+	ReleaseBindless();
+	m_imageView = VK_NULL_HANDLE;
+	m_arrayView = VK_NULL_HANDLE;
+	m_image = VK_NULL_HANDLE;
+	m_allocation = VK_NULL_HANDLE;
+	m_layoutTracker = ImageLayoutTracker{};
 }
 
 // =================================================================================================

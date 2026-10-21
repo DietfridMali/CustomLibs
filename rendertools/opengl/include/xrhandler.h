@@ -84,6 +84,34 @@ public:
 		return false;
 	}
 
+	inline void EnableSession(bool)
+	noexcept
+	{}
+
+	inline bool SessionEnabled(void) const
+	noexcept
+	{
+		return false;
+	}
+
+	inline bool DeviceCreated(void) const
+	noexcept
+	{
+		return false;
+	}
+
+	inline bool SessionStopped(void) const
+	noexcept
+	{
+		return false;
+	}
+
+	inline bool SystemAvailable(void)
+	noexcept
+	{
+		return false;
+	}
+
 	inline bool IsRunning(void) const
 	noexcept
 	{
@@ -190,9 +218,22 @@ public:
 		return false;
 	}
 
+	inline bool DepthSubmitted(void) const
+	noexcept
+	{
+		return false;
+	}
+
 	inline bool RenderLayer(Texture*, bool, bool)
 	{
 		return false;
+	}
+
+	inline void WindowCrop(float, Vector2f& tcOffset, Vector2f& tcScale) const
+	noexcept
+	{
+		tcOffset = Vector2f{ 0.0f, 0.0f };
+		tcScale = Vector2f{ 1.0f, 1.0f };
 	}
 
 	inline bool RenderMirror(bool)

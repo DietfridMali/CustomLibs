@@ -114,6 +114,10 @@ public:
 	void Destroy(void)
 	noexcept;
 
+	inline void ReleaseGpu(void)
+	noexcept
+	{}
+
 	static void DestroyDefaultStreams(void)
 	noexcept;
 

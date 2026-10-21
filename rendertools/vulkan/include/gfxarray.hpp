@@ -10,6 +10,7 @@
 #include "gfxtypes.h"
 #include "readtarget.h"
 #include "loghandler.h"
+#include "gpuregistry.h"
 
 #include <cstdio>
 #include <cstring>
@@ -48,7 +49,9 @@ public:
 };
 
 template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
-class GfxArray : public BaseGfxArray {
+class GfxArray
+	: public BaseGfxArray,
+	  public GpuResource {
 public:
 	static constexpr bool isInstanceBuffer = std::is_same_v<STORAGE_T, GfxTypes::InstanceBuffer>;
 	static constexpr bool isIndirectBuffer = std::is_same_v<STORAGE_T, GfxTypes::IndirectBuffer>;
@@ -81,11 +84,33 @@ public:
 	uint64_t		m_stagedFrame[CommandQueue::FRAME_COUNT]{};
 	VkDeviceSize	m_stagedMin[CommandQueue::FRAME_COUNT]{};
 	VkDeviceSize	m_stagedMax[CommandQueue::FRAME_COUNT]{};
+	bool			m_pinned{ false };
+	bool			m_restoreGpu{ false };
 
-	GfxArray() = default;
+	GfxArray() {
+		GpuRegistry::Register(this);
+	}
 
 	~GfxArray() {
+		GpuRegistry::Unregister(this);
 		Destroy();
+	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override
+	{
+		m_restoreGpu = m_buffer != VK_NULL_HANDLE;
+		ReleaseDeferred();
+	}
+
+	virtual bool RestoreGpu(void) override
+	{
+		if (not m_restoreGpu)
+			return true;
+		m_restoreGpu = false;
+		if (not AllocateBuffer())
+			return false;
+		return m_data.IsEmpty() or Upload();
 	}
 
 	inline DATA_T* Data(void) {
@@ -165,6 +190,17 @@ public:
 			return false;
 
 		m_bufferSize = VkDeviceSize(size) * VkDeviceSize(sizeof(DATA_T));
+		m_pinned = pinned;
+		return AllocateBuffer();
+	}
+
+	bool AllocateBuffer(void)
+	{
+		VmaAllocator	allocator = vkContext.Allocator();
+		const int		size = int(m_width * m_height);
+
+		if ((allocator == VK_NULL_HANDLE) or (m_bufferSize == 0))
+			return false;
 
 		VkBufferCreateInfo bi{};
 		bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -178,7 +214,7 @@ public:
 
 		VmaAllocationCreateInfo ai{};
 		ai.usage = VMA_MEMORY_USAGE_AUTO;
-		if (pinned)
+		if (m_pinned)
 			ai.pool = vkContext.PinnedPool(); // VK_NULL_HANDLE when there is none: the common memory then
 		VkResult res = vmaCreateBuffer(allocator, &bi, &ai, &m_buffer, &m_allocation, nullptr);
 		if ((res != VK_SUCCESS) and (ai.pool != VK_NULL_HANDLE)) {

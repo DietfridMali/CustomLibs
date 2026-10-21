@@ -231,6 +231,10 @@ public:
 
 	void CreateShaders(const AutoArray<String>& shaderIds);
 
+	void RecreateShaders(void);
+
+	void DestroyShaders(void);
+
 	inline bool HasPendingShaders(void) const {
 		return m_shaderSources.Length() > 0;
 	}

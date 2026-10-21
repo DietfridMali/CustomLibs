@@ -63,6 +63,10 @@ public:
 
 	void CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds);
 
+	void RecreateShaders(void);
+
+	void DestroyShaders(void);
+
 	Shader* SelectShader(Texture* texture);
 
 	static const String& DefaultDepthShaderId(void);

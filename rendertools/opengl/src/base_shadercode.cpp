@@ -116,6 +116,16 @@ void BaseShaderCode::CreateShaders(const AutoArray<String>& shaderIds)
 }
 
 
+void BaseShaderCode::RecreateShaders(void)
+{
+}
+
+
+void BaseShaderCode::DestroyShaders(void)
+{
+}
+
+
 void BaseShaderCode::CreateShader(const ShaderSource* source)
 {
 	if (not gfxStates.HaveFeatureLevel(source->m_featureLevel)) {

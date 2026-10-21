@@ -56,6 +56,7 @@ public:
 	VmaAllocator		m_allocator{ VK_NULL_HANDLE };
 	VmaPool				m_pinnedPool{ VK_NULL_HANDLE }; // see PinnedPool ()
 	bool				m_pinnedPoolFailed{ false };
+	uint32_t			m_generation{ 0 };
 
 	VkPhysicalDeviceProperties	m_deviceProps{};
 	uint32_t					m_apiVersion{ VK_API_VERSION_1_3 };
@@ -140,6 +141,11 @@ public:
 	noexcept
 	{
 		return m_allocator;
+	}
+	inline uint32_t Generation(void) const
+	noexcept
+	{
+		return m_generation;
 	}
 	inline uint32_t ApiVersion(void) const
 	noexcept

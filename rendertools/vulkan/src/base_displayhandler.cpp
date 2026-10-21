@@ -162,6 +162,17 @@ bool BaseDisplayHandler::SetupSwapchain(void)
 }
 
 
+void BaseDisplayHandler::DestroySwapchain(void)
+{
+	m_swapchain.Destroy();
+	m_backBufferIndex = 0;
+	m_isInRendering = false;
+	m_backBufferCb = VK_NULL_HANDLE;
+	m_backBufferList = nullptr;
+	m_backBufferWasWritten = false;
+}
+
+
 // EnableBackBuffer / DisableBackBuffer drive the swapchain image's layout transitions for the
 // presentable color attachment AND the matching vkCmdBeginRendering / vkCmdEndRendering scope.
 // Both run on the currently active CommandList's command buffer (top of the CommandListHandler

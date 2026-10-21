@@ -50,6 +50,7 @@ struct XRState {
 	XrSessionState					sessionState{ XR_SESSION_STATE_UNKNOWN };
 	bool							isRunning{ false };
 	bool							exitRequested{ false };
+	bool							sessionStopped{ false };
 	XrEnvironmentBlendMode			blendMode{ XR_ENVIRONMENT_BLEND_MODE_OPAQUE };
 	XrSpace							localSpace{ XR_NULL_HANDLE };
 	XrSpace							viewSpace{ XR_NULL_HANDLE };
@@ -103,6 +104,9 @@ struct XRState {
 
 static const XrPosef kIdentityPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
 
+static bool xrSessionEnabled = true;
+static bool xrDeviceCreated = false;
+
 static const GfxXRHandler::ControllerState kNoController{};
 
 
@@ -127,6 +131,18 @@ noexcept
 {
 	function = nullptr;
 	return XR_SUCCEEDED(xrGetInstanceProcAddr(instance, name, reinterpret_cast<PFN_xrVoidFunction*>(&function))) and (function != nullptr);
+}
+
+
+static void RecommendedEyeSize(const XRState& s, int& width, int& height)
+noexcept
+{
+	width = 0;
+	height = 0;
+	for (int i = 0; i < kMaxRenderViews; ++i) {
+		width = std::max(width, int(s.configViews[i].recommendedImageRectWidth));
+		height = std::max(height, int(s.configViews[i].recommendedImageRectHeight));
+	}
 }
 
 
@@ -579,10 +595,12 @@ noexcept
 				else if (changed.state == XR_SESSION_STATE_STOPPING) {
 					XrSucceeded(s.instance, xrEndSession(s.session), "xrEndSession");
 					s.isRunning = false;
+					s.sessionStopped = true;
 				}
 				else if ((changed.state == XR_SESSION_STATE_EXITING) or (changed.state == XR_SESSION_STATE_LOSS_PENDING)) {
 					s.isRunning = false;
 					s.exitRequested = true;
+					s.sessionStopped = true;
 				}
 				break;
 			}
@@ -590,6 +608,7 @@ noexcept
 			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
 				s.isRunning = false;
 				s.exitRequested = true;
+				s.sessionStopped = true;
 				break;
 
 			case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING: {
@@ -752,10 +771,12 @@ bool GfxXRHandler::Create(const char* appName)
 	}
 
 	XrSystemProperties systemProperties{ XR_TYPE_SYSTEM_PROPERTIES };
+	int eyeWidth = 0;
+	int eyeHeight = 0;
 
+	RecommendedEyeSize(s, eyeWidth, eyeHeight);
 	if (XR_SUCCEEDED(xrGetSystemProperties(s.instance, s.systemId, &systemProperties)))
-		logHandler.Print("OpenXR: %s, eye %u x %u, Vulkan %u.%u .. %u.%u\n", systemProperties.systemName,
-						 s.configViews[0].recommendedImageRectWidth, s.configViews[0].recommendedImageRectHeight,
+		logHandler.Print("OpenXR: %s, eye %d x %d, Vulkan %u.%u .. %u.%u\n", systemProperties.systemName, eyeWidth, eyeHeight,
 						 unsigned(XR_VERSION_MAJOR(requirements.minApiVersionSupported)),
 						 unsigned(XR_VERSION_MINOR(requirements.minApiVersionSupported)),
 						 unsigned(XR_VERSION_MAJOR(requirements.maxApiVersionSupported)),
@@ -836,6 +857,7 @@ noexcept
 		logHandler.Print("OpenXR: vkCreateDevice through the runtime failed (%d)\n", int(result));
 		return false;
 	}
+	xrDeviceCreated = true;
 	return true;
 }
 
@@ -848,6 +870,8 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 		return true;
 
 	XRState&						s = *m_state;
+
+	s.sessionStopped = false;
 	XrGraphicsBindingVulkan2KHR		binding{ XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR };
 	XrSessionCreateInfo				sessionInfo{ XR_TYPE_SESSION_CREATE_INFO };
 
@@ -910,10 +934,7 @@ bool GfxXRHandler::CreateSession(int layerWidth, int layerHeight)
 	int eyeWidth = 0;
 	int eyeHeight = 0;
 
-	for (int i = 0; i < kMaxRenderViews; ++i) {
-		eyeWidth = std::max(eyeWidth, int(s.configViews[i].recommendedImageRectWidth));
-		eyeHeight = std::max(eyeHeight, int(s.configViews[i].recommendedImageRectHeight));
-	}
+	RecommendedEyeSize(s, eyeWidth, eyeHeight);
 	if (not CreateSwapchain(s, s.color, colorFormat, XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT, eyeWidth,
 							eyeHeight, kMaxRenderViews, false, "xr eye buffer")) {
 		DestroySession();
@@ -1181,6 +1202,52 @@ noexcept
 }
 
 
+void GfxXRHandler::EnableSession(bool enable)
+noexcept
+{
+	xrSessionEnabled = enable;
+}
+
+
+bool GfxXRHandler::SessionEnabled(void) const
+noexcept
+{
+	return xrSessionEnabled;
+}
+
+
+bool GfxXRHandler::DeviceCreated(void) const
+noexcept
+{
+	return xrDeviceCreated;
+}
+
+
+bool GfxXRHandler::SessionStopped(void) const
+noexcept
+{
+	return HasSession() and m_state->sessionStopped;
+}
+
+
+bool GfxXRHandler::SystemAvailable(void)
+noexcept
+{
+	if (not IsAvailable())
+		return false;
+	if (m_state->exitRequested)
+		return false;
+
+	XrSystemGetInfo	systemInfo{ XR_TYPE_SYSTEM_GET_INFO };
+	XrSystemId		systemId = XR_NULL_SYSTEM_ID;
+
+	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+	if (XR_FAILED(xrGetSystem(m_state->instance, &systemInfo, &systemId)))
+		return false;
+	return systemId == m_state->systemId;
+}
+
+
 bool GfxXRHandler::IsRunning(void) const
 noexcept
 {
@@ -1214,7 +1281,14 @@ noexcept
 {
 	if (HasSession() and (m_state->color.width > 0))
 		return m_state->color.width;
-	return IsAvailable() ? int(m_state->configViews[0].recommendedImageRectWidth) : 0;
+	if (not IsAvailable())
+		return 0;
+
+	int width = 0;
+	int height = 0;
+
+	RecommendedEyeSize(*m_state, width, height);
+	return width;
 }
 
 
@@ -1223,7 +1297,14 @@ noexcept
 {
 	if (HasSession() and (m_state->color.height > 0))
 		return m_state->color.height;
-	return IsAvailable() ? int(m_state->configViews[0].recommendedImageRectHeight) : 0;
+	if (not IsAvailable())
+		return 0;
+
+	int width = 0;
+	int height = 0;
+
+	RecommendedEyeSize(*m_state, width, height);
+	return height;
 }
 
 
@@ -1365,6 +1446,13 @@ bool GfxXRHandler::SubmitDepth(Texture* sceneDepth, float zNear, float zFar)
 }
 
 
+bool GfxXRHandler::DepthSubmitted(void) const
+noexcept
+{
+	return m_state and m_state->depthSubmitted;
+}
+
+
 bool GfxXRHandler::RenderLayer(Texture* source, bool bRotate, bool bFlipVertically)
 {
 	RenderTarget* target = LayerTarget();
@@ -1391,6 +1479,24 @@ noexcept
 }
 
 
+void GfxXRHandler::WindowCrop(float sourceAspect, Vector2f& tcOffset, Vector2f& tcScale) const
+noexcept
+{
+	float windowAspect = float(baseDisplayHandler.GetWidth()) / float(baseDisplayHandler.GetHeight());
+
+	tcScale = Vector2f{ 1.0f, 1.0f };
+	tcOffset = Vector2f{ 0.0f, 0.0f };
+	if (windowAspect > sourceAspect) {
+		tcScale.y = sourceAspect / windowAspect;
+		tcOffset.y = 0.5f * (1.0f - tcScale.y);
+	}
+	else {
+		tcScale.x = windowAspect / sourceAspect;
+		tcOffset.x = 0.5f * (1.0f - tcScale.x);
+	}
+}
+
+
 bool GfxXRHandler::RenderMirror(bool bFlipVertically)
 {
 	RenderTarget* eye = EyeTarget();
@@ -1408,19 +1514,10 @@ bool GfxXRHandler::RenderMirror(bool bFlipVertically)
 	if (not shader)
 		return false;
 
-	float		eyeAspect = float(eye->GetWidth()) / float(eye->GetHeight());
-	float		windowAspect = float(baseRenderer.WindowWidth()) / float(baseRenderer.WindowHeight());
 	Vector2f	tcScale{ 1.0f, 1.0f };
 	Vector2f	tcOffset{ 0.0f, 0.0f };
 
-	if (windowAspect > eyeAspect) {
-		tcScale.y = eyeAspect / windowAspect;
-		tcOffset.y = 0.5f * (1.0f - tcScale.y);
-	}
-	else {
-		tcScale.x = windowAspect / eyeAspect;
-		tcOffset.x = 0.5f * (1.0f - tcScale.x);
-	}
+	WindowCrop(float(eye->GetWidth()) / float(eye->GetHeight()), tcOffset, tcScale);
 	shader->SetInt("bEncodeSRGB", IsSRGBFormat(baseDisplayHandler.CurrentBackBufferFormat()) ? 0 : 1);
 	shader->SetVector2f("tcOffset", tcOffset);
 	shader->SetVector2f("tcScale", tcScale);

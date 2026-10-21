@@ -97,7 +97,8 @@ public:
 
 class GfxReadTarget;
 
-class RenderTarget {
+class RenderTarget
+	: public GpuResource {
 public:
 	using DrawBufferList = DrawBufferHandler::DrawBufferList; // required for high level compatibility
 	using CustomDrawBufferList = DrawBufferHandler::CustomDrawBufferList;
@@ -246,13 +247,23 @@ public:
 	// Own command list - rendering recorded for this RT goes through it.
 	CommandList* m_cmdList{ nullptr };
 
+	RTCreationParams	m_creationParams{};
+	bool				m_isExternal{ false };
+	bool				m_restoreGpu{ false };
+
 	// -------------------------------------------------------------------------
 
 	RenderTarget();
 
 	~RenderTarget() {
+		GpuRegistry::Unregister(this);
 		Destroy();
 	}
+
+	virtual void ReleaseGpu(void)
+	noexcept override;
+
+	virtual bool RestoreGpu(void) override;
 
 	void Init(void);
 

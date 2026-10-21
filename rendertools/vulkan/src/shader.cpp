@@ -1272,11 +1272,26 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 	m_vs = vsCode;
 	m_fs = fsCode;
 	m_gs = gsCode;
+	m_tcs = tcsCode;
+	m_tes = tesCode;
 #if VK_STALL_DIAG
 	VkStallEvent("shader create", stallStart, static_cast<const char*>(m_name));
 #endif
 	pipelineCache.CreateShaderLibraries(this);
 	return true;
+}
+
+
+bool Shader::Recreate(const String& shaderFolder)
+{
+	String vs = m_vs;
+	String fs = m_fs;
+	String gs = m_gs;
+	String tcs = m_tcs;
+	String tes = m_tes;
+
+	Destroy();
+	return Create(vs, fs, gs, tcs, tes, shaderFolder);
 }
 
 

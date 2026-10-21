@@ -67,6 +67,21 @@ public:
 	bool HasSession(void) const
 	noexcept;
 
+	void EnableSession(bool enable)
+	noexcept;
+
+	bool SessionEnabled(void) const
+	noexcept;
+
+	bool DeviceCreated(void) const
+	noexcept;
+
+	bool SessionStopped(void) const
+	noexcept;
+
+	bool SystemAvailable(void)
+	noexcept;
+
 	bool IsRunning(void) const
 	noexcept;
 
@@ -120,7 +135,13 @@ public:
 
 	bool SubmitDepth(Texture* sceneDepth, float zNear, float zFar);
 
+	bool DepthSubmitted(void) const
+	noexcept;
+
 	bool RenderLayer(Texture* source, bool bRotate, bool bFlipVertically);
+
+	void WindowCrop(float sourceAspect, Vector2f& tcOffset, Vector2f& tcScale) const
+	noexcept;
 
 	bool RenderMirror(bool bFlipVertically);
 

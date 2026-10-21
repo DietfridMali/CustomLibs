@@ -109,6 +109,10 @@ public:
 	void Destroy(void)
 	noexcept;
 
+	inline void ReleaseGpu(void)
+	noexcept
+	{}
+
 	inline bool IsValid(void)
 	noexcept
 	{

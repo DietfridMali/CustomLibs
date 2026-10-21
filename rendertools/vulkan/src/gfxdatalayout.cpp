@@ -79,6 +79,16 @@ noexcept
 }
 
 
+void GfxDataLayout::ReleaseGpu(void)
+noexcept
+{
+	Disable();
+	for (auto& gfxDataBuffer : m_dataBuffers)
+		gfxDataBuffer->Destroy();
+	m_indexBuffer.Destroy();
+}
+
+
 GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other)
 {
 	if (this != &other) {

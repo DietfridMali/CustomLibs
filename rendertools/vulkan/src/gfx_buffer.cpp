@@ -45,6 +45,7 @@ noexcept
 	}
 	m_size = size;
 	m_mapped = (flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) ? allocResult.pMappedData : nullptr;
+	m_generation = vkContext.Generation();
 #if VK_STALL_DIAG
 	char detail[128];
 	snprintf(detail, sizeof(detail), "usage%s%s%s%s%s%s%s%s",
@@ -71,7 +72,7 @@ noexcept
 	// gfxResourceHandler.Cleanup sweep, which runs after the slot's in-flight fence has signalled
 	// (BeginFrame) or after WaitIdle (GfxRenderer::FlushResources / Cleanup).
 	VmaAllocator allocator = vkContext.Allocator();
-	if ((m_buffer != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+	if ((m_buffer != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE) and (m_generation == vkContext.Generation())) {
 		VkBuffer		buf = m_buffer;
 		VmaAllocation	alloc = m_allocation;
 		gfxResourceHandler.TrackCleanup([allocator, buf, alloc]() {

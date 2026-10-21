@@ -312,6 +312,7 @@ void BufferInfo::Release(bool immediate)
 RenderTarget::RenderTarget()
 {
 	Init();
+	GpuRegistry::Register(this);
 }
 
 
@@ -655,6 +656,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	if (vkContext.Device() == VK_NULL_HANDLE)
 		return false;
 
+	m_creationParams = params;
+	m_isExternal = false;
 	m_name = params.name;
 	m_width = width;
 	m_height = height;
@@ -744,6 +747,7 @@ bool RenderTarget::CreateExternal(int width, int height, const String& name, int
 	if ((vkContext.Device() == VK_NULL_HANDLE) or ((colorImage == VK_NULL_HANDLE) and (depthImage == VK_NULL_HANDLE)))
 		return false;
 
+	m_isExternal = true;
 	m_name = name;
 	m_width = width;
 	m_height = height;
@@ -876,6 +880,27 @@ void RenderTarget::Destroy(bool immediate)
 	m_computeBufferIndex = -1;
 	m_computeBufferCount = 0;
 	m_bufferInfo.Reset();
+}
+
+
+void RenderTarget::ReleaseGpu(void)
+noexcept
+{
+	m_restoreGpu = m_isAvailable and not m_isExternal;
+	if (m_restoreGpu)
+		Destroy();
+}
+
+
+bool RenderTarget::RestoreGpu(void)
+{
+	if (not m_restoreGpu)
+		return true;
+	m_restoreGpu = false;
+
+	RTCreationParams params = m_creationParams;
+
+	return Create(m_width, m_height, m_scale, params);
 }
 
 

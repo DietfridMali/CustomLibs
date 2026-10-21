@@ -28,7 +28,26 @@ bool Mesh::CreateLayout(void)
 		return true;
 	if (not (m_gfxDataLayout = new GfxDataLayout()))
 		return false;
+	GpuRegistry::Register(this);
 	return m_gfxDataLayout->Create(MeshTopology::Quads, m_dynamicBuffers);
+}
+
+
+void Mesh::ReleaseGpu(void)
+noexcept
+{
+	m_restoreGpu = m_gfxDataLayout != nullptr;
+	if (m_restoreGpu)
+		m_gfxDataLayout->ReleaseGpu();
+}
+
+
+bool Mesh::RestoreGpu(void)
+{
+	if (not m_restoreGpu)
+		return true;
+	m_restoreGpu = false;
+	return UpdateData(false, false, true);
 }
 
 // This only works for linearly increasing quad vertex indices starting at 0!
@@ -321,10 +340,13 @@ void Mesh::Destroy(void) noexcept(
 	m_vertexColors.Destroy();
 	m_indices.Destroy();
 	m_textures.Clear();
-	if (m_gfxDataLayout)
+	if (m_gfxDataLayout) {
+		GpuRegistry::Unregister(this);
 		m_gfxDataLayout->Destroy();
+	}
 	delete m_gfxDataLayout;
 	m_gfxDataLayout = nullptr;
+	m_restoreGpu = false;
 	m_vMax = Vector3f{ -1e6, -1e6, -1e6 };
 	m_vMin = Vector3f{ 1e6, 1e6, 1e6 };
 }

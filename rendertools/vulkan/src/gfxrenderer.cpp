@@ -24,6 +24,9 @@
 #include "xrhandler.h"
 #include "vkupload.h" // CreateReadbackBuffer for ReadBuffer ()
 #include "loghandler.h"
+#include "sampler_cache.h"
+#include "gfxdatalayout.h"
+#include "gpuregistry.h"
 
 // =================================================================================================
 // Vulkan Renderer
@@ -77,18 +80,20 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 		logHandler.Print("Smiley-Battle: Cannot create Vulkan CommandQueue.\n");
 		return false;
 	}
-	if (xrHandler.IsAvailable())
+	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled())
 		baseDisplayHandler.SetVSync(false);
 	if (not baseDisplayHandler.SetupSwapchain()) {
 		logHandler.Print("Smiley-Battle: Cannot create Vulkan swapchain.\n");
 		return false;
 	}
-	if (xrHandler.IsAvailable()) {
+	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled()) {
 		if (not vkContext.HasFeature(GfxFeature::Multiview))
 			logHandler.Print("The graphics device has no multiview with geometry and tessellation shaders - VR is off.\n");
-		else if (not xrHandler.CreateSession(baseDisplayHandler.GetWidth(), baseDisplayHandler.GetHeight()))
+		else if (not xrHandler.CreateSession(xrHandler.EyeWidth(), xrHandler.EyeHeight()))
 			logHandler.Print("OpenXR session could not be created - VR is off.\n");
 	}
+	if (m_isRestarting)
+		return true;
 	// Arm the first frame slot so subsequent BeginFrame paths have a valid sync state.
 	if (not commandListHandler.CmdQueue().BeginFrame()) {
 		logHandler.Print("Smiley-Battle: Cannot begin first Vulkan frame.\n");
@@ -174,7 +179,10 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 		baseDisplayHandler.EnableBackBuffer();
 		gfxStates.ClearBackBuffer();
 	}
-	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+	int backBufferWidth = baseDisplayHandler.GetWidth();
+	int backBufferHeight = baseDisplayHandler.GetHeight();
+
+	SetViewport(::Viewport(0, 0, backBufferWidth, backBufferHeight), backBufferWidth, backBufferHeight);
 
 	bool isMirrored = isXR and xrHandler.RenderMirror(bFlipVertically);
 
@@ -183,7 +191,19 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 		gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
 	}
 	m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-	RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
+
+	Texture*	screen = m_screenBuffer->GetAsTexture({});
+	Shader*		shader = nullptr;
+
+	if (xrHandler.HasSession() and screen) {
+		Vector2f	tcOffset{ 0.0f, 0.0f };
+		Vector2f	tcScale{ 1.0f, 1.0f };
+
+		xrHandler.WindowCrop(float(m_screenBuffer->GetWidth()) / float(m_screenBuffer->GetHeight()), tcOffset, tcScale);
+		shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White, screen->IsRenderTarget(), tcOffset, tcScale, false,
+														 screen->ColorEncoding(), screen->HasArrayView());
+	}
+	RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically, shader);
 	if (isMirrored)
 		Set2DRenderStates();
 
@@ -244,6 +264,52 @@ noexcept
 	gfxResourceHandler.Cleanup(1);
 	bindlessTextureHeap.Destroy();
 	xrHandler.Destroy();
+}
+
+
+void GfxRenderer::ShutdownGraphics(void)
+noexcept
+{
+	FlushResources();
+	xrHandler.DestroySession();
+	SavePipelineCache();
+	pipelineCache.Destroy();
+	GfxDataLayout::DestroyDefaultStreams();
+	GfxDataLayout::activeLayout = nullptr;
+	GfxDataLayout::layoutStack.Clear();
+	Shader::DestroyDefaultResources();
+	meshHandler.Destroy();
+	GpuRegistry::ReleaseAll();
+	baseShaderHandler.DestroyShaders();
+	gfxResourceHandler.Cleanup(0);
+	gfxResourceHandler.Cleanup(1);
+	bindlessTextureHeap.Destroy();
+	samplerCache.Destroy();
+	cbvAllocator.Destroy();
+	descriptorPoolHandler.Destroy();
+	commandListHandler.Destroy();
+	m_cmdList = nullptr;
+	m_temporaryList = nullptr;
+	baseDisplayHandler.DestroySwapchain();
+	vkContext.Destroy();
+}
+
+
+bool GfxRenderer::RestartGraphics(const GfxFeatureRequest& request)
+{
+	ShutdownGraphics();
+	m_isRestarting = true;
+
+	bool bOk = InitGraphics(request);
+
+	m_isRestarting = false;
+	if (not bOk)
+		return false;
+	SetViewCount(xrHandler.HasSession() ? kMaxRenderViews : 1);
+	baseShaderHandler.RecreateShaders();
+	baseDisplayHandler.BeginFrame();
+	GpuRegistry::RestoreAll();
+	return true;
 }
 
 

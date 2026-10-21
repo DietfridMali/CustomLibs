@@ -70,6 +70,15 @@ public:
 
 	virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 
+	inline void ShutdownGraphics(void)
+	noexcept
+	{}
+
+	inline bool RestartGraphics(const GfxFeatureRequest&)
+	{
+		return false;
+	}
+
 	// The presented picture as packed RGBA8, bottom row first: the window's back buffer, what
 	// DrawScreen () just put there. width/height of 0 mean the whole back buffer; a rectangle is
 	// (x, y) from the bottom left, and the destination needs width * height * 4 bytes. The same
