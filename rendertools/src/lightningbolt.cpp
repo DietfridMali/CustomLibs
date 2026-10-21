@@ -13,8 +13,8 @@
 
 // Variable segment length (2026-07-23): 1 = the segment length scales with the bolt length around a
 // calibration length X = referenceSamples * boltSegmentLength (48 * 0.25 = 12 wu): a bolt of length Y gets
-// round(Y/X) * 48 samples (long bolts get proportionally coarser steps), short bolts (Y < X) coarsen by an
-// integer divisor of 48 so the step never drops below minSegmentLength. Kink cell size AND kink amplitude
+// round(Y/X) * referenceSamples samples (long bolts get proportionally coarser steps), short bolts (Y < X) coarsen by an
+// integer divisor of referenceSamples so the step never drops below minSegmentLength. Kink cell size AND kink amplitude
 // scale with the local step -> every bolt is a scaled copy of the same pattern (self-similar, with a
 // minimum granularity). 0 = world-fixed step: every bolt samples the same boltSegmentLength raster.
 #define VARIABLE_SEGLENGTH 1
@@ -60,9 +60,9 @@ const float		CoreFlashFloor = expf(-CoreFlashDecay); // so the curve lands exact
 // segment count from a bolt length (shared by ComputeCounts and the strike's branches).
 #if VARIABLE_SEGLENGTH
 // User scheme: calibration length X = referenceSamples * boltSegmentLength. Y >= X: round(Y/X) blocks
-// of 48 samples, step = Y/(blocks*48) -> the step grows with Y inside a block bracket and snaps back at
+// of referenceSamples samples, step = Y/(blocks*referenceSamples) -> the step grows with Y inside a block bracket and snaps back at
 // the next block, staying within [0.75, 1.5] * boltSegmentLength overall. Y < X: coarsen by an integer
-// divisor of 48 (48/d samples) so the step never drops below minSegmentLength -> short branches get
+// divisor of referenceSamples (referenceSamples/d samples) so the step never drops below minSegmentLength -> short branches get
 // FEWER, not finer, features (minimum granularity) instead of oversampling the kink raster.
 int32_t SegmentCount(float length)
 {
@@ -79,12 +79,16 @@ int32_t SegmentCount(float length)
 			n = MaxSegments;
 		return n;
 	}
-	// integer-divisor quotients of 48, descending; pick the largest sample count whose step stays >= minSegmentLength
-	constexpr int32_t	quotients[] = { 48, 24, 16, 12, 8, 6, 4, 3, 2 };
-	int32_t				maxSamples = int32_t(length / ((look.minSegmentLength > 1e-4f) ? look.minSegmentLength : 1e-4f));
-	for (int32_t q : quotients) {
-		if (q <= maxSamples)
-			return q;
+	// largest integer-divisor quotient of referenceSamples whose step stays >= minSegmentLength = referenceSamples / d for the smallest divisor d >= referenceSamples / maxSamples
+	const int32_t	samples = look.referenceSamples;
+	int32_t			maxSamples = int32_t(length / ((look.minSegmentLength > 1e-4f) ? look.minSegmentLength : 1e-4f));
+	if (maxSamples > MaxSegments)
+		maxSamples = MaxSegments;
+	if (maxSamples < 2)
+		return 2;
+	for (int32_t d = std::max((samples + maxSamples - 1) / maxSamples, 1); d <= samples / 2; d++) {
+		if (samples % d == 0)
+			return samples / d;
 	}
 	return 2;
 }
