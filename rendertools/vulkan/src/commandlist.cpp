@@ -1525,6 +1525,13 @@ noexcept
 	VkGpuFrameAppend(length, "GPU %u frames in %.2f s, display period %.2f ms: busy avg %.2f max %.2f ms, span avg %.2f max %.2f ms, %u frames busy longer than the period, %u lists and %u stages not recorded",
 					 summary.frames, elapsedMs * 0.001, summary.periodMs, summary.busyTotalMs / frames, summary.busyMaxMs, summary.spanTotalMs / frames,
 					 summary.spanMaxMs, summary.overPeriod, summary.listsDropped, summary.stagesDropped);
+
+	uint64_t	memoryUsage = 0;
+	uint64_t	memoryBudget = 0;
+
+	if (gfxStates.GetMemoryBudget(memoryUsage, memoryBudget))
+		VkGpuFrameAppend(length, ", VRAM %llu of %llu MB", static_cast<unsigned long long>(memoryUsage >> 20),
+						 static_cast<unsigned long long>(memoryBudget >> 20));
 	VkGpuFrameAppendEntries(length, false, true);
 	VkGpuFrameAppendEntries(length, true, true);
 	logHandler.Print("%s\n", vkGpuFrameText);
