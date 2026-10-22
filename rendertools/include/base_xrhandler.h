@@ -7,6 +7,7 @@
 #include "vector.hpp"
 #include "matrix.hpp"
 #include "rendertypes.h"
+#include "log_frame_metrics.h"
 
 class RenderTarget;
 class Texture;
@@ -182,11 +183,13 @@ public:
 	const ControllerState& Controller(int hand) const
 	noexcept;
 
+#if LOG_FRAME_METRICS
 	void EnablePerformanceMetrics(bool enable)
 	noexcept;
 
 	void LogPerformanceMetrics(void)
 	noexcept;
+#endif
 
 protected:
 	XRState* m_state{ nullptr };

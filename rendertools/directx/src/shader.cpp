@@ -31,6 +31,7 @@
 #include "gfxstates.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
+#include "log_frame_metrics.h"
 #include "multiview_hlsl.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -983,6 +984,7 @@ bool Shader::Activate(void)
 	return true;
 }
 
+#if LOG_FRAME_METRICS
 
 static AutoArray<String> missingViewShaders;
 
@@ -1001,6 +1003,8 @@ noexcept
 	logHandler.Print("VR: shader '%s' draws without eye projections\n", static_cast<const char*>(name));
 }
 
+#endif
+
 
 bool Shader::UpdateMatrices(void)
 {
@@ -1012,8 +1016,10 @@ bool Shader::UpdateMatrices(void)
 	if (baseRenderer.ViewCount() > 1) {
 		const BaseRenderer::ViewProjections* views = baseRenderer.FindViewProjections(baseRenderer.Projection());
 
+#if LOG_FRAME_METRICS
 		if (not views)
 			LogMissingViewProjections(m_name);
+#endif
 		for (int i = 0; i < kMaxRenderViews; ++i) {
 			std::memcpy(m_b0Staging.mEyeProjection[i], views ? views->eyeProjection[i].AsArray() : baseRenderer.Projection().AsArray(),
 						16 * sizeof(float));

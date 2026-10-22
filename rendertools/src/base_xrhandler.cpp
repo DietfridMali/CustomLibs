@@ -33,7 +33,9 @@ static const XrPosef kIdentityPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.
 static bool xrSessionEnabled = true;
 static bool xrDeviceCreated = false;
 static bool xrTestPattern = false;
+#if LOG_FRAME_METRICS
 static bool xrPerformanceMetrics = false;
+#endif
 static float xrViewPitch = 0.0f;
 
 static const BaseXRHandler::ControllerState kNoController{};
@@ -280,6 +282,8 @@ noexcept
 }
 
 
+#if LOG_FRAME_METRICS
+
 static constexpr float	kFrameLogTurn = 1.5f;
 static constexpr int	kFrameLogFrames = 90;
 
@@ -309,6 +313,8 @@ noexcept
 	s.lastYaw = yaw;
 	s.lastDisplayTime = s.frameState.predictedDisplayTime;
 }
+
+#endif
 
 
 static void FillTestPattern(XRState& s)
@@ -710,7 +716,9 @@ bool BaseXRHandler::Create(const char* appName)
 	}
 	s.hasDepthExtension = HasExtension(extensions, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
 	s.hasVisibilityMaskExtension = HasExtension(extensions, XR_KHR_VISIBILITY_MASK_EXTENSION_NAME);
+#if LOG_FRAME_METRICS
 	s.hasPerformanceMetricsExtension = HasExtension(extensions, XR_META_PERFORMANCE_METRICS_EXTENSION_NAME);
+#endif
 	s.hasCylinderExtension = HasExtension(extensions, XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME);
 
 	const char*	enabledExtensions[5]{};
@@ -721,8 +729,10 @@ bool BaseXRHandler::Create(const char* appName)
 		enabledExtensions[enabledCount++] = XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME;
 	if (s.hasVisibilityMaskExtension)
 		enabledExtensions[enabledCount++] = XR_KHR_VISIBILITY_MASK_EXTENSION_NAME;
+#if LOG_FRAME_METRICS
 	if (s.hasPerformanceMetricsExtension)
 		enabledExtensions[enabledCount++] = XR_META_PERFORMANCE_METRICS_EXTENSION_NAME;
+#endif
 	if (s.hasCylinderExtension)
 		enabledExtensions[enabledCount++] = XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME;
 
@@ -787,11 +797,13 @@ bool BaseXRHandler::Create(const char* appName)
 
 	if (s.hasVisibilityMaskExtension and not LoadXrFunction(s.instance, "xrGetVisibilityMaskKHR", s.pfnGetVisibilityMask))
 		s.hasVisibilityMaskExtension = false;
+#if LOG_FRAME_METRICS
 	if (s.hasPerformanceMetricsExtension and
 		not (LoadXrFunction(s.instance, "xrEnumeratePerformanceMetricsCounterPathsMETA", s.pfnEnumeratePerformanceMetricsCounterPaths) and
 			 LoadXrFunction(s.instance, "xrSetPerformanceMetricsStateMETA", s.pfnSetPerformanceMetricsState) and
 			 LoadXrFunction(s.instance, "xrQueryPerformanceMetricsCounterMETA", s.pfnQueryPerformanceMetricsCounter)))
 		s.hasPerformanceMetricsExtension = false;
+#endif
 
 	String graphicsInfo;
 
@@ -932,8 +944,10 @@ bool BaseXRHandler::CreateSession(int layerWidth, int layerHeight)
 	if (not CreateActions(s))
 		logHandler.Print("OpenXR: controller input is not available\n");
 	UpdateVisibilityMasks(s);
+#if LOG_FRAME_METRICS
 	if (xrPerformanceMetrics)
 		EnablePerformanceMetrics(true);
+#endif
 	logHandler.Print("OpenXR: session created, eye buffers %d x %d (format %lld), depth layer %s, visibility mask %s, cylinder layer %s\n", eyeWidth,
 					 eyeHeight, static_cast<long long>(colorFormat), s.hasDepthExtension ? "on" : "off", s.hasVisibilityMaskExtension ? "on" : "off",
 					 s.hasCylinderExtension ? "on" : "off");
@@ -985,12 +999,16 @@ bool BaseXRHandler::BeginFrame(void)
 		return false;
 
 	XrFrameWaitInfo							waitInfo{ XR_TYPE_FRAME_WAIT_INFO };
+#if LOG_FRAME_METRICS
 	std::chrono::steady_clock::time_point	waitStart = std::chrono::steady_clock::now();
+#endif
 
 	s.frameState = XrFrameState{ XR_TYPE_FRAME_STATE };
 	if (not XrSucceeded(s.instance, xrWaitFrame(s.session, &waitInfo, &s.frameState), "xrWaitFrame"))
 		return false;
+#if LOG_FRAME_METRICS
 	s.waitTime = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - waitStart).count();
+#endif
 
 	XrFrameBeginInfo beginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
 
@@ -1044,7 +1062,9 @@ bool BaseXRHandler::BeginFrame(void)
 			AcquireSwapchainImage(s, s.depth, "xrAcquireSwapchainImage (depth)");
 		AcquireSwapchainImage(s, s.layer, "xrAcquireSwapchainImage (layer)");
 	}
+#if LOG_FRAME_METRICS
 	s.frameStart = std::chrono::steady_clock::now();
+#endif
 	return true;
 }
 
@@ -1077,12 +1097,15 @@ bool BaseXRHandler::EndFrame(void)
 	if (not (m_state and m_state->frameBegun))
 		return false;
 
+#if LOG_FRAME_METRICS
 	static uint32_t	loggedSubmit = 0xFFFFFFFFu;
+#endif
 
 	XRState&	s = *m_state;
 	bool		hasColor = s.color.isAcquired and s.eyesRendered;
 	bool		hasDepth = s.depth.isAcquired and s.depthSubmitted;
 	bool		hasLayer = not xrTestPattern and s.layer.isAcquired and s.layerRendered and s.layerVisible;
+#if LOG_FRAME_METRICS
 	uint32_t	submit =(s.frameState.shouldRender ? 1u : 0u) | (s.color.isAcquired ? 2u : 0u) | (s.eyesRendered ? 4u : 0u) |
 		(s.layer.isAcquired ? 8u : 0u) | (s.layerRendered ? 16u : 0u) | (s.layerVisible ? 32u : 0u) | (hasDepth ? 64u : 0u);
 
@@ -1097,6 +1120,7 @@ bool BaseXRHandler::EndFrame(void)
 		s.metricsTime = s.frameState.predictedDisplayTime;
 		LogPerformanceMetrics();
 	}
+#endif
 	ReleaseSwapchainImage(s, s.color);
 	ReleaseSwapchainImage(s, s.depth);
 	ReleaseSwapchainImage(s, s.layer);
@@ -1782,6 +1806,7 @@ noexcept
 	return m_state->controllers[hand];
 }
 
+#if LOG_FRAME_METRICS
 
 void BaseXRHandler::EnablePerformanceMetrics(bool enable)
 noexcept
@@ -1852,5 +1877,7 @@ noexcept
 	}
 	logHandler.Print("%s\n", line);
 }
+
+#endif
 
 // =================================================================================================

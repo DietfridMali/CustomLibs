@@ -19,10 +19,13 @@
 #include <chrono>
 #include "tracy_wrapper.h"
 #include "loghandler.h"
+#include "log_frame_metrics.h"
 
 // base_displayhandler.cpp - ends the program with a message when the device has been removed.
 extern void HandleDeviceLost(const char* where)
 noexcept;
+
+#if LOG_FRAME_METRICS
 
 static void DxGpuFrameBegin(const CommandList* list, const char* name, ID3D12GraphicsCommandList* gfxList, uint32_t slotIndex)
 noexcept;
@@ -38,6 +41,8 @@ noexcept;
 
 static void DxGpuFrameDestroy(void)
 noexcept;
+
+#endif
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL.Es gibt in dem Sinne keine verschachtelten Render-Tasks.
@@ -112,7 +117,9 @@ void CommandQueue::Destroy(void)
 noexcept
 {
 	WaitIdle();
+#if LOG_FRAME_METRICS
 	DxGpuFrameDestroy();
+#endif
 	cbvAllocator.Destroy();
 	if (m_fenceEvent) {
 		CloseHandle(m_fenceEvent);
@@ -258,7 +265,9 @@ noexcept
 		logHandler.Print("CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
 		return false;
 	}
+#if LOG_FRAME_METRICS
 	DxGpuFrameBegin(this, static_cast<const char*>(m_name), m_gfxListPtr.Get(), frameIndex);
+#endif
 	m_isRecording = true;
 	m_isFlushed = false;
 	m_openSerial = gfxResourceHandler.NextSerial();
@@ -310,7 +319,9 @@ noexcept
 	delete m_gpuZone;
 	m_gpuZone = nullptr;
 #endif
+#if LOG_FRAME_METRICS
 	DxGpuFrameEnd(this, m_gfxListPtr.Get(), uint32_t(commandListHandler.FrameIndex()));
+#endif
 	HRESULT hr = m_gfxListPtr->Close();
 	if (FAILED(hr))
 		logHandler.Print("CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
@@ -909,12 +920,16 @@ noexcept
 		SetFrameIndex(frameIndex);
 	else
 		NextFrame();
+#if LOG_FRAME_METRICS
 	DxGpuFrameAdvance(uint32_t(m_frameIndex));
+#endif
 	{
 		ZoneScopedN("WaitForFrame");
 		m_cmdQueue.WaitForFrame(m_frameIndex);
 	}
+#if LOG_FRAME_METRICS
 	DxGpuFrameResolve(uint32_t(m_frameIndex), m_frameNumber);
+#endif
 	{
 		ZoneScopedN("cbvAllocator::Reset");
 		cbvAllocator.Reset(UINT(m_frameIndex));
@@ -1277,6 +1292,7 @@ noexcept
 	return cl;
 }
 
+#if LOG_FRAME_METRICS
 
 static constexpr uint32_t	kGpuFrameSlotSize = 256;
 static constexpr uint32_t	kGpuFrameCycleMax = kGpuFrameSlotSize / 2;
@@ -1782,11 +1798,15 @@ noexcept
 	}
 }
 
+#endif
+
 
 void GfxStageMark(const char* name)
 noexcept
 {
+#if LOG_FRAME_METRICS
 	DxGpuFrameStage(commandListHandler.CurrentGfxList(), name);
+#endif
 }
 
 

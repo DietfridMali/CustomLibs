@@ -6,6 +6,7 @@
 #include "gfxstates.h"
 #include "shader_loading.h"
 #include "loghandler.h"
+#include "log_frame_metrics.h"
 
 #include <cstdio>
 #include <cstring>
@@ -23,6 +24,8 @@
 void HandleDeviceLost(VkResult res, const char* where)
 noexcept;
 
+#if LOG_FRAME_METRICS
+
 static void VkGpuFrameResolve(VkDevice device, uint32_t slotIndex, uint64_t frameNumber)
 noexcept;
 
@@ -31,6 +34,8 @@ noexcept;
 
 static void VkGpuFrameDestroy(VkDevice device)
 noexcept;
+
+#endif
 
 #if VK_STALL_DIAG
 
@@ -380,7 +385,9 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassDestroy(m_device);
 #endif
+#if LOG_FRAME_METRICS
 	VkGpuFrameDestroy(m_device);
+#endif
 	DestroySyncObjects();
 	m_swapchain = VK_NULL_HANDLE;
 	m_graphicsQueue = VK_NULL_HANDLE;
@@ -419,7 +426,9 @@ noexcept
 	}
 	// The slot's resources hang on its fence alone, so they are reset before the image is acquired -
 	// a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
+#if LOG_FRAME_METRICS
 	VkGpuFrameResolve(m_device, m_frameIndex, m_frameNumber);
+#endif
 #if VK_STALL_DIAG
 	VkGpuPassResolve(m_device, m_frameIndex, m_frameNumber);
 	stallStart = VkStallClock();
@@ -466,7 +475,9 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassAdvance(m_frameIndex);
 #endif
+#if LOG_FRAME_METRICS
 	VkGpuFrameAdvance(m_frameIndex);
+#endif
 }
 
 
@@ -1198,6 +1209,8 @@ noexcept
 
 #endif
 
+#if LOG_FRAME_METRICS
+
 static constexpr uint32_t	kGpuFrameSlotSize = 256;
 static constexpr uint32_t	kGpuFrameCycleMax = kGpuFrameSlotSize / 2;
 static constexpr uint32_t	kGpuFrameStageMax = 128;
@@ -1691,11 +1704,15 @@ noexcept
 	}
 }
 
+#endif
+
 
 void GfxStageMark(const char* name)
 noexcept
 {
+#if LOG_FRAME_METRICS
 	VkGpuFrameStage(commandListHandler.CurrentGfxList(), name);
+#endif
 #if VK_STALL_DIAG
 	++vkStalls.stageMarks;
 	if (vkGpuPassPool == VK_NULL_HANDLE)
@@ -1867,7 +1884,9 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassBegin(this, static_cast<const char*>(m_name), m_cmdBuffers[fi], fi);
 #endif
+#if LOG_FRAME_METRICS
 	VkGpuFrameBegin(this, static_cast<const char*>(m_name), m_cmdBuffers[fi], fi);
+#endif
 	m_isRecording = true;
 	m_isFlushed = false;
 	m_usesBackBuffer = false;
@@ -1915,7 +1934,9 @@ noexcept
 #if VK_STALL_DIAG
 	VkGpuPassEnd(this, m_cmdBuffers[fi], fi);
 #endif
+#if LOG_FRAME_METRICS
 	VkGpuFrameEnd(this, m_cmdBuffers[fi], fi);
+#endif
 	VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
 	if (res != VK_SUCCESS)
 		logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);

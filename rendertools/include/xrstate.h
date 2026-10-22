@@ -41,12 +41,14 @@ struct XRState {
 	XrTime							localChangeTime{ 0 };
 	XrPosef							localChange{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
 	XrPosef							appPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
+#if LOG_FRAME_METRICS
 	uint32_t						frameNumber{ 0 };
 	XrTime							lastDisplayTime{ 0 };
 	float							lastYaw{ 0.0f };
 	int								frameLogCount{ 0 };
 	double							waitTime{ 0.0 };
 	std::chrono::steady_clock::time_point	frameStart{};
+#endif
 	XrEnvironmentBlendMode			blendMode{ XR_ENVIRONMENT_BLEND_MODE_OPAQUE };
 	XrSpace							localSpace{ XR_NULL_HANDLE };
 	XrSpace							viewSpace{ XR_NULL_HANDLE };
@@ -61,10 +63,14 @@ struct XRState {
 	bool							layerInEyes{ false };
 	bool							hasDepthExtension{ false };
 	bool							hasVisibilityMaskExtension{ false };
+#if LOG_FRAME_METRICS
 	bool							hasPerformanceMetricsExtension{ false };
+#endif
 	bool							hasCylinderExtension{ false };
+#if LOG_FRAME_METRICS
 	bool							performanceMetricsEnabled{ false };
 	XrTime							metricsTime{ 0 };
+#endif
 	XRSwapchain						color;
 	XRSwapchain						depth;
 	XRSwapchain						layer;
@@ -90,12 +96,16 @@ struct XRState {
 	XrAction						thumbclickAction{ XR_NULL_HANDLE };
 	XrPath							handPaths[BaseXRHandler::xhCount]{ XR_NULL_PATH, XR_NULL_PATH };
 	BaseXRHandler::ControllerState	controllers[BaseXRHandler::xhCount];
+#if LOG_FRAME_METRICS
 	AutoArray<XrPath>				metricPaths;
+#endif
 
 	PFN_xrGetVisibilityMaskKHR							pfnGetVisibilityMask{ nullptr };
+#if LOG_FRAME_METRICS
 	PFN_xrEnumeratePerformanceMetricsCounterPathsMETA	pfnEnumeratePerformanceMetricsCounterPaths{ nullptr };
 	PFN_xrSetPerformanceMetricsStateMETA				pfnSetPerformanceMetricsState{ nullptr };
 	PFN_xrQueryPerformanceMetricsCounterMETA			pfnQueryPerformanceMetricsCounter{ nullptr };
+#endif
 };
 
 // =================================================================================================
