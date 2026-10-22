@@ -199,10 +199,13 @@ noexcept
 	info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 	// initialDataSize / pInitialData stay zero — could be loaded from disk for warm-start.
 
-	VkResult res = vkCreatePipelineCache(device, &info, nullptr, &m_pipelineCache);
-	if (res != VK_SUCCESS) {
-		logHandler.Print("PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
-		return false;
+	for (int i = 0; i < kMaxRenderViews; ++i) {
+		VkResult res = vkCreatePipelineCache(device, &info, nullptr, &m_pipelineCache[i]);
+		if (res != VK_SUCCESS) {
+			logHandler.Print("PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
+			return false;
+		}
+		m_cacheUsed[i] = false;
 	}
 #if VK_STALL_DIAG
 	VkPhysicalDeviceDriverProperties driver{};
@@ -238,9 +241,11 @@ noexcept
 			if (p != VK_NULL_HANDLE)
 				vkDestroyPipeline(m_device, p, nullptr);
 		}
-		if (m_pipelineCache != VK_NULL_HANDLE) {
-			vkDestroyPipelineCache(m_device, m_pipelineCache, nullptr);
-			m_pipelineCache = VK_NULL_HANDLE;
+		for (VkPipelineCache& cache : m_pipelineCache) {
+			if (cache != VK_NULL_HANDLE) {
+				vkDestroyPipelineCache(m_device, cache, nullptr);
+				cache = VK_NULL_HANDLE;
+			}
 		}
 	}
 	m_pipelines.Reset();
@@ -272,10 +277,10 @@ noexcept
 }
 
 
-static const char* MergeStoredCache(VkDevice device, VkPipelineCache target, const String& shaderFolder, size_t& size)
+static const char* MergeStoredCache(VkDevice device, VkPipelineCache target, int viewCount, size_t& size)
 {
 	std::vector<uint8_t> data;
-	if (not ShaderCache::ReadFile(shaderFolder, String("pipelines.vulkan"), data))
+	if (not ShaderCache::ReadFile(String("pipelines.vulkan"), data, viewCount))
 		return "no file";
 	size = data.size();
 	VkPipelineCacheHeaderVersionOne header{};
@@ -299,51 +304,84 @@ static const char* MergeStoredCache(VkDevice device, VkPipelineCache target, con
 }
 
 
-bool PipelineCache::Load(const String& shaderFolder)
+bool PipelineCache::Load(void)
 {
-	m_folder = shaderFolder;
-	LoadRecords();
+	bool loaded = true;
+
+	for (int viewCount = 1; viewCount <= kMaxRenderViews; ++viewCount) {
+		const int		i = viewCount - 1;
+		const String	shaderFolder = ShaderCache::GetFolder(viewCount);
+
+		LoadRecords(viewCount);
 #if VK_STALL_DIAG
-	char detail[1200];
-	snprintf(detail, sizeof(detail), "'%s'", static_cast<const char*>(shaderFolder));
-	VkStallEvent("shader folder", VkStallClock(), detail);
-	snprintf(detail, sizeof(detail), "pipelinekeys.vulkan: %d records", int(m_records.Length()));
-	VkStallEvent("pipeline cache", VkStallClock(), detail);
+		char detail[1200];
+		snprintf(detail, sizeof(detail), "'%s'", static_cast<const char*>(shaderFolder));
+		VkStallEvent("shader folder", VkStallClock(), detail);
+		snprintf(detail, sizeof(detail), "pipelinekeys.vulkan: %d records", int(m_records[i].Length()));
+		VkStallEvent("pipeline cache", VkStallClock(), detail);
 #endif
-	m_storedCacheMerged = false;
-	if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
-		return false;
-	size_t		size = 0;
-	const char*	failure = MergeStoredCache(m_device, m_pipelineCache, shaderFolder, size);
-	m_storedCacheMerged = (failure == nullptr);
+		m_storedCacheMerged[i] = false;
+		if (shaderFolder.IsEmpty() or (m_pipelineCache[i] == VK_NULL_HANDLE)) {
+			loaded = false;
+			continue;
+		}
+		size_t		size = 0;
+		const char*	failure = MergeStoredCache(m_device, m_pipelineCache[i], viewCount, size);
+		m_storedCacheMerged[i] = (failure == nullptr);
 #if VK_STALL_DIAG
-	if (failure == nullptr)
-		snprintf(detail, sizeof(detail), "pipelines.vulkan: merged, %zu bytes", size);
-	else
-		snprintf(detail, sizeof(detail), "pipelines.vulkan: not used, %s", failure);
-	VkStallEvent("pipeline cache", VkStallClock(), detail);
+		if (failure == nullptr)
+			snprintf(detail, sizeof(detail), "pipelines.vulkan: merged, %zu bytes", size);
+		else
+			snprintf(detail, sizeof(detail), "pipelines.vulkan: not used, %s", failure);
+		VkStallEvent("pipeline cache", VkStallClock(), detail);
 #endif
-	return failure == nullptr;
+		if (failure != nullptr)
+			loaded = false;
+	}
+	return loaded;
 }
 
 
 bool PipelineCache::Save(void)
 {
-	SaveRecords();
-	if (m_folder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
-		return false;
-	size_t size = 0;
-	if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, nullptr) != VK_SUCCESS)
-		return false;
-	if (size == 0)
-		return false;
-	std::vector<uint8_t> data(size, 0);
-	if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, data.data()) != VK_SUCCESS)
-		return false;
-	if (not ShaderCache::WriteFile(m_folder, String("pipelines.vulkan"), data.data(), size))
-		return false;
-	m_storedCacheMerged = true; // what is on disk now is what this process holds
-	return true;
+	bool saved = true;
+
+	for (int viewCount = 1; viewCount <= kMaxRenderViews; ++viewCount) {
+		const int		i = viewCount - 1;
+		const String	shaderFolder = ShaderCache::GetFolder(viewCount);
+
+		SaveRecords(viewCount);
+		if (not m_cacheUsed[i])
+			continue;
+		if (shaderFolder.IsEmpty() or (m_pipelineCache[i] == VK_NULL_HANDLE)) {
+			saved = false;
+			continue;
+		}
+		size_t size = 0;
+		if ((vkGetPipelineCacheData(m_device, m_pipelineCache[i], &size, nullptr) != VK_SUCCESS) or (size == 0)) {
+			saved = false;
+			continue;
+		}
+		std::vector<uint8_t> data(size, 0);
+		if ((vkGetPipelineCacheData(m_device, m_pipelineCache[i], &size, data.data()) != VK_SUCCESS) or
+			not ShaderCache::WriteFile(String("pipelines.vulkan"), data.data(), size, nullptr, viewCount)) {
+			saved = false;
+			continue;
+		}
+		m_storedCacheMerged[i] = true; // what is on disk now is what this process holds
+		m_cacheUsed[i] = false;
+	}
+	return saved;
+}
+
+
+VkPipelineCache PipelineCache::ActiveCache(void)
+noexcept
+{
+	const int i = baseRenderer.ViewCount() - 1;
+
+	m_cacheUsed[i] = true;
+	return m_pipelineCache[i];
 }
 
 
@@ -472,13 +510,18 @@ noexcept
 	record.colorFormatCount = key.colorFormatCount;
 	record.depthFormat = key.depthFormat;
 	record.viewMask = key.viewMask;
-	for (int i = 0; i < m_records.Length(); ++i) {
-		if ((m_recordNames[i] == key.shader->m_name) and (std::memcmp(&m_records[i], &record, sizeof(PipelineRecord)) == 0))
+
+	const int					v = baseRenderer.ViewCount() - 1;
+	AutoArray<String>&			recordNames = m_recordNames[v];
+	AutoArray<PipelineRecord>&	records = m_records[v];
+
+	for (int i = 0; i < records.Length(); ++i) {
+		if ((recordNames[i] == key.shader->m_name) and (std::memcmp(&records[i], &record, sizeof(PipelineRecord)) == 0))
 			return;
 	}
-	m_recordNames.Append(key.shader->m_name);
-	m_records.Append(record);
-	m_recordsDirty = true;
+	recordNames.Append(key.shader->m_name);
+	records.Append(record);
+	m_recordsDirty[v] = true;
 }
 
 
@@ -492,16 +535,21 @@ noexcept
 }
 
 
-bool PipelineCache::LoadRecords(void)
+bool PipelineCache::LoadRecords(int viewCount)
 {
-	m_recordNames.Reset();
-	m_records.Reset();
-	m_recordsDirty = false;
-	if (m_folder.IsEmpty())
+	const int					v = viewCount - 1;
+	const String				shaderFolder = ShaderCache::GetFolder(viewCount);
+	AutoArray<String>&			recordNames = m_recordNames[v];
+	AutoArray<PipelineRecord>&	records = m_records[v];
+
+	recordNames.Reset();
+	records.Reset();
+	m_recordsDirty[v] = false;
+	if (shaderFolder.IsEmpty())
 		return false;
 	std::vector<uint8_t>	payload;
 	uint32_t				tag = 0;
-	if (not ShaderCache::Read(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), payload, tag))
+	if (not ShaderCache::Read(String("pipelinekeys.vulkan"), PipelineRecordFileKey(), payload, tag, viewCount))
 		return false;
 	size_t offset = 0;
 	while (offset + sizeof(uint32_t) <= payload.size()) {
@@ -515,32 +563,37 @@ bool PipelineCache::LoadRecords(void)
 		PipelineRecord record{};
 		std::memcpy(&record, payload.data() + offset, sizeof(PipelineRecord));
 		offset += sizeof(PipelineRecord);
-		m_recordNames.Append(name);
-		m_records.Append(record);
+		recordNames.Append(name);
+		records.Append(record);
 	}
 	return true;
 }
 
 
-bool PipelineCache::SaveRecords(void)
+bool PipelineCache::SaveRecords(int viewCount)
 {
-	if (m_folder.IsEmpty() or not m_recordsDirty)
+	const int							v = viewCount - 1;
+	const String						shaderFolder = ShaderCache::GetFolder(viewCount);
+	const AutoArray<String>&			recordNames = m_recordNames[v];
+	const AutoArray<PipelineRecord>&	records = m_records[v];
+
+	if (shaderFolder.IsEmpty() or not m_recordsDirty[v])
 		return false;
 	std::vector<uint8_t> payload;
-	for (int i = 0; i < m_records.Length(); ++i) {
-		if (m_recordNames[i].IsEmpty())
+	for (int i = 0; i < records.Length(); ++i) {
+		if (recordNames[i].IsEmpty())
 			continue;
-		const char*		name = static_cast<const char*>(m_recordNames[i]);
+		const char*		name = static_cast<const char*>(recordNames[i]);
 		uint32_t		nameLength = uint32_t(std::strlen(name));
 		const uint8_t*	lengthBytes = reinterpret_cast<const uint8_t*>(&nameLength);
 		payload.insert(payload.end(), lengthBytes, lengthBytes + sizeof(nameLength));
 		payload.insert(payload.end(), reinterpret_cast<const uint8_t*>(name), reinterpret_cast<const uint8_t*>(name) + nameLength);
-		const uint8_t* recordBytes = reinterpret_cast<const uint8_t*>(&m_records[i]);
+		const uint8_t* recordBytes = reinterpret_cast<const uint8_t*>(&records[i]);
 		payload.insert(payload.end(), recordBytes, recordBytes + sizeof(PipelineRecord));
 	}
-	if (not ShaderCache::Write(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), 0, payload.data(), payload.size()))
+	if (not ShaderCache::Write(String("pipelinekeys.vulkan"), PipelineRecordFileKey(), 0, payload.data(), payload.size(), viewCount))
 		return false;
-	m_recordsDirty = false;
+	m_recordsDirty[v] = false;
 	return true;
 }
 
@@ -554,32 +607,36 @@ noexcept
 	int		withoutShader = 0;
 	int		failed = 0;
 #endif
+	const int					v = baseRenderer.ViewCount() - 1;
+	AutoArray<String>&			recordNames = m_recordNames[v];
+	AutoArray<PipelineRecord>&	records = m_records[v];
+
 	m_precreating = true;
-	for (int i = 0; i < m_records.Length(); ++i) {
+	for (int i = 0; i < records.Length(); ++i) {
 		if (progress) {
 			m_precreating = false;
-			progress(i, m_records.Length());
+			progress(i, records.Length());
 			m_precreating = true;
 		}
-		Shader* shader = baseShaderHandler.GetShader(m_recordNames[i]);
+		Shader* shader = baseShaderHandler.GetShader(recordNames[i]);
 		if (shader == nullptr) {
 #if VK_STALL_DIAG
 			++withoutShader;
 #endif
 			continue;
 		}
-		if (shader->IsTessellated() and (m_records[i].states.topology != TopologyForPatchControlPoints(shader->m_patchControlPoints))) {
-			m_recordNames[i] = String();
-			m_recordsDirty = true;
+		if (shader->IsTessellated() and (records[i].states.topology != TopologyForPatchControlPoints(shader->m_patchControlPoints))) {
+			recordNames[i] = String();
+			m_recordsDirty[v] = true;
 			continue;
 		}
 		PipelineKey key{};
 		key.shader = shader;
-		key.states = m_records[i].states;
-		std::memcpy(key.colorFormats, m_records[i].colorFormats, sizeof(key.colorFormats));
-		key.colorFormatCount = m_records[i].colorFormatCount;
-		key.depthFormat = m_records[i].depthFormat;
-		key.viewMask = m_records[i].viewMask;
+		key.states = records[i].states;
+		std::memcpy(key.colorFormats, records[i].colorFormats, sizeof(key.colorFormats));
+		key.colorFormatCount = records[i].colorFormatCount;
+		key.depthFormat = records[i].depthFormat;
+		key.viewMask = records[i].viewMask;
 #if VK_STALL_DIAG
 		if (GetOrCreate(key) == VK_NULL_HANDLE)
 			++failed;
@@ -591,7 +648,7 @@ noexcept
 #if VK_STALL_DIAG
 	char detail[128];
 	snprintf(detail, sizeof(detail), "%d records, %d new, %d without shader, %d failed",
-			 int(m_records.Length()), int(m_pipelines.Length()) - pipelineCount, withoutShader, failed);
+			 int(records.Length()), int(m_pipelines.Length()) - pipelineCount, withoutShader, failed);
 	VkStallEvent("pipeline precreate", stallStart, detail);
 #endif
 }
@@ -674,7 +731,7 @@ noexcept
 	info.pDynamicState = &dynamic;
 
 	VkPipeline	library = VK_NULL_HANDLE;
-	VkResult	res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &library);
+	VkResult	res = vkCreateGraphicsPipelines(m_device, ActiveCache(), 1, &info, nullptr, &library);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("PipelineCache::CreateLibrary: %s: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", logHandler.Context(),
 						 (int)res, unsigned(part));
@@ -908,7 +965,7 @@ noexcept
 
 	BuildContext	context(shader, optimize ? "pipeline link, optimized" : "pipeline link, fast");
 	VkPipeline		pipeline = VK_NULL_HANDLE;
-	VkResult		res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
+	VkResult		res = vkCreateGraphicsPipelines(m_device, ActiveCache(), 1, &info, nullptr, &pipeline);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("PipelineCache::LinkPipeline: %s: vkCreateGraphicsPipelines failed (%d)\n", logHandler.Context(), (int)res);
 		return VK_NULL_HANDLE;
@@ -1004,7 +1061,7 @@ noexcept
 
 	BuildContext	context(shader, "monolithic pipeline");
 	VkPipeline		pipeline = VK_NULL_HANDLE;
-	VkResult		res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
+	VkResult		res = vkCreateGraphicsPipelines(m_device, ActiveCache(), 1, &info, nullptr, &pipeline);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("PipelineCache::BuildPipeline: %s: vkCreateGraphicsPipelines failed (%d)\n", logHandler.Context(), (int)res);
 		return VK_NULL_HANDLE;

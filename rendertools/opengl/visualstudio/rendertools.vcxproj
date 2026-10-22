@@ -248,6 +248,7 @@
     <ClCompile Include="..\..\src\rendermatrices.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
+    <ClCompile Include="..\..\src\shadercache.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\lightningnoise.cpp" />
     <ClCompile Include="..\..\src\lightningbolt.cpp" />

@@ -335,6 +335,9 @@
     <ClCompile Include="..\..\src\base_shaderhandler.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\shadercache.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\billboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

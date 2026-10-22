@@ -413,7 +413,7 @@ static constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
 } // namespace
 
 
-bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut, const String& shaderFolder)
+bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut)
 {
 	if ((not hlslCode) or (not *hlslCode))
 		return false;
@@ -439,7 +439,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
 	String error;
 	String source = MultiviewHlslPrelude(baseRenderer.ViewCount()) + String(hlslCode);
 	if (not ShaderCompiler::CompileHlslToSpirv(static_cast<const char*>(source), entryPoint, target, args.data(), uint32_t(args.size()),
-											   spirvOut, error, shaderFolder,
+											   spirvOut, error,
 											   m_name + String(".") + String(target) +
 												   String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
 		logHandler.Print("ComputeShader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
@@ -533,7 +533,7 @@ noexcept
 #if VK_STALL_DIAG
 	VkStallEvent("build", VkStallClock(), logHandler.Context());
 #endif
-	VkResult res = vkCreateComputePipelines(device, pipelineCache.m_pipelineCache, 1, &info, nullptr, &m_pipeline);
+	VkResult res = vkCreateComputePipelines(device, pipelineCache.ActiveCache(), 1, &info, nullptr, &m_pipeline);
 	logHandler.ClearContext();
 	if (res != VK_SUCCESS) {
 		logHandler.Print("ComputeShader '%s': vkCreateComputePipelines failed (%d)\n", (const char*)m_name, (int)res);
@@ -543,7 +543,7 @@ noexcept
 }
 
 
-bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder)
+bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings)
 {
 	if (IsValid())
 		return true;
@@ -557,7 +557,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 		return false;
 	}
 
-	if (not Compile((const char*)csCode, "CSMain", m_csSpirv, shaderFolder))
+	if (not Compile((const char*)csCode, "CSMain", m_csSpirv))
 		return false;
 
 	m_csModule = ShaderCompiler::CreateShaderModule(m_csSpirv);
@@ -592,13 +592,13 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 }
 
 
-bool ComputeShader::Recreate(const String& shaderFolder)
+bool ComputeShader::Recreate(void)
 {
 	String							cs = m_cs;
 	AutoArray<ComputeBindingDesc>	bindings = m_bindings;
 
 	Destroy();
-	return Create(cs, bindings, shaderFolder);
+	return Create(cs, bindings);
 }
 
 

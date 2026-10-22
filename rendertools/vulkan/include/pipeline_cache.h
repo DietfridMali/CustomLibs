@@ -62,9 +62,8 @@ public:
 	using Cache = AVLTree<PipelineKey, VkPipeline>;
 
 	VkDevice		m_device{ VK_NULL_HANDLE };
-	VkPipelineCache	m_pipelineCache{ VK_NULL_HANDLE };
+	VkPipelineCache	m_pipelineCache[kMaxRenderViews]{};
 	Cache			m_cache;
-	String			m_folder;
 
 	// Companion lists kept in lock-step. Used for Destroy iteration and RemoveShader sweep.
 	AutoArray<VkPipeline>	m_pipelines;
@@ -76,10 +75,11 @@ public:
 	AutoArray<OutputLibraryKey>	m_outputLibraryKeys;
 	AutoArray<VkPipeline>		m_outputLibraries;
 
-	AutoArray<String>			m_recordNames;
-	AutoArray<PipelineRecord>	m_records;
-	bool						m_recordsDirty{ false };
-	bool						m_storedCacheMerged{ false }; // pipelines.vulkan was found and taken in by Load ()
+	AutoArray<String>			m_recordNames[kMaxRenderViews];
+	AutoArray<PipelineRecord>	m_records[kMaxRenderViews];
+	bool						m_recordsDirty[kMaxRenderViews]{};
+	bool						m_storedCacheMerged[kMaxRenderViews]{}; // pipelines.vulkan was found and taken in by Load ()
+	bool						m_cacheUsed[kMaxRenderViews]{};
 	bool						m_precreating{ false };
 
 	PipelineCache(void)
@@ -90,15 +90,22 @@ public:
 	void Destroy(void)
 	noexcept;
 
-	bool Load(const String& shaderFolder);
+	bool Load(void);
 	bool Save(void);
 
 	// Whether the files on disk are behind what this process knows: new key records, or no usable
 	// pipelines.vulkan to begin with. What GfxRenderer::PrecreatePipelines () saves on - a save that
 	// only happens at a clean exit never happens for a run that is killed or crashes.
 	inline bool NeedsSave(void) const noexcept {
-		return m_recordsDirty or not m_storedCacheMerged;
+		for (int i = 0; i < kMaxRenderViews; ++i) {
+			if (m_recordsDirty[i] or (m_cacheUsed[i] and not m_storedCacheMerged[i]))
+				return true;
+		}
+		return false;
 	}
+
+	VkPipelineCache ActiveCache(void)
+	noexcept;
 
 	// Cache lookup. On miss, builds the pipeline via vkCreateGraphicsPipelines and inserts it.
 	// Returns VK_NULL_HANDLE on shader/build failure.
@@ -125,9 +132,9 @@ private:
 	void Remember(const PipelineKey& key)
 	noexcept;
 
-	bool LoadRecords(void);
+	bool LoadRecords(int viewCount);
 
-	bool SaveRecords(void);
+	bool SaveRecords(int viewCount);
 
 	int FindPipeline(VkPipeline pipeline) const
 	noexcept;

@@ -382,7 +382,7 @@ noexcept
 void PSO::Remember(const String& shaderName, const RenderStates& states)
 noexcept
 {
-	PipelineRecords& records = GetRecords();
+	PipelineRecords& records = GetRecords(baseRenderer.ViewCount());
 	for (int i = 0; i < records.names.Length(); ++i) {
 		if ((records.names[i] == shaderName) and (records.states[i] == states))
 			return;
@@ -403,9 +403,10 @@ noexcept
 }
 
 
-bool PSO::LoadRecords(const String& shaderFolder)
+bool PSO::LoadRecords(int viewCount)
 {
-	PipelineRecords& records = GetRecords();
+	PipelineRecords&	records = GetRecords(viewCount);
+	const String		shaderFolder = ShaderCache::GetFolder(viewCount);
 	records.names.Reset();
 	records.states.Reset();
 	records.dirty = false;
@@ -413,7 +414,7 @@ bool PSO::LoadRecords(const String& shaderFolder)
 		return false;
 	std::vector<uint8_t>	payload;
 	uint32_t				tag = 0;
-	if (not ShaderCache::Read(shaderFolder, String("pipelinekeys.d3d12"), PipelineRecordFileKey(), payload, tag))
+	if (not ShaderCache::Read(String("pipelinekeys.d3d12"), PipelineRecordFileKey(), payload, tag, viewCount))
 		return false;
 	size_t offset = 0;
 	while (offset + sizeof(uint32_t) <= payload.size()) {
@@ -434,11 +435,11 @@ bool PSO::LoadRecords(const String& shaderFolder)
 }
 
 
-bool PSO::SaveRecords(void)
+bool PSO::SaveRecords(int viewCount)
 {
-	PipelineRecords& records = GetRecords();
-	PipelineLibrary& lib = GetLibrary();
-	if (lib.folder.IsEmpty() or not records.dirty)
+	PipelineRecords&	records = GetRecords(viewCount);
+	const String		shaderFolder = ShaderCache::GetFolder(viewCount);
+	if (shaderFolder.IsEmpty() or not records.dirty)
 		return false;
 	std::vector<uint8_t> payload;
 	for (int i = 0; i < records.names.Length(); ++i) {
@@ -450,7 +451,7 @@ bool PSO::SaveRecords(void)
 		const uint8_t* stateBytes = reinterpret_cast<const uint8_t*>(&records.states[i]);
 		payload.insert(payload.end(), stateBytes, stateBytes + sizeof(RenderStates));
 	}
-	if (not ShaderCache::Write(lib.folder, String("pipelinekeys.d3d12"), PipelineRecordFileKey(), 0, payload.data(), payload.size()))
+	if (not ShaderCache::Write(String("pipelinekeys.d3d12"), PipelineRecordFileKey(), 0, payload.data(), payload.size(), viewCount))
 		return false;
 	records.dirty = false;
 	return true;
@@ -460,7 +461,7 @@ bool PSO::SaveRecords(void)
 void PSO::PrecreatePSOs(void (*progress)(int, int))
 noexcept
 {
-	PipelineRecords& records = GetRecords();
+	PipelineRecords& records = GetRecords(baseRenderer.ViewCount());
 	for (int i = 0; i < records.names.Length(); ++i) {
 		if (progress)
 			progress(i, records.names.Length());
@@ -505,7 +506,7 @@ std::wstring PSO::PipelineName(const String& shaderName, uint64_t key)
 HRESULT PSO::StorePipeline(const std::wstring& name, ID3D12PipelineState* pso)
 noexcept
 {
-	PipelineLibrary&	lib = GetLibrary();
+	PipelineLibrary&	lib = GetLibrary(baseRenderer.ViewCount());
 	HRESULT				hr = lib.library->StorePipeline(name.c_str(), pso);
 	if (SUCCEEDED(hr))
 		lib.dirty = true;
@@ -513,66 +514,86 @@ noexcept
 }
 
 
-bool PSO::LoadPipelineLibrary(const String& shaderFolder)
+bool PSO::LoadPipelineLibrary(void)
 {
-	PipelineLibrary& lib = GetLibrary();
-	lib.library.Reset();
-	lib.data.clear();
-	lib.dirty = false;
-	lib.folder = shaderFolder;
-	LoadRecords(shaderFolder);
-	if (shaderFolder.IsEmpty())
-		return false;
-	ComPtr<ID3D12Device1> device;
-	if (FAILED(dx12Context.Device()->QueryInterface(IID_PPV_ARGS(device.GetAddressOf()))))
-		return false;
-	if (ShaderCache::ReadFile(shaderFolder, String("pipelines.d3d12"), lib.data) and
-		SUCCEEDED(device->CreatePipelineLibrary(lib.data.data(), lib.data.size(), IID_PPV_ARGS(lib.library.GetAddressOf()))))
-		return true;
-	lib.data.clear();
-	return SUCCEEDED(device->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(lib.library.ReleaseAndGetAddressOf())));
+	ComPtr<ID3D12Device1>	device;
+	bool					loaded = SUCCEEDED(dx12Context.Device()->QueryInterface(IID_PPV_ARGS(device.GetAddressOf())));
+
+	for (int viewCount = 1; viewCount <= kMaxRenderViews; ++viewCount) {
+		PipelineLibrary&	lib = GetLibrary(viewCount);
+		const String		shaderFolder = ShaderCache::GetFolder(viewCount);
+
+		lib.library.Reset();
+		lib.data.clear();
+		lib.dirty = false;
+		LoadRecords(viewCount);
+		if (shaderFolder.IsEmpty() or not device) {
+			loaded = false;
+			continue;
+		}
+		if (ShaderCache::ReadFile(String("pipelines.d3d12"), lib.data, viewCount) and
+			SUCCEEDED(device->CreatePipelineLibrary(lib.data.data(), lib.data.size(), IID_PPV_ARGS(lib.library.GetAddressOf()))))
+			continue;
+		lib.data.clear();
+		if (FAILED(device->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(lib.library.ReleaseAndGetAddressOf()))))
+			loaded = false;
+	}
+	return loaded;
 }
 
 
 bool PSO::SavePipelineLibrary(void)
 {
-	SaveRecords();
-	PipelineLibrary& lib = GetLibrary();
-	if (not (lib.library and lib.dirty))
-		return true;
-	size_t					size = lib.library->GetSerializedSize();
-	std::vector<uint8_t>	data(size, 0);
-	if (FAILED(lib.library->Serialize(data.data(), size)))
-		return false;
-	if (not ShaderCache::WriteFile(lib.folder, String("pipelines.d3d12"), data.data(), size))
-		return false;
-	lib.dirty = false;
-	return true;
+	bool saved = true;
+
+	for (int viewCount = 1; viewCount <= kMaxRenderViews; ++viewCount) {
+		PipelineLibrary&	lib = GetLibrary(viewCount);
+		const String		shaderFolder = ShaderCache::GetFolder(viewCount);
+
+		SaveRecords(viewCount);
+		if (not (lib.library and lib.dirty))
+			continue;
+		if (shaderFolder.IsEmpty()) {
+			saved = false;
+			continue;
+		}
+		size_t					size = lib.library->GetSerializedSize();
+		std::vector<uint8_t>	data(size, 0);
+		if (FAILED(lib.library->Serialize(data.data(), size)) or
+			not ShaderCache::WriteFile(String("pipelines.d3d12"), data.data(), size, nullptr, viewCount)) {
+			saved = false;
+			continue;
+		}
+		lib.dirty = false;
+	}
+	return saved;
 }
 
 
 void PSO::DestroyPipelines(void)
 noexcept
 {
-	PipelineLibrary& lib = GetLibrary();
-
 	GetCache(ComparePSOs).Clear();
-	lib.library.Reset();
-	lib.data.clear();
-	lib.dirty = false;
+	for (int viewCount = 1; viewCount <= kMaxRenderViews; ++viewCount) {
+		PipelineLibrary& lib = GetLibrary(viewCount);
+
+		lib.library.Reset();
+		lib.data.clear();
+		lib.dirty = false;
+	}
 }
 
 
 bool PSO::RestorePipelineLibrary(void)
 {
-	return LoadPipelineLibrary(String(GetLibrary().folder));
+	return LoadPipelineLibrary();
 }
 
 
 bool PSO::CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc, const String& shaderName,
 								ID3DBlob* rootSignatureBlob, PSOComPtr& pso)
 {
-	PipelineLibrary&	lib = GetLibrary();
+	PipelineLibrary&	lib = GetLibrary(baseRenderer.ViewCount());
 	BuildContext		context("compute shader '%s': pipeline", shaderName);
 	if (not lib.library)
 		return SUCCEEDED(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(pso.ReleaseAndGetAddressOf())));
@@ -708,7 +729,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader, const RenderStates& states)
 	psoDesc.SampleDesc.Count = 1;
 
 	PSOComPtr			psoComPtr;
-	PipelineLibrary&	lib = GetLibrary();
+	PipelineLibrary&	lib = GetLibrary(baseRenderer.ViewCount());
 	std::wstring		name;
 	BuildContext		context("shader '%s': pipeline state", shader->m_name);
 	if (psoStates.viewCount > 1) {

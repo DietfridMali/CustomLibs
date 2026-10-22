@@ -71,8 +71,16 @@ inline std::filesystem::path FilePath(const String& folder, const String& fileNa
 }
 
 
-inline bool ReadFile(const String& folder, const String& fileName, std::vector<uint8_t>& data)
+void SetFolder(const String& folder);
+
+String GetFolder(int viewCount = 0);
+
+
+inline bool ReadFile(const String& fileName, std::vector<uint8_t>& data, int viewCount = 0)
 {
+	const String folder = GetFolder(viewCount);
+	if (folder.IsEmpty())
+		return false;
 	std::ifstream f(FilePath(folder, fileName), std::ios::binary | std::ios::ate);
 	if (not f)
 		return false;
@@ -86,8 +94,11 @@ inline bool ReadFile(const String& folder, const String& fileName, std::vector<u
 }
 
 
-inline bool WriteFile(const String& folder, const String& fileName, const uint8_t* data, size_t size, const Header* header = nullptr)
+inline bool WriteFile(const String& fileName, const uint8_t* data, size_t size, const Header* header = nullptr, int viewCount = 0)
 {
+	const String folder = GetFolder(viewCount);
+	if (folder.IsEmpty())
+		return false;
 	std::error_code ec;
 	std::filesystem::create_directories(std::filesystem::path(static_cast<const char*>(folder)), ec);
 	std::ofstream f(FilePath(folder, fileName), std::ios::binary | std::ios::trunc);
@@ -100,10 +111,10 @@ inline bool WriteFile(const String& folder, const String& fileName, const uint8_
 }
 
 
-inline bool Read(const String& folder, const String& fileName, uint64_t key, std::vector<uint8_t>& payload, uint32_t& tag)
+inline bool Read(const String& fileName, uint64_t key, std::vector<uint8_t>& payload, uint32_t& tag, int viewCount = 0)
 {
 	std::vector<uint8_t> data;
-	if (not ReadFile(folder, fileName, data))
+	if (not ReadFile(fileName, data, viewCount))
 		return false;
 	if (data.size() <= sizeof(Header))
 		return false;
@@ -117,13 +128,13 @@ inline bool Read(const String& folder, const String& fileName, uint64_t key, std
 }
 
 
-inline bool Write(const String& folder, const String& fileName, uint64_t key, uint32_t tag, const uint8_t* payload, size_t size)
+inline bool Write(const String& fileName, uint64_t key, uint32_t tag, const uint8_t* payload, size_t size, int viewCount = 0)
 {
 	Header header;
 	header.tag = tag;
 	header.key = key;
 	header.size = uint64_t(size);
-	return WriteFile(folder, fileName, payload, size, &header);
+	return WriteFile(fileName, payload, size, &header, viewCount);
 }
 
 }

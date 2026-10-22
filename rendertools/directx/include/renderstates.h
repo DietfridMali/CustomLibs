@@ -146,7 +146,6 @@ class PSO {
 	struct PipelineLibrary {
 		ComPtr<ID3D12PipelineLibrary>	library;
 		std::vector<uint8_t>			data;
-		String							folder;
 		bool							dirty{ false };
 	};
 
@@ -165,18 +164,18 @@ private:
 		return cache;
 	}
 
-	static PipelineLibrary& GetLibrary(void)
+	static PipelineLibrary& GetLibrary(int viewCount)
 	noexcept
 	{
-		static PipelineLibrary library;
-		return library;
+		static PipelineLibrary libraries[kMaxRenderViews];
+		return libraries[viewCount - 1];
 	}
 
-	static PipelineRecords& GetRecords(void)
+	static PipelineRecords& GetRecords(int viewCount)
 	noexcept
 	{
-		static PipelineRecords records;
-		return records;
+		static PipelineRecords records[kMaxRenderViews];
+		return records[viewCount - 1];
 	}
 
 	static int ComparePSOs(void* context, const PSOKey& key1, const PSOKey& key2);
@@ -194,9 +193,9 @@ private:
 	static void Remember(const String& shaderName, const RenderStates& states)
 	noexcept;
 
-	static bool LoadRecords(const String& shaderFolder);
+	static bool LoadRecords(int viewCount);
 
-	static bool SaveRecords(void);
+	static bool SaveRecords(int viewCount);
 
 public:
 	static psoPtr_t GetPSO(Shader* shader)
@@ -205,7 +204,7 @@ public:
 	static void RemovePSOs(Shader* shader)
 	noexcept;
 
-	static bool LoadPipelineLibrary(const String& shaderFolder);
+	static bool LoadPipelineLibrary(void);
 
 	static bool SavePipelineLibrary(void);
 

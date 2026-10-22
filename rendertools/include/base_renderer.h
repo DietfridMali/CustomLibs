@@ -637,7 +637,7 @@ public:
 	noexcept
 	{}
 
-	virtual void LoadPipelineCache(const String& /*shaderFolder*/) {}
+	virtual void LoadPipelineCache(void) {}
 
 	virtual void SavePipelineCache(void) {}
 

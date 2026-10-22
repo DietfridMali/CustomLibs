@@ -42,8 +42,7 @@ const ShaderSource& BlackholeShader();
 
 // -------------------------------------------------------------------------------------------------
 
-BaseShaderCode::BaseShaderCode(const String& shaderFolder)
-	: m_shaderFolder(shaderFolder)
+BaseShaderCode::BaseShaderCode()
 {
 	AutoArray<const ShaderSource*> shaderSource = {
 		&TestShader(),
@@ -149,7 +148,7 @@ void BaseShaderCode::CreateShader(const ShaderSource* source)
 	}
 	if (source->IsCompute()) {
 		ComputeShader* shader = new ComputeShader(source->m_name);
-		if (shader->Create(source->m_cs, source->m_computeBindings, m_shaderFolder))
+		if (shader->Create(source->m_cs, source->m_computeBindings))
 			m_computeShaders[source->m_name] = shader;
 		else {
 			m_computeShaders[source->m_name] = nullptr;
@@ -161,7 +160,7 @@ void BaseShaderCode::CreateShader(const ShaderSource* source)
 	}
 	else {
 		Shader* shader = new Shader(source->m_name);
-		if (shader->Create(source->m_vs, source->m_fs, source->m_gs, source->m_tcs, source->m_tes, m_shaderFolder))
+		if (shader->Create(source->m_vs, source->m_fs, source->m_gs, source->m_tcs, source->m_tes))
 			m_shaders[source->m_name] = shader;
 		else {
 			m_shaders[source->m_name] = nullptr;

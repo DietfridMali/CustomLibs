@@ -229,9 +229,9 @@ bool GfxRenderer::RestartGraphics(const GfxFeatureRequest& request)
 }
 
 
-void GfxRenderer::LoadPipelineCache(const String& shaderFolder)
+void GfxRenderer::LoadPipelineCache(void)
 {
-	PSO::LoadPipelineLibrary(shaderFolder);
+	PSO::LoadPipelineLibrary();
 }
 
 

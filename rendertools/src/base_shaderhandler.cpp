@@ -58,21 +58,21 @@ FloatArray* BaseShaderHandler::ComputeGaussKernel1D(int radius)
 }
 
 
-void BaseShaderHandler::CreateShaders(const String& shaderFolder)
+void BaseShaderHandler::CreateShaders(void)
 {
 	if (m_shaderCode == nullptr) {
-		baseRenderer.LoadPipelineCache(shaderFolder);
-		CreateShaderCode(shaderFolder);
+		baseRenderer.LoadPipelineCache();
+		CreateShaderCode();
 	}
 	m_shaderCode->CreateShaders();
 }
 
 
-void BaseShaderHandler::CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds)
+void BaseShaderHandler::CreateShaders(const AutoArray<String>& shaderIds)
 {
 	if (m_shaderCode == nullptr) {
-		baseRenderer.LoadPipelineCache(shaderFolder);
-		CreateShaderCode(shaderFolder);
+		baseRenderer.LoadPipelineCache();
+		CreateShaderCode();
 	}
 	m_shaderCode->CreateShaders(shaderIds);
 }

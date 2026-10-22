@@ -217,12 +217,11 @@ protected:
 	Dictionary<String, Shader*>			m_shaders;
 	Dictionary<String, ComputeShader*>	m_computeShaders;
 	AutoArray<const ShaderSource*>		m_shaderSources;
-	String								m_shaderFolder;
 
 	void CreateShader(const ShaderSource* source);
 
 public:
-	BaseShaderCode(const String& shaderFolder);
+	BaseShaderCode();
 	~BaseShaderCode() = default;
 
 	void AddShaders(AutoArray<const ShaderSource*>& shaderSource);

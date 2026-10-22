@@ -110,11 +110,11 @@ public:
 		Destroy();
 	}
 
-	bool Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder);
+	bool Compile(const char* hlslCode, const char* entryPoint);
 
-	bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
+	bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings);
 
-	bool Recreate(const String& shaderFolder);
+	bool Recreate(void);
 
 	void Destroy(void)
 	noexcept;

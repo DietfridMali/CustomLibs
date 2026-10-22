@@ -113,7 +113,7 @@ static constexpr const wchar_t*	kOptimizationArg = L"-O3";
 #endif
 
 
-bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder)
+bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint)
 {
 	if ((not hlslCode) or (not *hlslCode))
 		return false;
@@ -150,7 +150,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
 		kOptimizationArg,
 	};
 
-	const bool		useCache = not shaderFolder.IsEmpty();
+	const bool		useCache = not ShaderCache::GetFolder().IsEmpty();
 	const String	fileName = m_name + String(".") + String(target) + String(kOptimizationLevel) + String(".dxil");
 	uint64_t		key = 0;
 	if (useCache) {
@@ -166,7 +166,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
 		}
 		std::vector<uint8_t>	dxil;
 		uint32_t				tag = 0;
-		if (ShaderCache::Read(shaderFolder, fileName, key, dxil, tag) and
+		if (ShaderCache::Read(fileName, key, dxil, tag) and
 			SUCCEEDED(D3DCreateBlob(dxil.size(), m_csBytecode.ReleaseAndGetAddressOf()))) {
 			std::memcpy(m_csBytecode->GetBufferPointer(), dxil.data(), dxil.size());
 			return true;
@@ -208,7 +208,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
 	}
 	std::memcpy(m_csBytecode->GetBufferPointer(), obj->GetBufferPointer(), obj->GetBufferSize());
 	if (useCache)
-		ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(m_csBytecode->GetBufferPointer()),
+		ShaderCache::Write(fileName, key, 0, static_cast<const uint8_t*>(m_csBytecode->GetBufferPointer()),
 						   m_csBytecode->GetBufferSize());
 	return true;
 }
@@ -399,7 +399,7 @@ noexcept
 }
 
 
-bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder)
+bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings)
 {
 	if (IsValid())
 		return true;
@@ -411,7 +411,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 		m_usesAccelStructure = false;
 		return false;
 	}
-	if (not Compile((const char*)csCode, "CSMain", shaderFolder))
+	if (not Compile((const char*)csCode, "CSMain"))
 		return false;
 #if USE_AFTERMATH
 	dx12Context.LogShaderHash(static_cast<const char*>(m_name), "compute", m_csBytecode->GetBufferPointer(), m_csBytecode->GetBufferSize());
@@ -437,13 +437,13 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 }
 
 
-bool ComputeShader::Recreate(const String& shaderFolder)
+bool ComputeShader::Recreate(void)
 {
 	String							cs = m_cs;
 	AutoArray<ComputeBindingDesc>	bindings = m_bindings;
 
 	Destroy();
-	return Create(cs, bindings, shaderFolder);
+	return Create(cs, bindings);
 }
 
 

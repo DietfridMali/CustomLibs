@@ -65,8 +65,7 @@ const ShaderSource& XRDepthCopyShader();
 
 // -------------------------------------------------------------------------------------------------
 
-BaseShaderCode::BaseShaderCode(const String& shaderFolder)
-	: m_shaderFolder(shaderFolder)
+BaseShaderCode::BaseShaderCode()
 {
 	AutoArray<const ShaderSource*> shaderSource = {
 		&TestShader(),
@@ -173,11 +172,11 @@ void BaseShaderCode::CreateShaders(const AutoArray<String>& shaderIds)
 void BaseShaderCode::RecreateShaders(void)
 {
 	for (auto& entry : m_shaders) {
-		if (entry.second and not entry.second->Recreate(m_shaderFolder))
+		if (entry.second and not entry.second->Recreate())
 			logHandler.Print("recreating shader '%s' failed\n", static_cast<const char*>(entry.first));
 	}
 	for (auto& entry : m_computeShaders) {
-		if (entry.second and not entry.second->Recreate(m_shaderFolder))
+		if (entry.second and not entry.second->Recreate())
 			logHandler.Print("recreating compute shader '%s' failed\n", static_cast<const char*>(entry.first));
 	}
 }
@@ -189,7 +188,7 @@ bool BaseShaderCode::RecreateShader(const String& shaderId)
 
 	if (not (shader and *shader))
 		return false;
-	if ((*shader)->Recreate(m_shaderFolder))
+	if ((*shader)->Recreate())
 		return true;
 	logHandler.Print("recreating shader '%s' failed\n", static_cast<const char*>(shaderId));
 	return false;
@@ -201,7 +200,7 @@ bool BaseShaderCode::RecreateShader(int index)
 	for (auto& entry : m_shaders) {
 		if (index-- > 0)
 			continue;
-		if (entry.second and not entry.second->Recreate(m_shaderFolder)) {
+		if (entry.second and not entry.second->Recreate()) {
 			logHandler.Print("recreating shader '%s' failed\n", static_cast<const char*>(entry.first));
 			return false;
 		}
@@ -210,7 +209,7 @@ bool BaseShaderCode::RecreateShader(int index)
 	for (auto& entry : m_computeShaders) {
 		if (index-- > 0)
 			continue;
-		if (entry.second and not entry.second->Recreate(m_shaderFolder)) {
+		if (entry.second and not entry.second->Recreate()) {
 			logHandler.Print("recreating compute shader '%s' failed\n", static_cast<const char*>(entry.first));
 			return false;
 		}
@@ -239,7 +238,7 @@ void BaseShaderCode::CreateShader(const ShaderSource* source)
 	if (source->IsCompute()) {
 		String			cs = prefix + source->m_cs;
 		ComputeShader*	shader = new ComputeShader(source->m_name);
-		if (shader->Create(cs, source->m_computeBindings, m_shaderFolder))
+		if (shader->Create(cs, source->m_computeBindings))
 			m_computeShaders[source->m_name] = shader;
 		else {
 #ifdef _DEBUG
@@ -256,7 +255,7 @@ void BaseShaderCode::CreateShader(const ShaderSource* source)
 	String	tes = source->m_tes.IsEmpty() ? String() : (prefix + source->m_tes);
 	Shader*	shader = new Shader(source->m_name, vs, fs, gs);
 	shader->m_dataLayout = source->m_dataLayout;
-	if (shader->Create(vs, fs, gs, tcs, tes, m_shaderFolder))
+	if (shader->Create(vs, fs, gs, tcs, tes))
 		m_shaders[source->m_name] = shader;
 	else {
 #ifdef _DEBUG

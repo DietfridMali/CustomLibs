@@ -55,7 +55,6 @@ bool CompileHlslToSpirv(const char*				hlslSource,
 						uint32_t				extraArgsCount,
 						std::vector<uint8_t>&	outSpirv,
 						String&					outError,
-						const String&			shaderFolder,
 						const String&			fileName);
 
 bool SupportsRayQuery(void)

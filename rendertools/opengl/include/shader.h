@@ -178,14 +178,13 @@ public:
 	// does not link.
 	GLuint Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle = 0, GLuint tcsHandle = 0, GLuint tesHandle = 0);
 
-	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
-				const String& shaderFolder);
+	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode);
 
 	static uint64_t ProgramKey(std::initializer_list<const char*> sources);
 
-	GLuint LoadProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key);
+	GLuint LoadProgramBinary(const String& fileName, uint64_t key);
 
-	void SaveProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key);
+	void SaveProgramBinary(const String& fileName, uint64_t key);
 
 	inline bool IsTessellated(void) const
 	noexcept

@@ -788,8 +788,7 @@ noexcept
 }
 
 
-bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target,
-					 std::vector<uint8_t>& spirvOut, const String& shaderFolder)
+bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, std::vector<uint8_t>& spirvOut)
 {
 	if ((not hlslCode) or (not *hlslCode))
 		return false;
@@ -820,7 +819,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 	String error;
 	String source = MultiviewHlslPrelude(baseRenderer.ViewCount()) + String(hlslCode);
 	if (not ShaderCompiler::CompileHlslToSpirv(static_cast<const char*>(source), entryPoint, target, args.data(), uint32_t(args.size()),
-											   spirvOut, error, shaderFolder,
+											   spirvOut, error,
 											   m_name + String(".") + String(target) +
 												   String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
 		logHandler.Print("Shader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
@@ -1158,8 +1157,7 @@ noexcept
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode,
-					const String& tesCode, const String& shaderFolder)
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode)
 {
 	if (IsValid())
 		return true;
@@ -1192,18 +1190,18 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 	}
 	const bool multiview = baseRenderer.ViewCount() > 1;
 
-	if (not Compile((const char*)vsCode, "VSMain", multiview ? "vs_6_1" : "vs_6_0", m_vsSpirv, shaderFolder))
+	if (not Compile((const char*)vsCode, "VSMain", multiview ? "vs_6_1" : "vs_6_0", m_vsSpirv))
 		return false;
-	if (not Compile((const char*)fsCode, "PSMain", multiview ? "ps_6_1" : "ps_6_0", m_fsSpirv, shaderFolder))
+	if (not Compile((const char*)fsCode, "PSMain", multiview ? "ps_6_1" : "ps_6_0", m_fsSpirv))
 		return false;
 	if (not gsCode.IsEmpty()) {
-		if (not Compile((const char*)gsCode, "GSMain", multiview ? "gs_6_1" : "gs_6_0", m_gsSpirv, shaderFolder))
+		if (not Compile((const char*)gsCode, "GSMain", multiview ? "gs_6_1" : "gs_6_0", m_gsSpirv))
 			return false;
 	}
 	if (not tcsCode.IsEmpty()) {
-		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", multiview ? "hs_6_1" : "hs_6_0", m_hsSpirv, shaderFolder))
+		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", multiview ? "hs_6_1" : "hs_6_0", m_hsSpirv))
 			return false;
-		if (not Compile(static_cast<const char*>(tesCode), "DSMain", multiview ? "ds_6_1" : "ds_6_0", m_dsSpirv, shaderFolder))
+		if (not Compile(static_cast<const char*>(tesCode), "DSMain", multiview ? "ds_6_1" : "ds_6_0", m_dsSpirv))
 			return false;
 		m_patchControlPoints = ReflectPatchControlPoints(m_hsSpirv);
 		if (m_patchControlPoints == 0) {
@@ -1283,7 +1281,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 }
 
 
-bool Shader::Recreate(const String& shaderFolder)
+bool Shader::Recreate(void)
 {
 	String vs = m_vs;
 	String fs = m_fs;
@@ -1292,7 +1290,7 @@ bool Shader::Recreate(const String& shaderFolder)
 	String tes = m_tes;
 
 	Destroy();
-	return Create(vs, fs, gs, tcs, tes, shaderFolder);
+	return Create(vs, fs, gs, tcs, tes);
 }
 
 

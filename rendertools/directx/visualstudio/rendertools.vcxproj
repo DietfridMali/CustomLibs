@@ -279,6 +279,7 @@
     <ClCompile Include="..\src\acceleration_structure.cpp" />
     <ClCompile Include="..\src\bindless_texture_heap.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
+    <ClCompile Include="..\..\src\shadercache.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\lightningnoise.cpp" />
     <ClCompile Include="..\..\src\lightningbolt.cpp" />

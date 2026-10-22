@@ -77,7 +77,7 @@ public:
 
 	bool RestartGraphics(const GfxFeatureRequest& request);
 
-	virtual void LoadPipelineCache(const String& shaderFolder) override;
+	virtual void LoadPipelineCache(void) override;
 
 	virtual void SavePipelineCache(void) override;
 

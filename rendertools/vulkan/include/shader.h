@@ -318,15 +318,13 @@ public:
 
 	// Compile a single HLSL stage to SPIR-V via DXC. entryPoint: "VSMain" / "PSMain" / "GSMain";
 	// target: "vs_6_0" / "ps_6_0" / "gs_6_0".
-	bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-				 std::vector<uint8_t>& spirvOut, const String& shaderFolder);
+	bool Compile(const char* hlslCode, const char* entryPoint, const char* target, std::vector<uint8_t>& spirvOut);
 
 	// Link: build pipeline layout + descriptor-set layout, build vertex input description from
 	// m_dataLayout, reflect b1 fields. gsCode is optional.
-	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
-				const String& shaderFolder);
+	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode);
 
-	bool Recreate(const String& shaderFolder);
+	bool Recreate(void);
 
 	void Destroy(void)
 	noexcept;

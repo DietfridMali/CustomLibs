@@ -194,11 +194,11 @@ uint64_t Shader::ProgramKey(std::initializer_list<const char*> sources)
 }
 
 
-GLuint Shader::LoadProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key)
+GLuint Shader::LoadProgramBinary(const String& fileName, uint64_t key)
 {
 	std::vector<uint8_t>	binary;
 	uint32_t				format = 0;
-	if (not ShaderCache::Read(shaderFolder, fileName, key, binary, format))
+	if (not ShaderCache::Read(fileName, key, binary, format))
 		return 0;
 	if (not HaveProgramBinaryFormat(GLenum(format)))
 		return 0;
@@ -215,7 +215,7 @@ GLuint Shader::LoadProgramBinary(const String& shaderFolder, const String& fileN
 }
 
 
-void Shader::SaveProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key)
+void Shader::SaveProgramBinary(const String& fileName, uint64_t key)
 {
 	GLint formatCount = 0;
 	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formatCount);
@@ -231,21 +231,20 @@ void Shader::SaveProgramBinary(const String& shaderFolder, const String& fileNam
 	glGetProgramBinary(m_handle, length, &written, &format, binary.data());
 	if (written <= 0)
 		return;
-	ShaderCache::Write(shaderFolder, fileName, key, uint32_t(format), binary.data(), size_t(written));
+	ShaderCache::Write(fileName, key, uint32_t(format), binary.data(), size_t(written));
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode,
-					const String& tesCode, const String& shaderFolder)
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode)
 {
-	const bool		useCache = not shaderFolder.IsEmpty();
+	const bool		useCache = not ShaderCache::GetFolder().IsEmpty();
 	const String	fileName = m_name + String(".glprog");
 	const uint64_t	key = useCache
 		? ProgramKey({ static_cast<const char*>(vsCode), static_cast<const char*>(fsCode), static_cast<const char*>(gsCode),
 					   static_cast<const char*>(tcsCode), static_cast<const char*>(tesCode) })
 		: 0;
 	if (useCache) {
-		m_handle = LoadProgramBinary(shaderFolder, fileName, key);
+		m_handle = LoadProgramBinary(fileName, key);
 		if (m_handle) {
 			m_isTessellated = not tcsCode.IsEmpty();
 			return true;
@@ -259,7 +258,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 	if (m_handle == 0)
 		return false;
 	if (useCache)
-		SaveProgramBinary(shaderFolder, fileName, key);
+		SaveProgramBinary(fileName, key);
 	return true;
 }
 

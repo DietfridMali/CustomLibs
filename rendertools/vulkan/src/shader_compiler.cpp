@@ -87,10 +87,10 @@ noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail)
 noexcept;
 
-static const char* CacheMissReason(const String& shaderFolder, const String& fileName, uint64_t key)
+static const char* CacheMissReason(const String& fileName, uint64_t key)
 {
 	std::vector<uint8_t> data;
-	if (not ShaderCache::ReadFile(shaderFolder, fileName, data))
+	if (not ShaderCache::ReadFile(fileName, data))
 		return "no file";
 	if (data.size() <= sizeof(ShaderCache::Header))
 		return "file too small";
@@ -196,7 +196,6 @@ bool CompileHlslToSpirv(const char*				hlslSource,
 						uint32_t				extraArgsCount,
 						std::vector<uint8_t>&	outSpirv,
 						String&					outError,
-						const String&			shaderFolder,
 						const String&			fileName)
 {
 	outSpirv.clear();
@@ -239,7 +238,7 @@ bool CompileHlslToSpirv(const char*				hlslSource,
 	for (uint32_t i = 0; i < extraArgsCount; ++i)
 		args.push_back(extraArgs[i]);
 
-	const bool	useCache = not shaderFolder.IsEmpty();
+	const bool	useCache = not (fileName.IsEmpty() or ShaderCache::GetFolder().IsEmpty());
 	uint64_t	key = 0;
 #if VK_STALL_DIAG
 	double		stallStart = VkStallClock();
@@ -259,14 +258,14 @@ bool CompileHlslToSpirv(const char*				hlslSource,
 			key = ShaderCache::Hash(key, &minor, sizeof(minor));
 		}
 		uint32_t	tag = 0;
-		const bool	isCached = ShaderCache::Read(shaderFolder, fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0);
+		const bool	isCached = ShaderCache::Read(fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0);
 #if VK_STALL_DIAG
 		if (isCached) {
 			snprintf(detail, sizeof(detail), "%s: from cache, %zu bytes", static_cast<const char*>(fileName), outSpirv.size());
 			VkStallEvent("spirv", VkStallClock(), detail);
 		}
 		else
-			missReason = CacheMissReason(shaderFolder, fileName, key);
+			missReason = CacheMissReason(fileName, key);
 #endif
 		if (isCached)
 			return true;
@@ -310,7 +309,7 @@ bool CompileHlslToSpirv(const char*				hlslSource,
 	outSpirv.assign(src, src + bytes);
 	DeclareRayCullingCapability(outSpirv);
 	[[maybe_unused]] const bool isStored =
-		useCache and ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
+		useCache and ShaderCache::Write(fileName, key, 0, outSpirv.data(), outSpirv.size());
 #if VK_STALL_DIAG
 	if (useCache) {
 		snprintf(detail, sizeof(detail), "%s: compiled (cache: %s), %zu bytes, %s", static_cast<const char*>(fileName),
@@ -345,7 +344,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 )";
 	std::vector<uint8_t>	spirv;
 	String					error;
-	if (CompileHlslToSpirv(probe, "CSMain", "cs_6_5", nullptr, 0, spirv, error, String(""), String("")))
+	if (CompileHlslToSpirv(probe, "CSMain", "cs_6_5", nullptr, 0, spirv, error, String("")))
 		return true;
 	logHandler.Print("ShaderCompiler::SupportsRayQuery: probe failed: %s\n", static_cast<const char*>(error));
 	return false;

@@ -54,14 +54,14 @@ public:
 	}
 
 protected:
-	virtual void CreateShaderCode(const String& shaderFolder) {
-		m_shaderCode = new BaseShaderCode(shaderFolder);
+	virtual void CreateShaderCode(void) {
+		m_shaderCode = new BaseShaderCode();
 	} // allokiert -> nicht noexcept
 
 public:
-	void CreateShaders(const String& shaderFolder);
+	void CreateShaders(void);
 
-	void CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds);
+	void CreateShaders(const AutoArray<String>& shaderIds);
 
 	void RecreateShaders(void);
 

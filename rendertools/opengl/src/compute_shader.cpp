@@ -3,22 +3,23 @@
 #include "texture.h"
 #include "rendertarget.h"
 #include "loghandler.h"
+#include "shadercache.h"
 
 // =================================================================================================
 // OpenGL ComputeShader — see compute_shader.h for the binding model and rationale.
 
 // -------------------------------------------------------------------------------------------------
 
-bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder)
+bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings)
 {
 	m_cs = csCode;
 	m_bindings = bindings;
 
-	const bool		useCache = not shaderFolder.IsEmpty();
+	const bool		useCache = not ShaderCache::GetFolder().IsEmpty();
 	const String	fileName = m_name + String(".glcomp");
 	const uint64_t	key = useCache ? ProgramKey({ static_cast<const char*>(m_cs) }) : 0;
 	if (useCache) {
-		m_handle = LoadProgramBinary(shaderFolder, fileName, key);
+		m_handle = LoadProgramBinary(fileName, key);
 		if (m_handle)
 			return true;
 	}
@@ -51,7 +52,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 	glDeleteShader(csHandle);
 	m_handle = program;
 	if (useCache)
-		SaveProgramBinary(shaderFolder, fileName, key);
+		SaveProgramBinary(fileName, key);
 	return true;
 }
 

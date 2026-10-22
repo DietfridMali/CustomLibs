@@ -312,6 +312,7 @@ bool GfxRenderer::RestartGraphics(const GfxFeatureRequest& request)
 	m_isRestarting = false;
 	if (not bOk)
 		return false;
+	pipelineCache.Load();
 	SetViewCount(xrHandler.HasSession() ? kMaxRenderViews : 1);
 	baseShaderHandler.RecreateShaders();
 	baseDisplayHandler.BeginFrame();
@@ -320,9 +321,9 @@ bool GfxRenderer::RestartGraphics(const GfxFeatureRequest& request)
 }
 
 
-void GfxRenderer::LoadPipelineCache(const String& shaderFolder)
+void GfxRenderer::LoadPipelineCache(void)
 {
-	pipelineCache.Load(shaderFolder);
+	pipelineCache.Load();
 }
 
 

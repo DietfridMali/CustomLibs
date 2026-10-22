@@ -195,8 +195,7 @@ static constexpr const char*	kOptimizationLevel = "-O3";
 static constexpr const wchar_t*	kOptimizationArg = L"-O3";
 #endif
 
-bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut,
-					 const String& shaderFolder)
+bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut)
 {
 	if (not hlslCode or not *hlslCode)
 		return false;
@@ -232,14 +231,14 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 #endif
 	args.push_back(kOptimizationArg);
 
-	const bool		useCache = not shaderFolder.IsEmpty();
+	const bool		useCache = not ShaderCache::GetFolder().IsEmpty();
 	const String	fileName = m_name + String(".") + String(target) + String(kOptimizationLevel) + String(".dxil");
 	uint64_t		key = 0;
 	if (useCache) {
 		key = CompileKey(hlslCode, args);
 		std::vector<uint8_t>	dxil;
 		uint32_t				tag = 0;
-		if (ShaderCache::Read(shaderFolder, fileName, key, dxil, tag) and SUCCEEDED(D3DCreateBlob(dxil.size(), &blobOut))) {
+		if (ShaderCache::Read(fileName, key, dxil, tag) and SUCCEEDED(D3DCreateBlob(dxil.size(), &blobOut))) {
 			std::memcpy(blobOut->GetBufferPointer(), dxil.data(), dxil.size());
 			return true;
 		}
@@ -288,7 +287,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 	}
 	std::memcpy(blobOut->GetBufferPointer(), dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
 	if (useCache)
-		ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()),
+		ShaderCache::Write(fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()),
 						   blobOut->GetBufferSize());
 	return true;
 }
@@ -592,8 +591,7 @@ noexcept
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode,
-					const String& tesCode, const String& shaderFolder)
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode)
 {
 	if (IsValid())
 		return true;
@@ -615,18 +613,18 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 	}
 	const bool multiview = baseRenderer.ViewCount() > 1;
 
-	if (not Compile(static_cast<const char*>(vsCode), "VSMain", multiview ? "vs_6_1" : "vs_6_0", m_vsBlob, shaderFolder))
+	if (not Compile(static_cast<const char*>(vsCode), "VSMain", multiview ? "vs_6_1" : "vs_6_0", m_vsBlob))
 		return false;
-	if (not Compile(static_cast<const char*>(fsCode), "PSMain", multiview ? "ps_6_1" : "ps_6_0", m_psBlob, shaderFolder))
+	if (not Compile(static_cast<const char*>(fsCode), "PSMain", multiview ? "ps_6_1" : "ps_6_0", m_psBlob))
 		return false;
 	if (gsCode.Length() > 0) {
-		if (not Compile(static_cast<const char*>(gsCode), "GSMain", multiview ? "gs_6_1" : "gs_6_0", m_gsBlob, shaderFolder))
+		if (not Compile(static_cast<const char*>(gsCode), "GSMain", multiview ? "gs_6_1" : "gs_6_0", m_gsBlob))
 			return false;
 	}
 	if (not tcsCode.IsEmpty()) {
-		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", multiview ? "hs_6_1" : "hs_6_0", m_hsBlob, shaderFolder))
+		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", multiview ? "hs_6_1" : "hs_6_0", m_hsBlob))
 			return false;
-		if (not Compile(static_cast<const char*>(tesCode), "DSMain", multiview ? "ds_6_1" : "ds_6_0", m_dsBlob, shaderFolder))
+		if (not Compile(static_cast<const char*>(tesCode), "DSMain", multiview ? "ds_6_1" : "ds_6_0", m_dsBlob))
 			return false;
 	}
 	m_vs = vsCode;
@@ -763,7 +761,7 @@ noexcept
 }
 
 
-bool Shader::Recreate(const String& shaderFolder)
+bool Shader::Recreate(void)
 {
 	String vs = m_vs;
 	String fs = m_fs;
@@ -772,7 +770,7 @@ bool Shader::Recreate(const String& shaderFolder)
 	String tes = m_tes;
 
 	Destroy();
-	return Create(vs, fs, gs, tcs, tes, shaderFolder);
+	return Create(vs, fs, gs, tcs, tes);
 }
 
 

@@ -224,15 +224,13 @@ public:
 	// Creation / destruction
 
 	// Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_1"/"ps_5_1"
-	bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-				 ComPtr<ID3DBlob>& blobOut, const String& shaderFolder);
+	bool Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut);
 
 	// Link: build root signature, build input layout from m_dataLayout (or reflection fallback),
 	// reflect b1 fields. gsCode is optional.
-	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
-				const String& shaderFolder);
+	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode);
 
-	bool Recreate(const String& shaderFolder);
+	bool Recreate(void);
 
 	void Destroy(void)
 	noexcept;
