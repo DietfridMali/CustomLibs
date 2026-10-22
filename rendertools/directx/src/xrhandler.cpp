@@ -35,6 +35,20 @@ noexcept
 		(format == DXGI_FORMAT_B8G8R8X8_UNORM_SRGB);
 }
 
+
+static bool DeviceMeetsRequirements(void)
+noexcept
+{
+	ID3D12Device* device = dx12Context.Device();
+
+	if (not (device and dx12Context.HasMultiview()) or (dx12Context.FeatureLevel() < xrD3D12.minFeatureLevel))
+		return false;
+
+	LUID luid = device->GetAdapterLuid();
+
+	return (luid.LowPart == xrD3D12.adapterLuid.LowPart) and (luid.HighPart == xrD3D12.adapterLuid.HighPart);
+}
+
 // =================================================================================================
 
 GfxXRHandler::GfxXRHandler()
@@ -71,6 +85,8 @@ bool GfxXRHandler::LoadGraphics(String& info)
 		return false;
 	xrD3D12.adapterLuid = requirements.adapterLuid;
 	xrD3D12.minFeatureLevel = requirements.minFeatureLevel;
+	if (DeviceMeetsRequirements())
+		SetDeviceCreated();
 
 	char text[64];
 

@@ -146,7 +146,7 @@ public:
 		return false;
 	}
 
-	inline bool ExitRequested(void) const
+	inline bool InstanceLost(void) const
 	noexcept
 	{
 		return false;

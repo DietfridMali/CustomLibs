@@ -33,7 +33,7 @@ struct XRState {
 	XrSession						probeSession{ XR_NULL_HANDLE };
 	XrSessionState					sessionState{ XR_SESSION_STATE_UNKNOWN };
 	bool							isRunning{ false };
-	bool							exitRequested{ false };
+	bool							instanceLost{ false };
 	bool							sessionStopped{ false };
 	bool							recenterPending{ false };
 	float							appliedViewPitch{ 0.0f };

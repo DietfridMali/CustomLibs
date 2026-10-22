@@ -103,7 +103,7 @@ public:
 	double DisplayPeriod(void) const
 	noexcept;
 
-	bool ExitRequested(void) const
+	bool InstanceLost(void) const
 	noexcept;
 
 	int EyeWidth(void) const

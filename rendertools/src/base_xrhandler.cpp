@@ -644,7 +644,6 @@ noexcept
 				}
 				else if ((changed.state == XR_SESSION_STATE_EXITING) or (changed.state == XR_SESSION_STATE_LOSS_PENDING)) {
 					s.isRunning = false;
-					s.exitRequested = true;
 					s.sessionStopped = true;
 				}
 				break;
@@ -653,7 +652,7 @@ noexcept
 			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
 				logHandler.Print("OpenXR: instance loss pending\n");
 				s.isRunning = false;
-				s.exitRequested = true;
+				s.instanceLost = true;
 				s.sessionStopped = true;
 				break;
 
@@ -834,6 +833,7 @@ noexcept
 		xrDestroyInstance(m_state->instance);
 	delete m_state;
 	m_state = nullptr;
+	xrDeviceCreated = false;
 }
 
 
@@ -1281,7 +1281,7 @@ noexcept
 {
 	if (not IsAvailable())
 		return false;
-	if (m_state->exitRequested)
+	if (m_state->instanceLost)
 		return false;
 
 	XrSystemGetInfo	systemInfo{ XR_TYPE_SYSTEM_GET_INFO };
@@ -1307,7 +1307,7 @@ noexcept
 		PollEvents(s);
 		if (s.isRunning)
 			return true;
-		if (s.exitRequested or s.sessionStopped or (std::chrono::steady_clock::now() >= end))
+		if (s.instanceLost or s.sessionStopped or (std::chrono::steady_clock::now() >= end))
 			return false;
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
@@ -1345,7 +1345,7 @@ noexcept
 				ready = true;
 		}
 		else if (event.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)
-			s.exitRequested = true;
+			s.instanceLost = true;
 		event = XrEventDataBuffer{ XR_TYPE_EVENT_DATA_BUFFER };
 	}
 	if (not ready)
@@ -1384,10 +1384,10 @@ noexcept
 }
 
 
-bool BaseXRHandler::ExitRequested(void) const
+bool BaseXRHandler::InstanceLost(void) const
 noexcept
 {
-	return m_state and m_state->exitRequested;
+	return m_state and m_state->instanceLost;
 }
 
 
