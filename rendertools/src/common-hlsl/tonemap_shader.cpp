@@ -26,6 +26,7 @@ const ShaderSource& ToneMapShader()
                 float2 tcOffset;
                 float2 tcScale;
                 int   bDecodeSRGB;
+                float gamma;
             };
             ScreenTexture surface : register(t0);
             SamplerState s0      : register(s0);
@@ -64,6 +65,8 @@ const ShaderSource& ToneMapShader()
                 SET_VIEW_ID
                 float4 sceneColor = surface.Sample(s0, SCREEN_UV(tcOffset + tcScale * i.fragCoord));
                 float3 color = ToneMap(sceneColor.rgb);
+                if (gamma > 0.0)
+                    color = pow(max(color, 0.0), gamma);
                 if (bEncodeSRGB != 0)
                     color = LinearToSRGB(color);
                 else if (bDecodeSRGB != 0)

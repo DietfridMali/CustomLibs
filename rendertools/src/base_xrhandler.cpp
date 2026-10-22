@@ -878,6 +878,13 @@ bool BaseXRHandler::CreateSession(int layerWidth, int layerHeight)
 		return false;
 	}
 
+	char	formatText[512];
+	int		formatLength = snprintf(formatText, sizeof(formatText), "OpenXR: swapchain formats of the runtime:");
+
+	for (int i = 0; (i < formats.Length()) and (formatLength < int(sizeof(formatText))); ++i)
+		formatLength += snprintf(formatText + formatLength, sizeof(formatText) - size_t(formatLength), " %lld", static_cast<long long>(formats[i]));
+	logHandler.Print("%s\n", formatText);
+
 	const int64_t*	colorFormats = nullptr;
 	const int64_t*	depthFormats = nullptr;
 	int				colorFormatCount = 0;
@@ -885,7 +892,7 @@ bool BaseXRHandler::CreateSession(int layerWidth, int layerHeight)
 
 	SwapchainFormats(colorFormats, colorFormatCount, depthFormats, depthFormatCount);
 
-	int64_t colorFormat = SelectFormat(formats, colorFormats, colorFormatCount, true);
+	int64_t colorFormat = SelectFormat(formats, colorFormats, colorFormatCount, false);
 	int64_t depthFormat = SelectFormat(formats, depthFormats, depthFormatCount, false);
 
 	if (colorFormat == 0) {
