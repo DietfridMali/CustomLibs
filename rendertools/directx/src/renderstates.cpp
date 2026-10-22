@@ -428,6 +428,10 @@ bool PSO::LoadRecords(int viewCount)
 		RenderStates states;
 		std::memcpy(&states, payload.data() + offset, sizeof(RenderStates));
 		offset += sizeof(RenderStates);
+		if ((viewCount < 2) and (states.viewCount > 1)) {
+			records.dirty = true;
+			continue;
+		}
 		records.names.Append(name);
 		records.states.Append(states);
 	}

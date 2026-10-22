@@ -563,6 +563,10 @@ bool PipelineCache::LoadRecords(int viewCount)
 		PipelineRecord record{};
 		std::memcpy(&record, payload.data() + offset, sizeof(PipelineRecord));
 		offset += sizeof(PipelineRecord);
+		if ((viewCount < 2) and (record.viewMask != 0)) {
+			m_recordsDirty[v] = true;
+			continue;
+		}
 		recordNames.Append(name);
 		records.Append(record);
 	}

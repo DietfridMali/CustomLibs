@@ -24,7 +24,9 @@ String GetFolder(int viewCount)
 		return String();
 	if (viewCount < 1)
 		viewCount = baseRenderer.ViewCount();
-	return String(FilePath(folder, String((viewCount > 1) ? "stereo" : "mono")).string().c_str());
+	if (viewCount < 2)
+		return folder;
+	return String(FilePath(folder, String("vr")).string().c_str());
 }
 
 }
