@@ -17,6 +17,8 @@ VULKAN_SDK_DIR := $(EXTERNAL_LIBS_DIR)/VulkanSDK
 
 VULKAN_INC_DIR := $(VULKAN_SDK_DIR)/include
 
+OPENXR_INC_DIR := $(EXTERNAL_LIBS_DIR)/OpenXR-SDK/include
+
 # API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
 SRCDIR := ../src
 
@@ -122,6 +124,7 @@ INCDIRS := \
 	$(VULKAN_INC_DIR)/vma \
 	$(VULKAN_INC_DIR)/SPIRV-Reflect \
 	$(EXTERNAL_LIBS_DIR)/DXC/include \
+	$(OPENXR_INC_DIR) \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
 
