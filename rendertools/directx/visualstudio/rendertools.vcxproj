@@ -125,6 +125,7 @@
     <ClInclude Include="..\..\include\base_renderer.h" />
     <ClInclude Include="..\..\include\base_xrhandler.h" />
     <ClInclude Include="..\..\include\xrstate.h" />
+    <ClInclude Include="..\..\include\xrview.h" />
     <ClInclude Include="..\..\include\multiview_hlsl.h" />
     <ClInclude Include="..\include\xrhandler.h" />
     <ClInclude Include="..\..\include\base_shadercode.h" />
@@ -290,6 +291,7 @@
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
     <ClCompile Include="..\..\src\variabletextureatlas.cpp" />
+    <ClCompile Include="..\..\src\xrview.cpp" />
     <ClCompile Include="..\src\texturebuffer.cpp" />
     <ClCompile Include="..\src\texturehandler.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\base_texture_shaders.cpp" />

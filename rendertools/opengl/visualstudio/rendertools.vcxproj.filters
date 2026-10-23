@@ -144,6 +144,9 @@
     <ClInclude Include="..\..\include\variabletextureatlas.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\xrview.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\skylinepacker.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
@@ -343,6 +346,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\variabletextureatlas.cpp">
       <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\xrview.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texture.cpp">
       <Filter>Source Files\Texture</Filter>

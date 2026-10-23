@@ -20,6 +20,7 @@ static uint gViewId = 0;
 #define SCREEN_STORE(xy, view) uint3 ((xy), (view))
 #define SCREEN_DIMENSIONS(tex, w, h) { uint screenLayers; tex.GetDimensions (w, h, screenLayers); }
 #define FRAME_EYE_MATRICES column_major float4x4 mFrameReserved; column_major float4x4 mEyeProjection [VIEW_COUNT]; column_major float4x4 mEyeView [VIEW_COUNT];
+#define EYE_MATRICES column_major float4x4 mEyeProjection [VIEW_COUNT]; column_major float4x4 mEyeView [VIEW_COUNT];
 #define VIEW_PROJECTION mEyeProjection [gViewId]
 #endif
 )");
@@ -38,6 +39,7 @@ static uint gViewId = 0;
 #define SCREEN_STORE(xy, view) uint2 (xy)
 #define SCREEN_DIMENSIONS(tex, w, h) { tex.GetDimensions (w, h); }
 #define FRAME_EYE_MATRICES
+#define EYE_MATRICES
 #define VIEW_PROJECTION mProjection
 #endif
 )");

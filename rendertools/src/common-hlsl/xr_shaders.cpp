@@ -223,6 +223,94 @@ const ShaderSource& XRMirrorShader()
 }
 
 
+static const ShaderDataAttributes VtxAttrs[] = {
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+};
+
+
+const ShaderSource& XRVisibilityMaskShader()
+{
+	static const ShaderSource xrVisibilityMaskShader(
+		"xrVisibilityMask",
+		String(R"(
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; };
+            struct PSInput {
+                float4 pos : SV_Position;
+            };
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
+                PSInput o;
+                o.pos = (uint(i.pos.z + 0.5) == gViewId) ? float4(i.pos.xy, 0.0, 1.0) : float4(2.0, 2.0, 2.0, 1.0);
+                return o;
+            }
+        )"),
+		String(R"(
+            struct PSInput {
+                float4 pos : SV_Position;
+            };
+            void PSMain(PSInput i) {
+            }
+        )"),
+		ShaderDataLayout(VtxAttrs, 1, 0));
+	return xrVisibilityMaskShader;
+}
+
+
+const ShaderSource& XRBackgroundShader()
+{
+	static const ShaderSource xrBackgroundShader(
+		"xrBackground",
+		String(R"(
+            cbuffer ShaderConstants : register(b1) {
+                column_major float4x4 mViewProj [VIEW_COUNT];
+                int    bDecodeSRGB;
+                float3 _pad0;
+                float4 tint;
+            };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+            PSInput VSMain(VSInput i VIEW_ID_PARAM) {
+                SET_VIEW_ID
+                PSInput o;
+                o.pos = mul(mViewProj[gViewId], float4(i.pos, 1.0));
+                o.fragCoord = i.tc;
+                return o;
+            }
+        )"),
+		String(R"(
+            cbuffer ShaderConstants : register(b1) {
+                column_major float4x4 mViewProj [VIEW_COUNT];
+                int    bDecodeSRGB;
+                float3 _pad0;
+                float4 tint;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+
+            float3 SRGBToLinear(float3 c) {
+                c = saturate(c);
+                return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
+            }
+
+            float4 PSMain(PSInput i) : SV_Target {
+                float3 c = saturate(surface.Sample(s0, i.fragCoord).rgb) * tint.rgb;
+                if (bDecodeSRGB != 0)
+                    c = SRGBToLinear(c);
+                return float4(c, 1.0);
+            }
+        )"),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return xrBackgroundShader;
+}
+
+
 const ShaderSource& XRDepthCopyShader()
 {
 	static const ShaderSource xrDepthCopyShader(

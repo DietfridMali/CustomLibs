@@ -203,6 +203,8 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
 
 	if (createTangents and m_tangents.IsDirty())
 		UpdateTangents();
+	else if (forceUpdate and m_tangents.HaveGfxData())
+		UpdateTangentBuffer(true);
 
 	updateBufferGroup(m_floatBuffers, [this](int i, bool f) { UpdateFloatDataBuffer(i, f); });
 	updateBufferGroup(m_offsetBuffers, [this](int i, bool f) { UpdateOffsetBuffer(i, f); });

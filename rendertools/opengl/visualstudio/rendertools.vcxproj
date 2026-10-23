@@ -190,6 +190,7 @@
     <ClInclude Include="..\include\texture.h" />
     <ClInclude Include="..\..\include\textureatlas.h" />
     <ClInclude Include="..\..\include\variabletextureatlas.h" />
+    <ClInclude Include="..\..\include\xrview.h" />
     <ClInclude Include="..\..\include\skylinepacker.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\..\include\texturehandler.h" />
@@ -259,6 +260,7 @@
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
     <ClCompile Include="..\..\src\variabletextureatlas.cpp" />
+    <ClCompile Include="..\..\src\xrview.cpp" />
     <ClCompile Include="..\src\texturebuffer.cpp" />
     <ClCompile Include="..\src\texturehandler.cpp" />
     <ClCompile Include="..\src\base_texture_shaders.cpp" />

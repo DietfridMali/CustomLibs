@@ -170,6 +170,20 @@ bool FontHandler::Open(String fontFolder, String fontName, int fontSize)
 }
 
 
+bool FontHandler::RebuildAtlas(void)
+{
+	if (not (m_isAvailable and m_font and m_atlas.GetRenderTarget()))
+		return false;
+	m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
+	m_glyphDict.Clear();
+	m_maxGlyphSize = GlyphSize();
+	CreateTextures();
+	m_maxGlyphSize.Update();
+	m_isAvailable = BuildAtlas() == int(m_glyphs.Length() + 1);
+	return m_isAvailable;
+}
+
+
 bool FontHandler::SetShaping(bool rightToLeft, String script)
 {
 	if (not m_font)

@@ -263,6 +263,9 @@
     <ClInclude Include="..\..\include\xrstate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\xrview.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\drawbufferhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -532,6 +535,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\base_xrhandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\xrview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\drawbufferhandler.cpp">

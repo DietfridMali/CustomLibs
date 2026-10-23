@@ -536,6 +536,7 @@ const ShaderSource& TintAndBlurShader()
 		"tintAndBlur",
 		Standard2DVS(),
 		String(R"(
+            #define SURFACE_UV(uv) SCREEN_UV(uv)
             cbuffer ShaderConstants : register(b1) {
                 float2 texelSize;
                 int    blurStrength;
@@ -546,7 +547,7 @@ const ShaderSource& TintAndBlurShader()
                 int    invert;
                 float4 tint;
             };
-            Texture2D    surface : register(t0);
+            ScreenTexture surface : register(t0);
             SamplerState s0      : register(s0);
             struct PSInput {
                 float4 pos       : SV_Position;
@@ -557,7 +558,8 @@ const ShaderSource& TintAndBlurShader()
 			GaussBlurFuncs() +
 			TintFuncs() +
 			String(R"(
-            float4 PSMain(PSInput i) : SV_Target {
+            float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+                SET_VIEW_ID
                 float4 texColor = GaussBlur(i.fragCoord, -1, -1);
                 // Rec.601 luma in gamma space
                 float gray = dot(texColor.rgb, float3(0.299, 0.587, 0.114));

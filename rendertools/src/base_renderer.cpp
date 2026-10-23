@@ -13,6 +13,7 @@
 #include "gfxapitype.h"
 #include "shadowmap.h"
 #include "xrhandler.h"
+#include "xrview.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
 
@@ -225,6 +226,18 @@ noexcept
 }
 
 
+void BaseRenderer::RemoveViewProjections(const Matrix4f& projection)
+noexcept
+{
+	for (int i = 0; i < m_viewProjections.Length(); ++i) {
+		if (std::memcmp(m_viewProjections[i].projection.AsArray(), projection.AsArray(), 16 * sizeof(float)) == 0) {
+			m_viewProjections.Discard(i);
+			return;
+		}
+	}
+}
+
+
 const BaseRenderer::ViewProjections* BaseRenderer::FindViewProjections(const Matrix4f& projection) const
 noexcept
 {
@@ -270,7 +283,10 @@ bool BaseRenderer::Start2DScene(void)
 	ZoneScoped;
 	m_frameCounter.Start();
 	ResetDrawBuffers();
-	gfxStates.SetClearColor(m_backgroundColor);
+	if (xrHandler.HasSession())
+		gfxStates.SetClearColor(ColorData::Invisible);
+	else
+		gfxStates.SetClearColor(m_backgroundColor);
 	m_screenIsAvailable = true;
 	ResetTransformation();
 	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
@@ -301,6 +317,34 @@ void BaseRenderer::Draw3DScene(bool flipVertically)
 {
 	ZoneScoped;
 	RenderTarget* source = RenderPostEffect();
+	if (xrView.IsActive()) {
+		if (Stop3DScene()) {
+			RenderTarget* eyes = xrHandler.EyeTarget();
+
+			if (eyes and eyes->Activate({ .clear = false })) {
+				ResetTransformation();
+				Set2DRenderStates();
+
+				Shader* shader = UsePostEffectShader() ? LoadPostEffectShader() : nullptr;
+
+				if (shader) {
+					shader->SetInt("bEncodeSRGB", 0);
+					shader->SetInt("bDecodeSRGB", xrView.DecodeSRGB() ? 1 : 0);
+				}
+				RenderToViewport(source->GetAsTexture({}), ColorData::White, false, UsesOpenGL(), shader);
+				eyes->Deactivate();
+				xrHandler.SetEyesRendered();
+				if (xrHandler.HasDepthLayer() and not xrHandler.DepthSubmitted()) {
+					Texture* depth = GetSceneBuffer()->GetDepthAsTexture();
+
+					if (depth)
+						xrHandler.SubmitDepth(depth, ZNear() / xrView.UnitsPerMeter(), ZFar() / xrView.UnitsPerMeter());
+				}
+			}
+		}
+		Start2DScene();
+		return;
+	}
 	if (Stop3DScene() and Start2DScene()) {
 		Set2DRenderStates();
 		SetViewport(m_sceneViewport, 0, 0, false);

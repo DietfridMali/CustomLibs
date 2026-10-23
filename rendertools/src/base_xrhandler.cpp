@@ -37,6 +37,8 @@ static bool xrTestPattern = false;
 static bool xrPerformanceMetrics = false;
 #endif
 static float xrViewPitch = 0.0f;
+static int xrLayerWidth = 0;
+static int xrLayerHeight = 0;
 
 static const BaseXRHandler::ControllerState kNoController{};
 
@@ -984,6 +986,41 @@ noexcept
 	s.isRunning = false;
 	s.frameBegun = false;
 	s.sessionState = XR_SESSION_STATE_UNKNOWN;
+}
+
+
+void BaseXRHandler::SetLayerSize(int width, int height)
+{
+	xrLayerWidth = width;
+	xrLayerHeight = height;
+	if (not HasSession())
+		return;
+
+	XRState& s = *m_state;
+
+	if (((s.layer.width == LayerWidth()) and (s.layer.height == LayerHeight())) or s.layer.isAcquired or (s.color.format == 0))
+		return;
+	gfxStates.Finish();
+	DestroySwapchain(s.layer);
+	if (not CreateSwapchain(s.layer, s.color.format,
+							XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT,
+							LayerWidth(), LayerHeight(), 1, false, "xr layer buffer"))
+		DestroySwapchain(s.layer);
+	logHandler.Print("OpenXR: hud layer %d x %d\n", s.layer.width, s.layer.height);
+}
+
+
+int BaseXRHandler::LayerWidth(void) const
+noexcept
+{
+	return ((xrLayerWidth > 0) and (xrLayerHeight > 0)) ? xrLayerWidth : EyeWidth();
+}
+
+
+int BaseXRHandler::LayerHeight(void) const
+noexcept
+{
+	return ((xrLayerWidth > 0) and (xrLayerHeight > 0)) ? xrLayerHeight : EyeHeight();
 }
 
 

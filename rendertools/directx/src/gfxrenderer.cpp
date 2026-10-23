@@ -82,7 +82,7 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled()) {
 		if (not HasFeature(GfxFeature::Multiview))
 			logHandler.Print("The graphics device has no view instancing with shader model 6.1 - VR is off.\n");
-		else if (not xrHandler.CreateSession(xrHandler.EyeWidth(), xrHandler.EyeHeight()))
+		else if (not xrHandler.CreateSession(xrHandler.LayerWidth(), xrHandler.LayerHeight()))
 			logHandler.Print("OpenXR session could not be created - VR is off.\n");
 	}
 	return true;

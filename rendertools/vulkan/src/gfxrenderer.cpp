@@ -89,7 +89,7 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request)
 	if (xrHandler.IsAvailable() and xrHandler.SessionEnabled()) {
 		if (not vkContext.HasFeature(GfxFeature::Multiview))
 			logHandler.Print("The graphics device has no multiview with geometry and tessellation shaders - VR is off.\n");
-		else if (not xrHandler.CreateSession(xrHandler.EyeWidth(), xrHandler.EyeHeight()))
+		else if (not xrHandler.CreateSession(xrHandler.LayerWidth(), xrHandler.LayerHeight()))
 			logHandler.Print("OpenXR session could not be created - VR is off.\n");
 	}
 	if (m_isRestarting)

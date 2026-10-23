@@ -312,10 +312,19 @@ noexcept
 }
 
 
-GLint Shader::SetMatrix4fArray(const char*, const float*, int)
+GLint Shader::SetMatrix4fArray(const char* name, const float* data, int count)
 noexcept
 {
-	return -1;
+	if (count < 1)
+		return -1;
+	if (count == 1)
+		return SetMatrix4f(name, data, false);
+
+	GLint location = GetLocation(name);
+
+	if (location >= 0)
+		glUniformMatrix4fv(location, GLsizei(count), GL_FALSE, data);
+	return location;
 }
 
 

@@ -51,6 +51,14 @@ public:
 	void DestroySession(void)
 	noexcept;
 
+	void SetLayerSize(int width, int height);
+
+	int LayerWidth(void) const
+	noexcept;
+
+	int LayerHeight(void) const
+	noexcept;
+
 	bool BeginFrame(void);
 
 	bool EndFrame(void);

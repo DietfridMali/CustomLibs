@@ -283,8 +283,17 @@ public:
 	void ClearViewProjections(void)
 	noexcept;
 
+	void RemoveViewProjections(const Matrix4f& projection)
+	noexcept;
+
 	const ViewProjections* FindViewProjections(const Matrix4f& projection) const
 	noexcept;
+
+	inline bool RendersEyeViews(void) const
+	noexcept
+	{
+		return (m_viewCount > 1) and m_sceneBufferStack.IsEmpty() and (m_activeStack == 0);
+	}
 
 	virtual bool Start3DScene(void);
 

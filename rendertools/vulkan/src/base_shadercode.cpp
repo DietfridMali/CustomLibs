@@ -61,6 +61,8 @@ const ShaderSource& XRLayerMirrorShader();
 const ShaderSource& XRLayerEyesShader();
 const ShaderSource& XRMirrorShader();
 const ShaderSource& XRDepthCopyShader();
+const ShaderSource& XRVisibilityMaskShader();
+const ShaderSource& XRBackgroundShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -120,7 +122,9 @@ BaseShaderCode::BaseShaderCode()
 		&XRLayerMirrorShader(),
 		&XRLayerEyesShader(),
 		&XRMirrorShader(),
-		&XRDepthCopyShader()
+		&XRDepthCopyShader(),
+		&XRVisibilityMaskShader(),
+		&XRBackgroundShader()
 	};
 	AddShaders(shaderSource);
 }

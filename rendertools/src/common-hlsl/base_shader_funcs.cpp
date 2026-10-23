@@ -123,6 +123,9 @@ const String& Offset2DVS()
 const String& GaussBlurFuncs()
 {
 	static const String source(R"(
+#ifndef SURFACE_UV
+#define SURFACE_UV(uv) (uv)
+#endif
         float4 GaussBlur7x7(float2 baseUV, float spread) {
             const int HALF = 3;
             static const int weight[7] = { 1, 6, 15, 20, 15, 6, 1 };
@@ -130,7 +133,7 @@ const String& GaussBlurFuncs()
             for (int j = -HALF; j <= HALF; ++j) {
                 for (int i2 = -HALF; i2 <= HALF; ++i2) {
                     int w = weight[i2+HALF] * weight[j+HALF];
-                    float4 c = surface.Sample(s0, baseUV + float2((float)i2,(float)j)*texelSize*spread);
+                    float4 c = surface.Sample(s0, SURFACE_UV(baseUV + float2((float)i2,(float)j)*texelSize*spread));
                     sumRGB += c.rgb * c.a * (float)w;
                     sumA   += c.a   * (float)w;
                     wSum   += (float)w;
@@ -147,7 +150,7 @@ const String& GaussBlurFuncs()
             for (int j = -HALF; j <= HALF; ++j) {
                 for (int i2 = -HALF; i2 <= HALF; ++i2) {
                     int w = weight[i2+HALF] * weight[j+HALF];
-                    float4 c = surface.Sample(s0, baseUV + float2((float)i2,(float)j)*texelSize*spread);
+                    float4 c = surface.Sample(s0, SURFACE_UV(baseUV + float2((float)i2,(float)j)*texelSize*spread));
                     sumRGB += c.rgb * c.a * (float)w;
                     sumA   += c.a   * (float)w;
                     wSum   += (float)w;
@@ -164,7 +167,7 @@ const String& GaussBlurFuncs()
             for (int j = -HALF; j <= HALF; ++j) {
                 for (int i2 = -HALF; i2 <= HALF; ++i2) {
                     int w = weight[i2+HALF] * weight[j+HALF];
-                    float4 c = surface.Sample(s0, baseUV + float2((float)i2,(float)j)*texelSize*spread);
+                    float4 c = surface.Sample(s0, SURFACE_UV(baseUV + float2((float)i2,(float)j)*texelSize*spread));
                     sumRGB += c.rgb * c.a * (float)w;
                     sumA   += c.a   * (float)w;
                     wSum   += (float)w;
@@ -183,7 +186,7 @@ const String& GaussBlurFuncs()
                 return GaussBlur5x5(baseUV, sp);
             if (s == 1) 
                 return GaussBlur3x3(baseUV, sp);
-            return surface.Sample(s0, baseUV);
+            return surface.Sample(s0, SURFACE_UV(baseUV));
         }
     )");
 	return source;
@@ -421,6 +424,9 @@ const String& EdgeFadeFunc()
 const String& ChromAbFuncs()
 {
 	static const String source(R"(
+#ifndef SURFACE_UV
+#define SURFACE_UV(uv) (uv)
+#endif
         float2 LinearOffset(float2 uv) {
             return uv * (0.6*aberration + 1e-4);
         }
@@ -435,17 +441,17 @@ const String& ChromAbFuncs()
         }
         float3 ChromaticAberration(float2 baseUV, float2 dispUV) {
             float2 off = (offsetType == 1) ? RadialOffset(baseUV) : LinearOffset(dispUV);
-            return float3(surface.Sample(s0,baseUV+off).r,
-                          surface.Sample(s0,baseUV    ).g,
-                          surface.Sample(s0,baseUV-off).b);
+            return float3(surface.Sample(s0,SURFACE_UV(baseUV+off)).r,
+                          surface.Sample(s0,SURFACE_UV(baseUV    )).g,
+                          surface.Sample(s0,SURFACE_UV(baseUV-off)).b);
         }
         float3 ChromaticAberration(float2 baseUV, float2 dispUV, float3 baseColor) {
             if (aberration < 1e-6) return baseColor;
             float2 off = (offsetType == 1) ? RadialOffset(baseUV) : LinearOffset(dispUV);
-            float3 c0  = surface.Sample(s0, baseUV).rgb;
-            return baseColor + float3(surface.Sample(s0,baseUV+off).r - c0.r,
+            float3 c0  = surface.Sample(s0, SURFACE_UV(baseUV)).rgb;
+            return baseColor + float3(surface.Sample(s0,SURFACE_UV(baseUV+off)).r - c0.r,
                                       0.0,
-                                      surface.Sample(s0,baseUV-off).b - c0.b);
+                                      surface.Sample(s0,SURFACE_UV(baseUV-off)).b - c0.b);
         }
     )");
 	return source;

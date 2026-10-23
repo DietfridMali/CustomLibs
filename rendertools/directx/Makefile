@@ -97,7 +97,8 @@ COMMON_FILES := \
  variabletextureatlas \
  textureprocessing \
  tiny_gltf \
- viewport
+ viewport \
+ xrview
 
 INCDIRS := \
 	./include ../include ../src ../../basetools/include \

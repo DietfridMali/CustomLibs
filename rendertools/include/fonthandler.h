@@ -97,6 +97,8 @@ public:
 
 	bool Open(String fontFolder, String fontName, int fontSize);
 
+	bool RebuildAtlas(void);
+
 	bool SetShaping(bool rightToLeft, String script = "");
 
 	Texture* CreateTextTexture(const String& text);

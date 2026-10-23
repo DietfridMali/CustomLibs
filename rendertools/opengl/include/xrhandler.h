@@ -54,6 +54,21 @@ public:
 	noexcept
 	{}
 
+	inline void SetLayerSize(int, int)
+	{}
+
+	inline int LayerWidth(void) const
+	noexcept
+	{
+		return 0;
+	}
+
+	inline int LayerHeight(void) const
+	noexcept
+	{
+		return 0;
+	}
+
 	inline bool BeginFrame(void)
 	{
 		return false;
