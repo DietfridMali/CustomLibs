@@ -107,6 +107,7 @@ COMMON_FILES := \
  projector \
  quad \
  rendermatrices \
+ shadercache \
  shadowmap \
  skybox \
  texteffects \
