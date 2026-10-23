@@ -74,6 +74,7 @@ struct XRState {
 	XRSwapchain						color;
 	XRSwapchain						depth;
 	XRSwapchain						layer;
+	XrRect2Di						layerRect{};
 	float							layerDistance{ 1.0f };
 	float							layerWidth{ 1.0f };
 	bool							layerVisible{ false };

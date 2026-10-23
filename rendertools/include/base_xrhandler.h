@@ -164,7 +164,7 @@ public:
 	bool DepthSubmitted(void) const
 	noexcept;
 
-	bool RenderLayer(Texture* source, bool bRotate, bool bFlipVertically);
+	bool RenderLayer(Texture* source, bool bRotate, bool bFlipVertically, int width = 0, int height = 0);
 
 	void WindowFit(int sourceWidth, int sourceHeight, int& x, int& y, int& width, int& height) const
 	noexcept;
@@ -172,6 +172,10 @@ public:
 	bool RenderMirror(bool bFlipVertically, int view);
 
 	bool RenderLayerMirror(Texture* source, bool bFlipVertically, int view);
+
+	bool RenderImageToEyes(Texture* source, float widthScale, float aspect, bool bFlipVertically);
+
+	bool RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically);
 
 	void SetTestPattern(bool enable)
 	noexcept;
@@ -224,7 +228,12 @@ protected:
 private:
 	bool CreateSwapchain(XRSwapchain& swapchain, int64_t format, uint64_t usage, int width, int height, int layers, bool isDepth, const char* name);
 
+	void SetLayerRect(int width, int height)
+	noexcept;
+
 	bool RenderLayerToEyes(Texture* source, bool bFlipVertically);
+
+	bool RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically);
 };
 
 // =================================================================================================

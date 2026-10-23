@@ -1013,14 +1013,14 @@ void BaseXRHandler::SetLayerSize(int width, int height)
 int BaseXRHandler::LayerWidth(void) const
 noexcept
 {
-	return ((xrLayerWidth > 0) and (xrLayerHeight > 0)) ? xrLayerWidth : EyeWidth();
+	return ((xrLayerWidth > 0) and (xrLayerHeight > 0)) ? std::min(xrLayerWidth, EyeWidth()) : EyeWidth();
 }
 
 
 int BaseXRHandler::LayerHeight(void) const
 noexcept
 {
-	return ((xrLayerWidth > 0) and (xrLayerHeight > 0)) ? xrLayerHeight : EyeHeight();
+	return ((xrLayerWidth > 0) and (xrLayerHeight > 0)) ? int(std::lround(float(LayerWidth()) * float(xrLayerHeight) / float(xrLayerWidth))) : EyeHeight();
 }
 
 
@@ -1202,14 +1202,13 @@ bool BaseXRHandler::EndFrame(void)
 		cylinder.space = s.appSpace;
 		cylinder.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
 		cylinder.subImage.swapchain = s.layer.handle;
-		cylinder.subImage.imageRect.offset = { 0, 0 };
-		cylinder.subImage.imageRect.extent = { s.layer.width, s.layer.height };
+		cylinder.subImage.imageRect = s.layerRect;
 		cylinder.subImage.imageArrayIndex = 0;
 		cylinder.pose = kIdentityPose;
 		cylinder.pose.position.z = s.layerRadius - s.layerDistance;
 		cylinder.radius = s.layerRadius;
 		cylinder.centralAngle = s.layerWidth / s.layerRadius;
-		cylinder.aspectRatio = float(s.layer.width) / float(s.layer.height);
+		cylinder.aspectRatio = float(s.layerRect.extent.width) / float(s.layerRect.extent.height);
 		layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader*>(&cylinder);
 	}
 	else if (s.frameState.shouldRender and hasLayer) {
@@ -1217,13 +1216,12 @@ bool BaseXRHandler::EndFrame(void)
 		quad.space = s.appSpace;
 		quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
 		quad.subImage.swapchain = s.layer.handle;
-		quad.subImage.imageRect.offset = { 0, 0 };
-		quad.subImage.imageRect.extent = { s.layer.width, s.layer.height };
+		quad.subImage.imageRect = s.layerRect;
 		quad.subImage.imageArrayIndex = 0;
 		quad.pose = kIdentityPose;
 		quad.pose.position.z = -s.layerDistance;
 		quad.size.width = s.layerWidth;
-		quad.size.height = s.layerWidth * float(s.layer.height) / float(s.layer.width);
+		quad.size.height = s.layerWidth * float(s.layerRect.extent.height) / float(s.layerRect.extent.width);
 		layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad);
 	}
 
@@ -1629,8 +1627,24 @@ noexcept
 }
 
 
-bool BaseXRHandler::RenderLayer(Texture* source, bool bRotate, bool bFlipVertically)
+void BaseXRHandler::SetLayerRect(int width, int height)
+noexcept
 {
+	XRState& s = *m_state;
+
+	if ((width <= 0) or (height <= 0)) {
+		width = s.layer.width;
+		height = s.layer.height;
+	}
+	s.layerRect.offset = { (s.layer.width - width) / 2, (s.layer.height - height) / 2 };
+	s.layerRect.extent = { width, height };
+}
+
+
+bool BaseXRHandler::RenderLayer(Texture* source, bool bRotate, bool bFlipVertically, int width, int height)
+{
+	if (m_state)
+		SetLayerRect(width, height);
 	if (source and m_state and (m_state->layerFovScale > 1.0f) and m_state->layerVisible and m_state->eyesRendered)
 		return RenderLayerToEyes(source, bFlipVertically);
 
@@ -1644,6 +1658,7 @@ bool BaseXRHandler::RenderLayer(Texture* source, bool bRotate, bool bFlipVertica
 	if (not (shader and target->Activate({ .clear = false })))
 		return false;
 	baseRenderer.Set2DRenderStates();
+	baseRenderer.SetViewport(::Viewport(m_state->layerRect.offset.x, m_state->layerRect.offset.y, m_state->layerRect.extent.width, m_state->layerRect.extent.height));
 	baseRenderer.RenderToViewport(source, ColorData::White, bRotate, bFlipVertically, shader);
 	target->Deactivate();
 	m_state->layerRendered = true;
@@ -1715,7 +1730,7 @@ bool BaseXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int
 		return false;
 
 	XRState&	s = *m_state;
-	float		layerHeight = s.layerWidth * float(s.layer.height) / float(s.layer.width);
+	float		layerHeight = s.layerWidth * float(s.layerRect.extent.height) / float(s.layerRect.extent.width);
 	float		zNear = s.layerDistance * kLayerZNearScale;
 	float		zFar = s.layerDistance * kLayerZFarScale;
 
@@ -1749,10 +1764,46 @@ bool BaseXRHandler::RenderLayerMirror(Texture* source, bool bFlipVertically, int
 
 bool BaseXRHandler::RenderLayerToEyes(Texture* source, bool bFlipVertically)
 {
+	XRState& s = *m_state;
+
+	if (not (s.layer.width > 0))
+		return false;
+	if (not RenderPlaneToEyes(source, s.layerDistance, s.layerWidth, s.layerWidth * float(s.layerRect.extent.height) / float(s.layerRect.extent.width),
+							  s.layerCurved, bFlipVertically))
+		return false;
+	s.layerInEyes = true;
+	return true;
+}
+
+
+bool BaseXRHandler::RenderImageToEyes(Texture* source, float widthScale, float aspect, bool bFlipVertically)
+{
+	if (not (source and m_state and m_state->eyesRendered and (aspect > 0.0f)))
+		return false;
+
+	float width = m_state->layerWidth * widthScale;
+
+	return RenderPlaneToEyes(source, m_state->layerDistance, width, width / aspect, false, bFlipVertically);
+}
+
+
+bool BaseXRHandler::RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically)
+{
+	if (not (source and m_state and m_state->eyesRendered and (distance > 0.0f) and (aspect > 0.0f)))
+		return false;
+
+	float width = m_state->layerWidth * widthScale * distance / m_state->layerDistance;
+
+	return RenderPlaneToEyes(source, distance, width, width / aspect, false, bFlipVertically);
+}
+
+
+bool BaseXRHandler::RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically)
+{
 	XRState&		s = *m_state;
 	RenderTarget*	eyes = EyeTarget();
 
-	if (not (eyes and (s.layerWidth > 0.0f) and (s.layer.width > 0)))
+	if (not (eyes and (width > 0.0f)))
 		return false;
 
 	Shader* shader = baseShaderHandler.SetupRenderShader("xrLayerEyes");
@@ -1760,14 +1811,13 @@ bool BaseXRHandler::RenderLayerToEyes(Texture* source, bool bFlipVertically)
 	if (not (shader and eyes->Activate({ .clear = false })))
 		return false;
 
-	float		layerHeight = s.layerWidth * float(s.layer.height) / float(s.layer.width);
-	float		zNear = s.layerDistance * kLayerZNearScale;
-	float		zFar = s.layerDistance * kLayerZFarScale;
+	float		zNear = distance * kLayerZNearScale;
+	float		zFar = distance * kLayerZFarScale;
 	float		tanScale = s.layerFovScale * zNear;
 	glm::mat4	stretch = glm::scale(glm::mat4(1.0f), glm::vec3(s.layerFovScale, s.layerFovScale, 1.0f));
-	glm::mat4	layerToApp = s.layerCurved ? stretch
-										   : stretch * glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -s.layerDistance)),
-																  glm::vec3(s.layerWidth, layerHeight, 1.0f));
+	glm::mat4	layerToApp = curved ? stretch
+									: stretch * glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -distance)),
+														   glm::vec3(width, height, 1.0f));
 	Matrix4f	layerToClip[kMaxRenderViews];
 
 	for (int i = 0; i < kMaxRenderViews; ++i) {
@@ -1781,15 +1831,15 @@ bool BaseXRHandler::RenderLayerToEyes(Texture* source, bool bFlipVertically)
 	gfxStates.SetBlending(1);
 	gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
 	shader->SetMatrix4fArray("mLayerToClip", layerToClip[0].AsArray(), baseRenderer.ViewCount());
-	if (not s.layerCurved) {
+	if (not curved) {
 		shader->SetFloat("fCentralAngle", 0.0f);
 		baseRenderer.RenderToViewport(source, ColorData::White, false, bFlipVertically, shader);
 	}
 	else {
-		shader->SetFloat("fCentralAngle", s.layerWidth / s.layerRadius);
+		shader->SetFloat("fCentralAngle", width / s.layerRadius);
 		shader->SetFloat("fRadius", s.layerRadius);
-		shader->SetFloat("fCenterDistance", s.layerDistance - s.layerRadius);
-		shader->SetFloat("fLayerHeight", layerHeight);
+		shader->SetFloat("fCenterDistance", distance - s.layerRadius);
+		shader->SetFloat("fLayerHeight", height);
 		shader->SetFloat("fStripWidth", 1.0f / float(kMirrorStrips));
 		for (int i = 0; i < kMirrorStrips; ++i) {
 			shader->SetFloat("fStripStart", float(i) / float(kMirrorStrips));
@@ -1798,7 +1848,6 @@ bool BaseXRHandler::RenderLayerToEyes(Texture* source, bool bFlipVertically)
 	}
 	eyes->Deactivate();
 	baseRenderer.Set2DRenderStates();
-	s.layerInEyes = true;
 	return true;
 }
 

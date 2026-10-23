@@ -269,7 +269,7 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 	bool isXR = xrHandler.IsRunning();
 
 	if (isXR)
-		xrHandler.RenderLayer(m_screenBuffer->GetAsTexture({}), bRotate, bFlipVertically);
+		xrHandler.RenderLayer(ScreenTarget()->GetAsTexture({}), bRotate, bFlipVertically, m_uiBuffer ? m_uiBuffer->GetWidth() : 0, m_uiBuffer ? m_uiBuffer->GetHeight() : 0);
 
 	void* cl = StartOperation("DrawScreen", false);
 
@@ -290,7 +290,7 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 
 	m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
 
-	Texture*	screen = m_screenBuffer->GetAsTexture({});
+	Texture*	screen = ScreenTarget()->GetAsTexture({});
 	bool		isMirrored = false;
 
 	if (isXR and xrHandler.EyesRendered()) {
@@ -309,7 +309,7 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically)
 	}
 	if (not isMirrored) {
 		if (xrHandler.HasSession())
-			xrHandler.WindowFit(m_screenBuffer->GetWidth(), m_screenBuffer->GetHeight(), x, y, w, h);
+			xrHandler.WindowFit(ScreenTarget()->GetWidth(), ScreenTarget()->GetHeight(), x, y, w, h);
 		SetViewport(::Viewport(x, y, w, h), backBufferWidth, backBufferHeight);
 		RenderToViewport(screen, ColorData::White, bRotate, bFlipVertically);
 	}

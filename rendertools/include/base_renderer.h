@@ -52,9 +52,11 @@ public:
 
 protected:
 	RenderTarget*	m_screenBuffer;
+	RenderTarget*	m_uiBuffer{ nullptr };
 	RenderTarget*	m_sceneBuffer;
 	RenderTarget*	m_skyBuffer;
 	Texture			m_renderTexture;
+	int				m_screenId{ 0 };
 
 	bool m_screenIsAvailable;
 
@@ -420,6 +422,25 @@ public:
 		return m_screenBuffer;
 	}
 
+	inline RenderTarget* UIBuffer(void)
+	noexcept
+	{
+		return m_uiBuffer;
+	}
+
+	inline void SetUIBuffer(RenderTarget* uiBuffer)
+	noexcept
+	{
+		m_uiBuffer = uiBuffer;
+		++m_screenId;
+	}
+
+	inline RenderTarget* ScreenTarget(void)
+	noexcept
+	{
+		return m_uiBuffer ? m_uiBuffer : m_screenBuffer;
+	}
+
 	inline int WindowWidth(void)
 	noexcept
 	{
@@ -430,6 +451,27 @@ public:
 	noexcept
 	{
 		return m_windowHeight;
+	}
+
+	inline int ScreenWidth(void)
+	noexcept
+	{
+		return m_uiBuffer ? m_uiBuffer->GetWidth() : m_windowWidth;
+	}
+
+	inline int ScreenHeight(void)
+	noexcept
+	{
+		return m_uiBuffer ? m_uiBuffer->GetHeight() : m_windowHeight;
+	}
+
+	inline bool ScreenHasChanged(int& lastScreen)
+	noexcept
+	{
+		if (lastScreen == m_screenId)
+			return false;
+		lastScreen = m_screenId;
+		return true;
 	}
 
 	inline int SceneWidth(void)

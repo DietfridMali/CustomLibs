@@ -40,9 +40,12 @@ public:
 		srOn = 1
 	};
 
+	static constexpr float	cMinFov = 1.0f;
+	static constexpr float	cMaxFov = 1.5f;
+
 private:
 	float			m_unitsPerMeter{ 1.0f };
-	float			m_fovScale{ 1.0f };
+	float			m_fovScale{ cMaxFov };
 	float			m_fovRamp{ 0.0f };
 	bool			m_applyFovScale{ false };
 	std::chrono::steady_clock::time_point	m_rampTime{};

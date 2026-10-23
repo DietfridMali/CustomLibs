@@ -40,6 +40,7 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
 		m_windowWidth = width;
 	m_sceneHeight =
 		m_windowHeight = height;
+	++m_screenId;
 	m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
 	m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
 	m_fov = fov;
@@ -289,11 +290,11 @@ bool BaseRenderer::Start2DScene(void)
 		gfxStates.SetClearColor(m_backgroundColor);
 	m_screenIsAvailable = true;
 	ResetTransformation();
-	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+	SetViewport(::Viewport(0, 0, ScreenWidth(), ScreenHeight()));
 
 	Set2DRenderStates();
 
-	if (not (m_screenBuffer and m_screenBuffer->Activate({ .clear = true }))) {
+	if (not (ScreenTarget() and ScreenTarget()->Activate({ .clear = true }))) {
 		baseDisplayHandler.EnableBackBuffer();
 		gfxStates.ClearBackBuffer();
 	}
@@ -308,7 +309,7 @@ bool BaseRenderer::Stop2DScene(void)
 	if (not m_screenIsAvailable)
 		return false;
 	ResetDrawBuffers();
-	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+	SetViewport(::Viewport(0, 0, ScreenWidth(), ScreenHeight()));
 	return true;
 }
 
@@ -435,7 +436,7 @@ void BaseRenderer::PopViewport(void)
 		return;
 	::Viewport viewport;
 	m_viewportStack.Pop(viewport);
-	if ((viewport.Width() > WindowWidth()) || (viewport.Height() > WindowHeight()))
+	if ((viewport.Width() > std::max(WindowWidth(), ScreenWidth())) or (viewport.Height() > std::max(WindowHeight(), ScreenHeight())))
 		return;
 	SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
 }

@@ -95,7 +95,7 @@ noexcept
 void XRView::SetFovScale(float fovScale)
 noexcept
 {
-	m_fovScale = std::max(fovScale, 1.0f);
+	m_fovScale = std::max(fovScale, cMinFov);
 }
 
 
