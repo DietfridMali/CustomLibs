@@ -6,6 +6,8 @@
 
 class GpuResource {
 public:
+	virtual ~GpuResource() = default;
+
 	virtual void ReleaseGpu(void) noexcept = 0;
 
 	virtual bool RestoreGpu(void) = 0;
