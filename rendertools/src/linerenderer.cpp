@@ -182,8 +182,12 @@ void LineRenderer::SetupQuad(void)
 		return;
 	m_quadReady = true;
 	m_quad.Setup(
-		{ Vector3f(-0.5f, -0.5f, 0.0f), Vector3f(0.5f, -0.5f, 0.0f), Vector3f(0.5f, 0.5f, 0.0f), Vector3f(-0.5f, 0.5f, 0.0f) },
-		{ TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } });
+		{ Vector3f(-0.5f, -0.5f, 0.0f), Vector3f(0.5f, -0.5f, 0.0f), Vector3f(0.5f, 0.5f, 0.0f), Vector3f(-0.5f, 0.5f, 0.0f),
+		  Vector3f(-0.5f, -0.5f, 0.0f), Vector3f(-0.5f, -0.5f, 0.0f), Vector3f(-0.5f, 0.5f, 0.0f), Vector3f(-0.5f, 0.5f, 0.0f),
+		  Vector3f(0.5f, -0.5f, 0.0f), Vector3f(0.5f, -0.5f, 0.0f), Vector3f(0.5f, 0.5f, 0.0f), Vector3f(0.5f, 0.5f, 0.0f) },
+		{ TexCoord{ 1, 0 }, TexCoord{ 2, 0 }, TexCoord{ 2, 1 }, TexCoord{ 1, 1 },
+		  TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 },
+		  TexCoord{ 2, 0 }, TexCoord{ 3, 0 }, TexCoord{ 3, 1 }, TexCoord{ 2, 1 } });
 }
 
 

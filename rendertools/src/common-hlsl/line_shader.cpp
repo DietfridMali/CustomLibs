@@ -92,7 +92,8 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float3 perp = cross(axis, toEye);
     float perpLen = length(perp);
     // a line seen exactly end on has no unique across direction - any perpendicular will do
-    perp = (perpLen > 1e-4) ? perp / perpLen : normalize(cross(axis, float3(0.0, 0.0, 1.0)));
+    perp = (perpLen > 1e-4) ? perp / perpLen : normalize(cross(toEye, (abs(toEye.x) < 0.9) ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0)));
+    float3 side = cross(toEye, perp);
 
     // Pixels one view unit covers on screen, ACROSS the line and ALONG it: the projection's derivative
     // along perp and along axis at the line's middle, exact at that depth for a perspective projection
@@ -105,14 +106,15 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float4 cMid = mul(mClip, float4(0.5 * (vp0 + vp1), 1.0));
     float4 cPerp = mul(mClip, float4(perp, 0.0));
     float4 cAxis = mul(mClip, float4(axis, 0.0));
+    float4 cSide = mul(mClip, float4(side, 0.0));
     float wMid = (abs(cMid.w) > 1e-6) ? cMid.w : 1e-6;
     float2 pxScale = 0.5 / texelSize;
     float2 dPerpNdc = (cPerp.xy - (cMid.xy / wMid) * cPerp.w) / wMid;   // d(ndc) / d(perp)
     float2 dAxisNdc = (cAxis.xy - (cMid.xy / wMid) * cAxis.w) / wMid;   // d(ndc) / d(axis)
+    float2 dSideNdc = (cSide.xy - (cMid.xy / wMid) * cSide.w) / wMid;   // d(ndc) / d(side)
     float pxAcross = max(length(dPerpNdc * pxScale), 1e-6);
-    // a line seen nearly end on has no projected length: the along scale is kept above a fraction of
-    // the across scale, so the cap's extension in view units stays bounded
-    float pxAlong = max(length(dAxisNdc * pxScale), 0.05 * pxAcross);
+    float pxAlong = length(dAxisNdc * pxScale);
+    float pxSide = max(length(dSideNdc * pxScale), 1e-6);
     float halfWidth = max(0.5 * l.width, 1e-3);   // pixels
     if (worldWidth > 0.0)
         halfWidth = max(min(halfWidth, 0.5 * worldWidth * pxAcross), minWorldHalfWidth);
@@ -127,15 +129,16 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float endValue = ((caps & 8) != 0) ? clamp(l.pad.z * slopeScale, -8.0, 8.0) : l.pad.z;
     float startReach = ((caps & 4) != 0) ? max(halfDraw, halfWidth * abs(startValue) + 1.0) : ((caps & 1) != 0) ? max(halfDraw, startValue + 1.0) : halfDraw;
     float endReach = ((caps & 8) != 0) ? max(halfDraw, halfWidth * abs(endValue) + 1.0) : ((caps & 2) != 0) ? max(halfDraw, endValue + 1.0) : halfDraw;
-    float capStart = startReach / pxAlong;
-    float capEnd = endReach / pxAlong;
-    float along  = (v.pos.x + 0.5) * (segLen + capStart + capEnd) - capStart;
+    int column = int(v.tc.x + 0.5);
+    float segPx = segLen * pxAlong;
+    float along = (column == 0) ? -startReach : (column == 1) ? 0.0 : (column == 2) ? segPx : segPx + endReach;
     float across = v.pos.y * 2.0 * halfDraw / pxAcross;
-    float3 node = vp0 + axis * along + perp * across;
+    float3 node = (column == 0) ? vp0 - side * (startReach / pxSide) : (column == 1) ? vp0 : (column == 2) ? vp1 : vp1 + side * (endReach / pxSide);
+    node += perp * across;
 
     PSInput o;
     o.pos = mul(mViewport, mul(VIEW_PROJECTION, float4(node, 1.0)));
-    o.cap = float4(along * pxAlong, across * pxAcross, segLen * pxAlong, halfWidth);
+    o.cap = float4(along, across * pxAcross, segPx, halfWidth);
     o.color = l.color;
     o.pattern = float4(l.style, l.phase * pxAlong, l.pad.x, 0.0);
     o.ends = float2(startValue, endValue);
