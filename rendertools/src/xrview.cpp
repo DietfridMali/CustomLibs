@@ -19,7 +19,6 @@
 // =================================================================================================
 
 static constexpr float	kFovRampTime = 0.2f;
-static constexpr float	kFovHeadDeadzone = 7.5f;
 static constexpr float	kBackgroundScale = 1.1f;
 static constexpr float	kBackgroundMaxHeight = 160.0f;
 static constexpr float	kBackgroundRadius = 10.0f;
@@ -31,6 +30,8 @@ static constexpr float	kMaskZNear = 0.1f;
 static constexpr float	kMaskZFar = 100.0f;
 static constexpr int	kPollInterval = 3000;
 static constexpr int	kSwitchSlice = 33;
+
+static float	xrFovHeadDeadzone = 0.0f;
 
 // =================================================================================================
 
@@ -92,6 +93,14 @@ noexcept
 }
 
 
+void XRView::SetViewPitch(float degrees)
+noexcept
+{
+	m_viewPitch = degrees;
+	xrHandler.SetViewPitch(degrees);
+}
+
+
 void XRView::SetFovScale(float fovScale)
 noexcept
 {
@@ -112,7 +121,8 @@ noexcept
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	float step = m_hasRampTime ? std::chrono::duration<float>(now - m_rampTime).count() / kFovRampTime : 0.0f;
 	Matrix4f head = xrHandler.HeadOrientation();
-	bool isHeadForward = (head.m[2][2] > 0.0f) and (std::fabs(head.m[2][0]) <= std::sin(Conversions::DegToRad(kFovHeadDeadzone)));
+	bool isHeadForward = (xrFovHeadDeadzone == 0.0f) or
+						 ((head.m[2][2] > 0.0f) and (std::fabs(head.m[2][0]) <= std::sin(Conversions::DegToRad(xrFovHeadDeadzone))));
 
 	m_rampTime = now;
 	m_hasRampTime = true;
@@ -124,12 +134,25 @@ noexcept
 
 // =================================================================================================
 
+Matrix4f XRView::ViewPitchShear(void) const
+noexcept
+{
+	float		slope = std::tan(Conversions::DegToRad(m_viewPitch));
+	Matrix4f	shear{ 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, -slope, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+
+	return Matrix4f::Rotation(-m_viewPitch, 1.0f, 0.0f, 0.0f) * shear;
+}
+
+
 Matrix4f XRView::SetupEyeProjections(float zNear, float zFar)
 noexcept
 {
 	Projector	projector{ 1.0f, 45.0f, zNear, zFar };
 	Matrix4f	eyeProjections[kMaxRenderViews];
 	float		fovScale = FovScale();
+	Matrix4f	headFromBase = xrHandler.HeadOrientation().Transpose();
+	Matrix4f	baseMap = ViewPitchShear() * Matrix4f::Scaling(1.0f / fovScale, 1.0f / fovScale, 1.0f);
+	Matrix4f	eyeScale = Matrix4f::Scaling(fovScale, fovScale, 1.0f);
 	float		tanX = 0.0f;
 	float		tanY = 0.0f;
 
@@ -146,10 +169,18 @@ noexcept
 		d *= fovScale;
 		m_eyeView[i] = xrHandler.EyeFromHead(i);
 		m_eyeView[i].m[3] = glm::vec4(glm::vec3(m_eyeView[i].m[3]) * m_unitsPerMeter, 1.0f);
-		m_eyeProjection[i] = projector.ComputeFrustum(l * zNear, r * zNear, d * zNear, u * zNear);
+
+		Matrix4f eyeFromBase = m_eyeView[i];
+
+		eyeFromBase.m[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		eyeFromBase = eyeFromBase * headFromBase;
+
+		Matrix4f eyeMap = eyeScale * eyeFromBase * baseMap * eyeFromBase.Transpose();
+
+		m_eyeProjection[i] = projector.ComputeFrustum(l * zNear, r * zNear, d * zNear, u * zNear) * eyeMap;
 		eyeProjections[i] = m_eyeProjection[i] * m_eyeView[i];
 
-		Matrix4f headFromEye = m_eyeView[i].Inverse();
+		Matrix4f headFromEye = (eyeMap * m_eyeView[i]).Inverse();
 
 		for (int c = 0; c < 8; ++c) {
 			float		z = (c & 4) ? zFar : zNear;

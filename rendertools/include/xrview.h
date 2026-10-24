@@ -45,6 +45,7 @@ public:
 
 private:
 	float			m_unitsPerMeter{ 1.0f };
+	float			m_viewPitch{ 0.0f };
 	float			m_fovScale{ cMaxFov };
 	float			m_fovRamp{ 0.0f };
 	bool			m_applyFovScale{ false };
@@ -97,6 +98,9 @@ public:
 	{
 		return m_unitsPerMeter;
 	}
+
+	void SetViewPitch(float degrees)
+	noexcept;
 
 	void SetFovScale(float fovScale)
 	noexcept;
@@ -183,6 +187,9 @@ public:
 	}
 
 private:
+	Matrix4f ViewPitchShear(void) const
+	noexcept;
+
 	bool BuildVisibilityMask(void);
 
 	bool BuildBackground(float aspect);
