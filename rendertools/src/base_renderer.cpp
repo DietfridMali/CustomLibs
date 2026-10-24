@@ -197,25 +197,29 @@ noexcept
 
 // =================================================================================================
 
+static constexpr int kMaxViewProjections = 8;
+
 void BaseRenderer::SetViewProjections(const Matrix4f& projection, const Matrix4f* eyeProjections, const Matrix4f* eyeViews)
 noexcept
 {
-	ViewProjections* views = nullptr;
-
 	for (int i = 0; i < m_viewProjections.Length(); ++i) {
 		if (std::memcmp(m_viewProjections[i].projection.AsArray(), projection.AsArray(), 16 * sizeof(float)) == 0) {
-			views = &m_viewProjections[i];
+			m_viewProjections.Discard(i);
 			break;
 		}
 	}
-	if (views == nullptr) {
-		if (not (views = m_viewProjections.Append()))
-			return;
-		views->projection = projection;
-	}
+	if (m_viewProjections.Length() >= kMaxViewProjections)
+		m_viewProjections.Discard(0);
+
+	ViewProjections* views = m_viewProjections.Append();
+
+	if (not views)
+		return;
+	views->projection = projection;
 	for (int i = 0; i < kMaxRenderViews; ++i) {
 		views->eyeProjection[i] = eyeProjections[i];
 		views->eyeView[i] = eyeViews[i];
+		views->headFromEye[i] = eyeViews[i].Inverse();
 	}
 }
 

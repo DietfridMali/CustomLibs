@@ -46,7 +46,7 @@
 class Texture;
 
 // -------------------------------------------------------------------------------------------------
-// FrameConstants — layout of the b0 constant buffer (512 bytes, register b0 / set 0 binding 0)
+// FrameConstants — layout of the b0 constant buffer (640 bytes, register b0 / set 0 binding 0)
 
 #pragma pack(push, 4)
 struct FrameConstants {
@@ -56,8 +56,9 @@ struct FrameConstants {
 	float mLightTransform[16]{};
 	float mEyeProjection[kMaxRenderViews][16]{};
 	float mEyeView[kMaxRenderViews][16]{};
+	float mHeadFromEye[kMaxRenderViews][16]{};
 };
-static_assert(sizeof(FrameConstants) == 512, "FrameConstants must be 512 bytes");
+static_assert(sizeof(FrameConstants) == 640, "FrameConstants must be 640 bytes");
 #pragma pack(pop)
 
 inline constexpr uint32_t kMonoFrameConstantsSize = 256;

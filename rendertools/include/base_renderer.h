@@ -48,6 +48,7 @@ public:
 		Matrix4f	projection;
 		Matrix4f	eyeProjection[kMaxRenderViews];
 		Matrix4f	eyeView[kMaxRenderViews];
+		Matrix4f	headFromEye[kMaxRenderViews];
 	};
 
 protected:

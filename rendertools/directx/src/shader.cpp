@@ -1022,6 +1022,7 @@ bool Shader::UpdateMatrices(void)
 			std::memcpy(m_b0Staging.mEyeProjection[i], views ? views->eyeProjection[i].AsArray() : baseRenderer.Projection().AsArray(),
 						16 * sizeof(float));
 			std::memcpy(m_b0Staging.mEyeView[i], views ? views->eyeView[i].AsArray() : Matrix4f::IDENTITY.AsArray(), 16 * sizeof(float));
+			std::memcpy(m_b0Staging.mHeadFromEye[i], views ? views->headFromEye[i].AsArray() : Matrix4f::IDENTITY.AsArray(), 16 * sizeof(float));
 		}
 	}
 	return true;
