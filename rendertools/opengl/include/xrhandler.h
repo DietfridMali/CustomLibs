@@ -167,6 +167,12 @@ public:
 		return false;
 	}
 
+	inline bool RuntimeMissing(void) const
+	noexcept
+	{
+		return false;
+	}
+
 	inline int EyeWidth(void) const
 	noexcept
 	{

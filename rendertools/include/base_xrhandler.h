@@ -114,6 +114,9 @@ public:
 	bool InstanceLost(void) const
 	noexcept;
 
+	bool RuntimeMissing(void) const
+	noexcept;
+
 	int EyeWidth(void) const
 	noexcept;
 

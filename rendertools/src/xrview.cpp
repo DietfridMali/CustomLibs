@@ -512,6 +512,8 @@ int XRView::PollHeadset(void)
 		m_suspended = true;
 		return srOff;
 	}
+	if (xrHandler.RuntimeMissing())
+		return srNone;
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 

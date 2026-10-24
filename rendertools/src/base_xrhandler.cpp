@@ -32,6 +32,7 @@ static const XrPosef kIdentityPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.
 
 static bool xrSessionEnabled = true;
 static bool xrDeviceCreated = false;
+static bool xrRuntimeMissing = false;
 static bool xrTestPattern = false;
 #if LOG_FRAME_METRICS
 static bool xrPerformanceMetrics = false;
@@ -696,8 +697,10 @@ bool BaseXRHandler::Create(const char* appName)
 
 	XRState&	s = *m_state;
 	uint32_t	extensionCount = 0;
+	XrResult	result = xrEnumerateInstanceExtensionProperties(nullptr, 0, &extensionCount, nullptr);
 
-	if (XR_FAILED(xrEnumerateInstanceExtensionProperties(nullptr, 0, &extensionCount, nullptr))) {
+	xrRuntimeMissing = (result == XR_ERROR_RUNTIME_UNAVAILABLE);
+	if (XR_FAILED(result)) {
 		logHandler.Print("OpenXR: no runtime found\n");
 		return false;
 	}
@@ -1423,6 +1426,13 @@ bool BaseXRHandler::InstanceLost(void) const
 noexcept
 {
 	return m_state and m_state->instanceLost;
+}
+
+
+bool BaseXRHandler::RuntimeMissing(void) const
+noexcept
+{
+	return xrRuntimeMissing;
 }
 
 
