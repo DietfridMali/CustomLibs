@@ -32,8 +32,7 @@ inline size_t ToSizeT(std::string_view s)
 	auto	res = std::from_chars(s.data(), s.data() + s.size(), value);
 	if (res.ec != std::errc())
 		throw std::invalid_argument("Invalid size_t");
-	return value;
-}
+	return value;}
 
 inline float ToFloat(std::string_view s)
 {
@@ -47,7 +46,7 @@ inline float ToFloat(std::string_view s)
 
 inline uint16_t ToUInt16(std::string_view s)
 {
-	unsigned long val = ToSizeT(s);
+	size_t val = ToSizeT(s);
 	if (val > (std::numeric_limits<uint16_t>::max)())
 		throw std::out_of_range("Value exceeds uint16_t");
 	return static_cast<uint16_t>(val);
