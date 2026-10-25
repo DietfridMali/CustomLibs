@@ -29,9 +29,9 @@ STEAM_SDK = $(EXTERNAL_LIBS_DIR)steamworks_sdk_164/sdk
 STEAM_INCLUDE = $(STEAM_SDK)/public/steam
 
 ifeq ($(UNAME),Darwin)
-    SYS_INC_DIRS := /opt/homebrew/include /opt/homebrew/include/gl /opt/homebrew/include/SDL2 
+    SYS_INC_DIRS := /opt/homebrew/include /opt/homebrew/include/gl
 else
-    SYS_INC_DIRS := /usr/include/ /usr/include/GL /usr/include/SDL2
+    SYS_INC_DIRS := $(EXTERNAL_LIBS_DIR)static/include /usr/include/ /usr/include/GL
 endif
 
 INCDIRS := \

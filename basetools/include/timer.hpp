@@ -10,7 +10,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL.h"
+#include "SDL3/SDL.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

@@ -127,8 +127,8 @@ INCDIRS := \
 	$(VULKAN_INC_DIR)/SPIRV-Reflect \
 	$(EXTERNAL_LIBS_DIR)/DXC/include \
 	$(OPENXR_INC_DIR) \
-	/usr/include/ /usr/include/SDL2 \
-	/opt/homebrew/include /opt/homebrew/include/SDL2
+	$(EXTERNAL_LIBS_DIR)/static/include /usr/include/ \
+	/opt/homebrew/include
 
 .PHONY: all clean DEBUG RELEASE
 

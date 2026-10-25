@@ -9,8 +9,8 @@ FILES := std_string glm_matrix format loghandler missingfiles
 
 INCDIRS := \
 	./include \
-	/usr/include/ /usr/include/GL /usr/include/SDL2 \
-	/opt/homebrew/include /opt/homebrew/include/gl /opt/homebrew/include/SDL2
+	/usr/include/ /usr/include/GL \
+	/opt/homebrew/include /opt/homebrew/include/gl
 
 .PHONY: all clean DEBUG RELEASE
 

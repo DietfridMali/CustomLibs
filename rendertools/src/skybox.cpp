@@ -12,7 +12,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL_image.h"
+#include "SDL3_image/SDL_image.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -162,17 +162,17 @@ bool Skybox::SaveFaces(Cubemap* texture, List<String>& filenames)
 		int				width = buffer->m_info.m_width;
 		int				height = buffer->m_info.m_height;
 		SDL_Surface*	surface =
-			SDL_CreateRGBSurfaceWithFormatFrom(buffer->DataBuffer(), width, height, 32, width * 4, SDL_PIXELFORMAT_RGBA32);
+			SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32, buffer->DataBuffer(), width * 4);
 		if (not surface) {
 			logHandler.Print("Skybox: cannot write '%s': %s\n", static_cast<const char*>(path), SDL_GetError());
 			ok = false;
 			continue;
 		}
-		if (IMG_SavePNG(surface, static_cast<const char*>(path)) != 0) {
+		if (not IMG_SavePNG(surface, static_cast<const char*>(path))) {
 			logHandler.Print("Skybox: cannot write '%s': %s\n", static_cast<const char*>(path), SDL_GetError());
 			ok = false;
 		}
-		SDL_FreeSurface(surface);
+		SDL_DestroySurface(surface);
 	}
 	return ok;
 }

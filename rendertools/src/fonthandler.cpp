@@ -118,7 +118,7 @@ bool FontHandler::InitTTF(void)
 {
 	static int haveTTF = 0;
 	if (not haveTTF) {
-		haveTTF = (0 > TTF_Init()) ? -1 : 1;
+		haveTTF = TTF_Init() ? 1 : -1;
 		if (haveTTF < 0)
 			logHandler.Print("Paintjob-Rampage: Cannot initialize font system.\n");
 	}
@@ -139,8 +139,8 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 	}
 
 	String fontFile = fontFolder + fontName;
-	if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
-		logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*)fontName, TTF_GetError());
+	if (not (m_font = TTF_OpenFont(fontFile.Data(), float(fontSize)))) {
+		logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*)fontName, SDL_GetError());
 		missingFiles.Report(fontFile.Data());
 		return false;
 	}
@@ -188,9 +188,9 @@ bool FontHandler::SetShaping(bool rightToLeft, String script)
 {
 	if (not m_font)
 		return false;
-	if (TTF_SetFontDirection(m_font, rightToLeft ? TTF_DIRECTION_RTL : TTF_DIRECTION_LTR) != 0)
+	if (not TTF_SetFontDirection(m_font, rightToLeft ? TTF_DIRECTION_RTL : TTF_DIRECTION_LTR))
 		return false;
-	return script.IsEmpty() or (TTF_SetFontScriptName(m_font, script.Data()) == 0);
+	return script.IsEmpty() or TTF_SetFontScript(m_font, TTF_StringToTag(script.Data()));
 }
 
 
@@ -198,7 +198,7 @@ Texture* FontHandler::CreateTextTexture(const String& text)
 {
 	if (not m_font or text.IsEmpty())
 		return nullptr;
-	SDL_Surface* surface = TTF_RenderUTF8_Blended(m_font, text.Data(), SDL_Color(255, 255, 255, 255));
+	SDL_Surface* surface = TTF_RenderText_Blended(m_font, text.Data(), 0, SDL_Color(255, 255, 255, 255));
 	if (surface == nullptr)
 		return nullptr;
 	Texture*	texture = new Texture();
@@ -226,8 +226,8 @@ void FontHandler::ComputeInkBand(void)
 	m_inkHeight = 1.0f;
 	if (not m_font)
 		return;
-	int fontHeight = TTF_FontHeight(m_font);
-	int ascent = TTF_FontAscent(m_font);
+	int fontHeight = TTF_GetFontHeight(m_font);
+	int ascent = TTF_GetFontAscent(m_font);
 	if (fontHeight <= 0)
 		return;
 
@@ -235,7 +235,7 @@ void FontHandler::ComputeInkBand(void)
 	bool	haveInk = false;
 	auto	Accumulate = [&](Uint16 ch) {
 		int minx, maxx, miny, maxy, advance;
-		if (TTF_GlyphMetrics(m_font, ch, &minx, &maxx, &miny, &maxy, &advance) != 0)
+		if (not TTF_GetGlyphMetrics(m_font, ch, &minx, &maxx, &miny, &maxy, &advance))
 			return;
 		if (maxy <= miny) // empty glyph (e.g. space)
 			return;
@@ -275,9 +275,7 @@ bool FontHandler::CreateTexture(const char* szChar, String key, int index)
 	GlyphInfo info{ new Texture(), String(key), index };
 	if (info.texture == nullptr)
 		return false;
-	SDL_Surface* surface = (strlen(szChar) == 1)
-		? TTF_RenderText_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255))
-		: TTF_RenderUTF8_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255));
+	SDL_Surface* surface = TTF_RenderText_Blended(m_font, szChar, 0, SDL_Color(255, 255, 255, 255));
 	if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, { .isDisposable = true })) {
 		delete info.texture;
 		info = GlyphInfo();
@@ -360,7 +358,7 @@ FontHandler::TextDimensions FontHandler::TextSize(String text)
 
 bool FontHandler::HasGlyph(uint32_t codepoint)
 {
-	return m_font and (TTF_GlyphIsProvided32(m_font, Uint32(codepoint)) != 0);
+	return m_font and TTF_FontHasGlyph(m_font, Uint32(codepoint));
 }
 
 
@@ -369,13 +367,13 @@ bool FontHandler::GetGlyphMetrics(uint32_t codepoint, GlyphMetrics& metrics)
 	metrics = GlyphMetrics();
 	if (not HasGlyph(codepoint))
 		return false;
-	if (TTF_GlyphMetrics32(m_font, Uint32(codepoint), &metrics.minX, &metrics.maxX, &metrics.minY, &metrics.maxY, &metrics.advance) != 0)
+	if (not TTF_GetGlyphMetrics(m_font, Uint32(codepoint), &metrics.minX, &metrics.maxX, &metrics.minY, &metrics.maxY, &metrics.advance))
 		return false;
 	// SDL_ttf lays a single glyph out like a string of one: the surface reaches from the leftmost of pen
 	// position and ink to the rightmost of advance and ink, so ink left of the pen moves the pen inwards.
 	metrics.originX = std::max(0, -metrics.minX);
 	metrics.width = std::max(metrics.advance, metrics.maxX) + metrics.originX;
-	metrics.height = TTF_FontHeight(m_font);
+	metrics.height = TTF_GetFontHeight(m_font);
 	return true;
 }
 
@@ -384,7 +382,7 @@ SDL_Surface* FontHandler::RenderGlyphSurface(uint32_t codepoint, GlyphMetrics& m
 {
 	if (not GetGlyphMetrics(codepoint, metrics))
 		return nullptr;
-	SDL_Surface* surface = TTF_RenderGlyph32_Blended(m_font, Uint32(codepoint), SDL_Color(255, 255, 255, 255));
+	SDL_Surface* surface = TTF_RenderGlyph_Blended(m_font, Uint32(codepoint), SDL_Color(255, 255, 255, 255));
 	if (surface == nullptr)
 		return nullptr;
 	// what the surface really is, in case SDL_ttf's layout differs from the estimate above
@@ -401,7 +399,7 @@ Texture* FontHandler::RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics)
 		return nullptr;
 	Texture* texture = new (std::nothrow) Texture();
 	if (texture == nullptr) {
-		SDL_FreeSurface(surface);
+		SDL_DestroySurface(surface);
 		return nullptr;
 	}
 	if (not texture->CreateFromSurface(surface, { .isDisposable = true })) {
@@ -414,19 +412,19 @@ Texture* FontHandler::RenderGlyph(uint32_t codepoint, GlyphMetrics& metrics)
 
 int FontHandler::Ascent(void)
 {
-	return m_font ? TTF_FontAscent(m_font) : 0;
+	return m_font ? TTF_GetFontAscent(m_font) : 0;
 }
 
 
 int FontHandler::Descent(void)
 {
-	return m_font ? TTF_FontDescent(m_font) : 0;
+	return m_font ? TTF_GetFontDescent(m_font) : 0;
 }
 
 
 int FontHandler::LineHeight(void)
 {
-	return m_font ? TTF_FontHeight(m_font) : 0;
+	return m_font ? TTF_GetFontHeight(m_font) : 0;
 }
 
 

@@ -206,8 +206,9 @@ noexcept
 {
 	// Required instance extensions for the SDL Vulkan surface (e.g. VK_KHR_surface, VK_KHR_win32_surface)
 	uint32_t sdlExtCount = 0;
-	if (SDL_Vulkan_GetInstanceExtensions(window, &sdlExtCount, nullptr) == SDL_FALSE) {
-		logHandler.Print("VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions(count) failed: %s\n", SDL_GetError());
+	const char* const* sdlExtensions = SDL_Vulkan_GetInstanceExtensions(&sdlExtCount);
+	if (not sdlExtensions) {
+		logHandler.Print("VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions failed: %s\n", SDL_GetError());
 		return false;
 	}
 	if (sdlExtCount + 1 > kMaxInstanceExts) {
@@ -215,10 +216,8 @@ noexcept
 		return false;
 	}
 	StaticArray<const char*, kMaxInstanceExts> extensions{};
-	if (SDL_Vulkan_GetInstanceExtensions(window, &sdlExtCount, extensions.data()) == SDL_FALSE) {
-		logHandler.Print("VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions(list) failed: %s\n", SDL_GetError());
-		return false;
-	}
+	for (uint32_t i = 0; i < sdlExtCount; ++i)
+		extensions[i] = sdlExtensions[i];
 	uint32_t extCount = sdlExtCount;
 #if ENABLE_VK_LOGGING
 	if (enableValidationLayers)
@@ -270,7 +269,7 @@ noexcept
 bool VKContext::CreateSurface(SDL_Window* window)
 noexcept
 {
-	if (SDL_Vulkan_CreateSurface(window, m_instance, &m_surface) == SDL_FALSE) {
+	if (not SDL_Vulkan_CreateSurface(window, m_instance, nullptr, &m_surface)) {
 		logHandler.Print("VKContext::CreateSurface: SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError());
 		return false;
 	}

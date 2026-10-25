@@ -9,7 +9,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL_image.h"
+#include "SDL3_image/SDL_image.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -563,7 +563,7 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
 	if (not Create()) {
-		SDL_FreeSurface(surface);
+		SDL_DestroySurface(surface);
 		return false;
 	}
 	m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));

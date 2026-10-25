@@ -21,8 +21,8 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL.h"
-#include "SDL_vulkan.h"
+#include "SDL3/SDL.h"
+#include "SDL3/SDL_vulkan.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

@@ -14,7 +14,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL_ttf.h"
+#include "SDL3_ttf/SDL_ttf.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

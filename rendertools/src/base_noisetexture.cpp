@@ -24,7 +24,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL_image.h"
+#include "SDL3_image/SDL_image.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -803,7 +803,7 @@ void BaseBlueNoiseTexture::Compute(String textureFolder)
 		SDL_Surface*	image = IMG_Load(filename.Data());
 		if (image) {
 			std::memcpy(m_data.DataPtr(layerSize * i), image->pixels, layerSize);
-			SDL_FreeSurface(image);
+			SDL_DestroySurface(image);
 		}
 	}
 }

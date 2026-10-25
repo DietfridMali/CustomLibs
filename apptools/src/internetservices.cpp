@@ -9,8 +9,8 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL.h"
-#include "SDL_net.h"
+#include "SDL3/SDL.h"
+#include "SDL3_net/SDL_net.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -32,10 +32,10 @@ std::optional<NetworkEndpoint> InternetServices::StunQueryIPv4(const char* serve
 	constexpr uint32_t MAGIC = 0x2112A442u;
 
 	// STUN-Server �ber SDL_net aufl�sen, um einen sendef�higen Endpoint zu haben
-	IPaddress socketAddress;
-	if (SDLNet_ResolveHost(&socketAddress, serverHost, serverPort) != 0)
+	uint32_t serverHostAddress;
+	if (not UDPSocket::ResolveIPv4(serverHost, serverHostAddress))
 		return std::nullopt;
-	NetworkEndpoint serverAddress = socketAddress;
+	NetworkEndpoint serverAddress = IPv4Address{ .host = serverHostAddress, .port = SDL_Swap16BE(serverPort) };
 
 	UDPSocket sock;
 	if (not sock.Open("0.0.0.0", 0))
@@ -59,9 +59,9 @@ std::optional<NetworkEndpoint> InternetServices::StunQueryIPv4(const char* serve
 	while ((Timer::GetTime() - start) < timeoutMs) {
 		data = sock.Receive(20);
 		if (data.length) {
-			const uint16_t msgType = SDLNet_Read16(data.buffer + 0); // host-order
-			const uint16_t msgLen = SDLNet_Read16(data.buffer + 2);
-			const uint32_t cookie = SDLNet_Read32(data.buffer + 4);
+			const uint16_t msgType = be16(data.buffer + 0); // host-order
+			const uint16_t msgLen = be16(data.buffer + 2);
+			const uint32_t cookie = be32(data.buffer + 4);
 			if (msgType != 0x0101 or cookie != MAGIC) // Binding Success
 				continue;
 			if (20 + msgLen > data.length)
@@ -71,17 +71,17 @@ std::optional<NetworkEndpoint> InternetServices::StunQueryIPv4(const char* serve
 
 			size_t pos = 20;
 			while (pos + 4 <= size_t(20 + msgLen)) {
-				const uint16_t at = SDLNet_Read16(data.buffer + pos + 0);
-				const uint16_t al = SDLNet_Read16(data.buffer + pos + 2);
+				const uint16_t at = be16(data.buffer + pos + 0);
+				const uint16_t al = be16(data.buffer + pos + 2);
 				pos += 4;
 				if (pos + al > size_t(20 + msgLen))
 					break;
 
 				if (at == 0x0020) { // XOR-MAPPED-ADDRESS
 					if ((al >= 8) and (data.buffer[pos + 1] == 0x01)) { // IPv4
-						uint16_t port = SDLNet_Read16(data.buffer + pos + 2);
+						uint16_t port = be16(data.buffer + pos + 2);
 						port ^= uint16_t(MAGIC >> 16);
-						uint32_t addr = SDLNet_Read32(data.buffer + pos + 4);
+						uint32_t addr = be32(data.buffer + pos + 4);
 						addr ^= MAGIC;
 						sock.Close();
 						return NetworkEndpoint(addr, port, ByteOrder::Host);
@@ -208,7 +208,7 @@ uint32_t InternetServices::ParseNtpDate(const uint8_t* buf, int len)
 		return 0;
 	uint32_t secs_be = 0;
 	std::memcpy(&secs_be, buf + 40, 4);
-	uint32_t ntp_secs = SDL_SwapBE32(secs_be);
+	uint32_t ntp_secs = SDL_Swap32BE(secs_be);
 	if (ntp_secs < NTP_UNIX_EPOCH_DIFF)
 		return 0;
 	uint64_t	unix_secs_u64 = uint64_t(ntp_secs) - uint64_t(NTP_UNIX_EPOCH_DIFF);
@@ -240,13 +240,13 @@ uint32_t InternetServices::QueryDate(int timeout)
 	if (not sock.Open("0.0.0.0", 0))
 		return 0;
 
-	IPaddress srv{};
-	if (SDLNet_ResolveHost(&srv, "time.cloudflare.com", NtpServerPort) != 0) {
+	uint32_t serverHost;
+	if (not UDPSocket::ResolveIPv4("time.cloudflare.com", serverHost)) {
 		sock.Close(true);
 		return 0;
 	}
 
-	NetworkEndpoint	server(srv);
+	NetworkEndpoint	server(IPv4Address{ .host = serverHost, .port = SDL_Swap16BE(NtpServerPort) });
 	uint8_t			req[NtpRequestSize];
 	BuildNtpRequest(req, NtpRequestSize);
 	if (not sock.Send(req, NtpRequestSize, server)) {

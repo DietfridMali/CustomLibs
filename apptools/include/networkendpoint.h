@@ -7,7 +7,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL_net.h"
+#include "SDL3/SDL.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -16,6 +16,11 @@
 
 enum class ByteOrder { Host,
 					   Network };
+
+struct IPv4Address {
+	uint32_t	host{ 0 };
+	uint16_t	port{ 0 };
+};
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -44,7 +49,7 @@ public:
 	eNetworkType	m_type{ ntIPv4 };
 	String			m_ipAddress{ "" };
 	uint16_t		m_port{ 0 };
-	IPaddress		m_socketAddress{};
+	IPv4Address		m_socketAddress{};
 
 	bool UpdateSocketAddress(const String& ipAddress, int32_t port)
 	noexcept;
@@ -55,7 +60,7 @@ public:
 		UpdateSocketAddress(ipAddress, port);
 	}
 
-	NetworkEndpoint(const IPaddress& socketAddress)
+	NetworkEndpoint(const IPv4Address& socketAddress)
 	noexcept
 	{
 		m_socketAddress = socketAddress;
@@ -133,13 +138,13 @@ public:
 	void UpdateNetworkID(uint64_t networkID, eNetworkType networkType = ntSteam)
 	noexcept;
 
-	inline const IPaddress& SocketAddress(void) const
+	inline const IPv4Address& SocketAddress(void) const
 	noexcept
 	{
 		return m_socketAddress;
 	}
 
-	inline IPaddress& SocketAddress(void)
+	inline IPv4Address& SocketAddress(void)
 	noexcept
 	{
 		return m_socketAddress;
@@ -175,7 +180,7 @@ public:
 		return *this;
 	}
 
-	NetworkEndpoint& operator=(const IPaddress& socketAddress) {
+	NetworkEndpoint& operator=(const IPv4Address& socketAddress) {
 		m_socketAddress = socketAddress;
 		UpdateFromSocketAddress();
 		return *this;
@@ -184,7 +189,7 @@ public:
 	inline uint32_t SubNet(void)
 	noexcept
 	{
-		return m_socketAddress.host & SDL_SwapBE32(0xFFFFFF00u);
+		return m_socketAddress.host & SDL_Swap32BE(0xFFFFFF00u);
 	}
 
 	// Limited Broadcast 255.255.255.255:port

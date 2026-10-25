@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include <algorithm>
 #include "std_defines.h"
 #include "conversions.hpp"
 
@@ -8,8 +9,8 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL.h"
-#include "SDL_mixer.h"
+#include "SDL3/SDL.h"
+#include "SDL3_mixer/SDL_mixer.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -28,18 +29,21 @@ class SoundObject {
 public:
 	int			m_id;
 	String		m_name;
-	Mix_Chunk*	m_sound;
+	MIX_Audio*	m_sound;
+	MIX_Track*	m_track;
 	int			m_channel;
 	float		m_volume;
 	Vector3f	m_position;
 	void*		m_owner;
+	uint64_t	m_startTime{ 0 };
 
-	SoundObject(int id = -1, String name = String(""), int channel = -1, Mix_Chunk* sound = nullptr,
+	SoundObject(int id = -1, String name = String(""), int channel = -1, MIX_Track* track = nullptr, MIX_Audio* sound = nullptr,
 				Vector4f position = { 0, 0, 0 }, float volume = 1.0f)
 		: m_id(id)
 		, m_name(name)
 		, m_channel(channel)
 		, m_sound(sound)
+		, m_track(track)
 		, m_position(position)
 		, m_owner(nullptr)
 		, m_volume(volume)
@@ -68,9 +72,11 @@ public:
 class BaseSoundHandler
 	: public PolymorphSingleton<BaseSoundHandler> {
 public:
-	Dictionary<String, Mix_Chunk*>	m_sounds;
+	Dictionary<String, MIX_Audio*>	m_sounds;
 	AutoArray<SoundObject>			m_channels;
-	Mix_Music*						m_song{ nullptr };
+	MIX_Mixer*						m_mixer{ nullptr };
+	MIX_Track*						m_musicTrack{ nullptr };
+	MIX_Audio*						m_song{ nullptr };
 	int								m_soundLevel{ 0 }; // maximum
 	float							m_masterVolume{ 1.0f };
 	float							m_musicVolume{ 1.0f };
@@ -181,7 +187,7 @@ public:
 	}
 
 	inline bool IsPlayingMusic(void) {
-		return Mix_PlayingMusic() != 0;
+		return m_haveAudio and MIX_TrackPlaying(m_musicTrack);
 	}
 
 	inline float GetMasterVolume(void)
@@ -207,11 +213,13 @@ public:
 
 	void SetMusicVolume(float volume) {
 		m_musicVolume = volume;
-		Mix_VolumeMusic((int(round(MIX_MAX_VOLUME * volume))));
+		if (m_haveAudio)
+			MIX_SetTrackGain(m_musicTrack, std::clamp(volume, 0.0f, 1.0f));
 	}
 
 	void FadeOutMusic(int duration = 1000) {
-		Mix_FadeOutMusic(duration);
+		if (m_haveAudio)
+			MIX_StopTrack(m_musicTrack, MIX_TrackMSToFrames(m_musicTrack, duration));
 	}
 
 	inline bool SupportsMP3(void)

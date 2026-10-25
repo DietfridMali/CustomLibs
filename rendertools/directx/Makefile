@@ -103,8 +103,8 @@ COMMON_FILES := \
 INCDIRS := \
 	./include ../include ../src ../../basetools/include \
 	$(EXTERNAL_LIBS_DIR)/DXC/include \
-	/usr/include/ /usr/include/SDL2 \
-	/opt/homebrew/include /opt/homebrew/include/SDL2
+	$(EXTERNAL_LIBS_DIR)/static/include /usr/include/ \
+	/opt/homebrew/include
 
 .PHONY: all clean DEBUG RELEASE
 

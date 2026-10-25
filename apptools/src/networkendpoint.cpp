@@ -6,8 +6,8 @@
 
 void NetworkEndpoint::UpdateFromSocketAddress(void)
 {
-	uint32_t host = SDL_SwapBE32(m_socketAddress.host);
-	m_port = SDL_SwapBE16(m_socketAddress.port);
+	uint32_t host = SDL_Swap32BE(m_socketAddress.host);
+	m_port = SDL_Swap16BE(m_socketAddress.port);
 	m_id.host = m_socketAddress.host;
 	m_id.port = m_socketAddress.port;
 	m_type = ntIPv4;
@@ -19,8 +19,8 @@ void NetworkEndpoint::UpdateFromSocketAddress(void)
 NetworkEndpoint::NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder)
 {
 	if (byteOrder == ByteOrder::Host) {
-		m_socketAddress.host = SDL_SwapBE32(host);
-		m_socketAddress.port = SDL_SwapBE16(port);
+		m_socketAddress.host = SDL_Swap32BE(host);
+		m_socketAddress.port = SDL_Swap16BE(port);
 	}
 	else {
 		m_socketAddress.host = host;
@@ -80,11 +80,11 @@ noexcept
 		}
 		m_ipAddress = ipAddress;
 		uint32_t host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
-		m_socketAddress.host = SDL_SwapBE32(host);
+		m_socketAddress.host = SDL_Swap32BE(host);
 	}
 	if (port >= 0) {
 		m_port = uint16_t(port);
-		m_socketAddress.port = SDL_SwapBE16(m_port);
+		m_socketAddress.port = SDL_Swap16BE(m_port);
 	}
 	m_id.host = m_socketAddress.host;
 	m_id.port = m_socketAddress.port;

@@ -4,7 +4,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL.h"
+#include "SDL3/SDL.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -27,7 +27,7 @@ public:
 		uint32_t failed = 0;
 		for (uint32_t i = 1; i; i <<= 1) {
 			if ((subSystems & i) and not (m_subSystems & i)) {
-				if (SDL_Init(i))
+				if (not SDL_Init(i))
 					failed |= i;
 				else
 					m_subSystems |= i;

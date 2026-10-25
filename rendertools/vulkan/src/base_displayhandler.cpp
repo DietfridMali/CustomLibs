@@ -14,8 +14,8 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL.h"
-#include "SDL_vulkan.h"
+#include "SDL3/SDL.h"
+#include "SDL3/SDL_vulkan.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -30,6 +30,7 @@
 
 bool BaseDisplayHandler::Init(void)
 {
+	SDL_SetHint(SDL_HINT_VIDEO_SYNC_WINDOW_OPERATIONS, "1");
 	if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
 		return false;
 	return GetDisplayModes() > 0;
@@ -38,10 +39,14 @@ bool BaseDisplayHandler::Init(void)
 
 int BaseDisplayHandler::GetDisplayModes(void)
 {
-	int							n = SDL_GetNumDisplayModes(0);
+	int					n = 0;
+	SDL_DisplayMode**	modes = SDL_GetFullscreenDisplayModes(SDL_GetPrimaryDisplay(), &n);
+	if (not modes)
+		n = 0;
 	AutoArray<SDL_DisplayMode>	m(n);
 	for (int i = 0; i < n; ++i)
-		SDL_GetDisplayMode(0, i, &m[i]);
+		m[i] = *modes[i];
+	SDL_free(modes);
 
 	std::sort(m.begin(), m.end(),
 			  [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
@@ -98,7 +103,7 @@ void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool 
 		height = m_displayModes[m_activeDisplayMode].h;
 	}
 	SDL_Rect rect;
-	SDL_GetDisplayBounds(0, &rect);
+	SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &rect);
 	m_maxWidth = rect.w;
 	m_maxHeight = rect.h;
 	ComputeDimensions(width, height, useFullscreen);
@@ -127,16 +132,27 @@ noexcept
 
 void BaseDisplayHandler::SetupDisplay(String windowTitle)
 {
-	Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN;
-	if (m_isFullscreen)
-		windowFlags |= SDL_WINDOW_FULLSCREEN;
-
 	SetContextAttributes();
-	m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
+	SDL_PropertiesID properties = SDL_CreateProperties();
+	SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, windowTitle);
+	SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
+	SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
+	SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, m_width);
+	SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, m_height);
+	SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, Sint64(SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN));
+	m_window = SDL_CreateWindowWithProperties(properties);
+	SDL_DestroyProperties(properties);
 	if (not m_window) {
 		logHandler.Print("BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
 		exit(1);
 	}
+	if (m_isFullscreen) {
+		SDL_DisplayMode mode;
+		if (SDL_GetClosestFullscreenDisplayMode(SDL_GetPrimaryDisplay(), m_width, m_height, 0.0f, false, &mode))
+			SDL_SetWindowFullscreenMode(m_window, &mode);
+		SDL_SetWindowFullscreen(m_window, true);
+	}
+	SDL_ShowWindow(m_window);
 	// Swapchain creation is deferred to SetupSwapchain (called from gfxRenderer::InitGraphics
 	// after VKContext + Device + Surface are up).
 }
@@ -384,11 +400,11 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen)
 	SDL_DisplayMode mode = GetDisplayMode();
 
 	if (m_isFullscreen) {
-		SDL_SetWindowDisplayMode(m_window, &mode);
-		SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
+		SDL_SetWindowFullscreenMode(m_window, &mode);
+		SDL_SetWindowFullscreen(m_window, true);
 	}
 	else {
-		SDL_SetWindowFullscreen(m_window, 0);
+		SDL_SetWindowFullscreen(m_window, false);
 		SDL_SetWindowSize(m_window, mode.w, mode.h);
 		SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
@@ -411,7 +427,7 @@ bool BaseDisplayHandler::UpdateWindowSize(int width, int height)
 	m_height = std::min(height, m_maxHeight);
 	m_aspectRatio = float(m_width) / float(m_height);
 	m_activeDisplayMode = FindDisplayMode(m_width, m_height);
-	SDL_SetWindowFullscreen(m_window, 0);
+	SDL_SetWindowFullscreen(m_window, false);
 	SDL_SetWindowSize(m_window, m_width, m_height);
 	SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	return RecreateSwapchain();
@@ -465,7 +481,7 @@ void BaseDisplayHandler::WaitWhileMinimized(void)
 	bool restoreRequested = false;
 	while ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0) {
 		SDL_PumpEvents();
-		if (not restoreRequested and (SDL_HasEvent(SDL_QUIT) == SDL_TRUE)) {
+		if (not restoreRequested and SDL_HasEvent(SDL_EVENT_QUIT)) {
 			SDL_RestoreWindow(m_window);
 			restoreRequested = true;
 		}

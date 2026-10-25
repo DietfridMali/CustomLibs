@@ -8,7 +8,7 @@
 #pragma warning(push)
 #pragma warning(disable : 26819)
 #endif
-#include "SDL_image.h"
+#include "SDL3_image/SDL_image.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -154,17 +154,18 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool
 {
 	// of the SOURCE - the buffer below is always RGBA. An indexed image carries its transparency in the
 	// palette or as a colour key, not in a mask.
-	m_info.m_hasAlpha = (source->format->Amask != 0) or (SDL_HasColorKey(source) == SDL_TRUE);
-	if (not m_info.m_hasAlpha and source->format->palette)
-		for (int i = 0; i < source->format->palette->ncolors; ++i)
-			if (source->format->palette->colors[i].a < 255) {
+	SDL_Palette* palette = SDL_GetSurfacePalette(source);
+	m_info.m_hasAlpha = (SDL_GetPixelFormatDetails(source->format)->Amask != 0) or SDL_SurfaceHasColorKey(source);
+	if (not m_info.m_hasAlpha and palette)
+		for (int i = 0; i < palette->ncolors; ++i)
+			if (palette->colors[i].a < 255) {
 				m_info.m_hasAlpha = true;
 				break;
 			}
-	if (source->format->format != SDL_PIXELFORMAT_RGBA32) {
+	if (source->format != SDL_PIXELFORMAT_RGBA32) {
 		SDL_Surface* h = source;
-		source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_RGBA32, 0);
-		SDL_FreeSurface(h);
+		source = SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
+		SDL_DestroySurface(h);
 	}
 	if (not Allocate(source->w, source->h, source->pitch / source->w))
 		logHandler.Print("%s (%d): Memory allocation for texture clone failed\n", __FILE__, __LINE__);
@@ -173,10 +174,10 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool
 			FlipSurface(source);
 		else
 			memcpy(m_data.Data(), source->pixels, m_info.m_dataSize);
-		SDL_FreeSurface(source);
 		if (premultiply)
 			Premultiply();
 	}
+	SDL_DestroySurface(source);
 	return *this;
 }
 

@@ -1,5 +1,6 @@
 
 #include <limits>
+#include <algorithm>
 
 #include "arghandler.h"
 #include "base_soundhandler.h"
@@ -9,39 +10,45 @@
 
 bool SoundObject::Play(int loops)
 {
-	if (0 > Mix_PlayChannel(m_channel, m_sound, loops)) {
+	SDL_PropertiesID options = SDL_CreateProperties();
+	SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, loops);
+	bool isPlaying = MIX_SetTrackAudio(m_track, m_sound) and MIX_PlayTrack(m_track, options);
+	SDL_DestroyProperties(options);
+	if (not isPlaying) {
 #ifdef _DEBUG
-		logHandler.Print("Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError());
+		logHandler.Print("Couldn't play sound '%s' (%s)\n", m_name.Data(), SDL_GetError());
 #endif
 		return false;
 	}
+	m_startTime = SDL_GetTicks();
 	return true;
 }
 
 void SoundObject::FadeOut(int fadeTime)
 {
-	Mix_FadeOutChannel(m_channel, fadeTime);
+	MIX_StopTrack(m_track, MIX_TrackMSToFrames(m_track, fadeTime));
 }
 
 bool SoundObject::Stop(void)
 {
-	Mix_HaltChannel(m_channel);
+	MIX_StopTrack(m_track, 0);
 	return true;
 }
 
 void SoundObject::SetPanning(float left, float right)
 {
-	Mix_SetPanning(m_channel, Uint8(left * 255), Uint8(right * 255));
+	MIX_StereoGains gains = { .left = left, .right = right };
+	MIX_SetTrackStereo(m_track, &gains);
 }
 
 void SoundObject::SetVolume(float volume)
 {
-	Mix_Volume(m_channel, int(MIX_MAX_VOLUME * volume));
+	MIX_SetTrackGain(m_track, std::clamp(volume, 0.0f, 1.0f));
 }
 
 bool SoundObject::Busy(void) const
 {
-	return bool(Mix_Playing(m_channel));
+	return MIX_TrackPlaying(m_track);
 }
 
 // =================================================================================================
@@ -65,24 +72,35 @@ bool BaseSoundHandler::Setup(String soundFolder)
 	SetMusicPlayback(argHandler.BoolVal("playmusic", 0, 1, false));
 	m_maxAudibleDistance = 30.0f;
 	Destroy();
-#if 1
-	m_supportsMP3 = (Mix_Init(MIX_INIT_MP3) & MIX_INIT_MP3) != 0;
-#endif
-	if (0 > Mix_OpenAudioDevice(48000, AUDIO_S16SYS, 2, 512, nullptr, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE)) {
-		logHandler.Print("Couldn't initialize sound system (%s)\n", Mix_GetError());
+	if (not MIX_Init()) {
+		logHandler.Print("Couldn't initialize sound system (%s)\n", SDL_GetError());
 		return true;
 	}
+#if 1
+	m_supportsMP3 = false;
+	for (int i = 0; i < MIX_GetNumAudioDecoders(); i++) {
+		String decoder = MIX_GetAudioDecoder(i);
+		if ((decoder == "DRMP3") or (decoder == "MPG123"))
+			m_supportsMP3 = true;
+	}
+#endif
+	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
+	SDL_AudioSpec spec = { .format = SDL_AUDIO_S16, .channels = 2, .freq = 48000 };
+	if (not (m_mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec))) {
+		logHandler.Print("Couldn't initialize sound system (%s)\n", SDL_GetError());
+		return true;
+	}
+	m_musicTrack = MIX_CreateTrack(m_mixer);
 	m_haveAudio = true;
 	SetMusicVolume(m_musicVolume);
 #if 0
-    int frequency, channels;
-    Uint16 format;
-    Mix_QuerySpec(&frequency, &format, &channels);
+    SDL_AudioSpec format;
+    MIX_GetMixerFormat(m_mixer, &format);
 #endif
-	m_channelCount = Mix_AllocateChannels(128);
+	m_channelCount = 128;
 	m_channels.Resize(m_channelCount);
 	for (int i = 0; i < m_channelCount; i++)
-		m_channels[i] = SoundObject(-1, String(""), i);
+		m_channels[i] = SoundObject(-1, String(""), i, MIX_CreateTrack(m_mixer));
 	return LoadSounds(soundFolder);
 }
 
@@ -96,12 +114,12 @@ bool BaseSoundHandler::LoadSounds(String soundFolder)
 	bool isComplete = true;
 	for (auto& name : soundNames) {
 		String		fileName = soundFolder + name + ".wav";
-		Mix_Chunk*	sound = Mix_LoadWAV(fileName.Data());
+		MIX_Audio*	sound = MIX_LoadAudio(m_mixer, fileName.Data(), true);
 		if (sound)
 			m_sounds.Insert(name, sound);
 		else {
 			isComplete = false;
-			logHandler.Print("Couldn't load sound '%s' (%s)\n", name.Data(), Mix_GetError());
+			logHandler.Print("Couldn't load sound '%s' (%s)\n", name.Data(), SDL_GetError());
 			missingFiles.Report(fileName.Data());
 		}
 	}
@@ -128,9 +146,21 @@ void BaseSoundHandler::UpdateVolume(SoundObject& soundObject, float distance)
 // if all channels are busy, pick the oldest busy one
 SoundObject& BaseSoundHandler::GetChannel(void)
 {
-	int channel = Mix_GroupAvailable(-1);
+	int channel = -1;
+	for (int i = 0; i < m_channelCount; i++) {
+		if (not m_channels[i].Busy()) {
+			channel = i;
+			break;
+		}
+	}
 	if (channel < 0) {
-		channel = Mix_GroupOldest(-1);
+		uint64_t oldest = (std::numeric_limits<uint64_t>::max)();
+		for (int i = 0; i < m_channelCount; i++) {
+			if (m_channels[i].m_startTime <= oldest) {
+				oldest = m_channels[i].m_startTime;
+				channel = i;
+			}
+		}
 		m_channels[channel].Stop();
 	}
 	SoundObject& so = m_channels[channel];
@@ -178,7 +208,7 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
 	SoundObject* activeSound = FindSoundByOwner(owner, soundName);
 	if (activeSound != nullptr)
 		return activeSound;
-	Mix_Chunk** sound = m_sounds.Find(soundName);
+	MIX_Audio** sound = m_sounds.Find(soundName);
 	if (not sound)
 		return nullptr;
 	SoundObject& newSound = GetChannel();
@@ -234,8 +264,13 @@ void BaseSoundHandler::Update(void)
 
 void BaseSoundHandler::PauseAudio(bool pause)
 {
-	if (m_haveAudio)
-		Mix_PauseAudio(pause ? 1 : 0);
+	if (not m_haveAudio)
+		return;
+	SDL_AudioDeviceID device = SDL_AudioDeviceID(SDL_GetNumberProperty(MIX_GetMixerProperties(m_mixer), MIX_PROP_MIXER_DEVICE_NUMBER, 0));
+	if (pause)
+		SDL_PauseAudioDevice(device);
+	else
+		SDL_ResumeAudioDevice(device);
 }
 
 
@@ -244,25 +279,28 @@ void BaseSoundHandler::Destroy(void)
 	if (m_haveAudio) {
 		m_haveAudio = false;
 		for (auto& sound : m_sounds)
-			Mix_FreeChunk(sound.second);
+			MIX_DestroyAudio(sound.second);
 		m_sounds.Destroy();
-		Mix_CloseAudio();
+		MIX_DestroyMixer(m_mixer);
+		m_mixer = nullptr;
+		m_musicTrack = nullptr;
 		m_channels.Reset();
 		m_channelCount = 0;
 		if (m_song) {
-			Mix_FreeMusic(m_song);
+			MIX_DestroyAudio(m_song);
 			m_song = nullptr;
 		}
 	}
-	Mix_Quit();
+	MIX_Quit();
 }
 
 
 void BaseSoundHandler::StopMusic(void)
 {
 	if (m_song) {
-		Mix_HaltMusic();
-		Mix_FreeMusic(m_song);
+		MIX_StopTrack(m_musicTrack, 0);
+		MIX_SetTrackAudio(m_musicTrack, nullptr);
+		MIX_DestroyAudio(m_song);
 		m_song = nullptr;
 	}
 }
@@ -278,13 +316,20 @@ bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime)
 	if (not m_playMusic or songName.IsEmpty())
 		return false;
 	m_lastSong = songName;
-	if (not (m_song = Mix_LoadMUS((const char*)songName))) {
+	if (not (m_song = MIX_LoadAudio(m_mixer, (const char*)songName, false))) {
 		missingFiles.Report(songName.Data());
 		return false;
 	}
-	if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops)))
+	SDL_PropertiesID options = SDL_CreateProperties();
+	SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, (loops < 0) ? -1 : std::max(loops, 1) - 1);
+	if (fadeTime > 0)
+		SDL_SetNumberProperty(options, MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER, fadeTime);
+	bool isPlaying = MIX_SetTrackAudio(m_musicTrack, m_song) and MIX_PlayTrack(m_musicTrack, options);
+	SDL_DestroyProperties(options);
+	if (isPlaying)
 		return true;
-	Mix_FreeMusic(m_song);
+	MIX_SetTrackAudio(m_musicTrack, nullptr);
+	MIX_DestroyAudio(m_song);
 	m_song = nullptr;
 	return false;
 }
