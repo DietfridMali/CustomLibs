@@ -46,8 +46,7 @@ bool UDPSocket::Open(const String& localAddress, uint16_t port)
 {
 #ifdef _DEBUG
 	if (localAddress == "127.0.0.1") {
-		logHandler.Print("UDP OpenSocket: Please specify a valid local network or internet address in the command line or ini file
-");
+		logHandler.Print("UDP OpenSocket: Please specify a valid local network or internet address in the command line or ini file");
 		return false;
 	}
 #endif
