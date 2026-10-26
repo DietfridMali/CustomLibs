@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <thread>
 #include <cmath>
@@ -32,7 +33,7 @@ static const XrPosef kIdentityPose{ { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.
 
 static bool xrSessionEnabled = true;
 static bool xrDeviceCreated = false;
-static bool xrRuntimeMissing = false;
+static std::atomic<bool> xrRuntimeMissing{ false };
 static bool xrTestPattern = false;
 #if LOG_FRAME_METRICS
 static bool xrPerformanceMetrics = false;
@@ -686,16 +687,9 @@ noexcept
 	}
 }
 
-// =================================================================================================
 
-bool BaseXRHandler::Create(const char* appName)
+static bool CreateXrInstance(XRState& s, const char* appName, const char* graphicsExtension)
 {
-	if (IsAvailable())
-		return true;
-	if (not (m_state or (m_state = new (std::nothrow) XRState())))
-		return false;
-
-	XRState&	s = *m_state;
 	uint32_t	extensionCount = 0;
 	XrResult	result = xrEnumerateInstanceExtensionProperties(nullptr, 0, &extensionCount, nullptr);
 
@@ -714,8 +708,8 @@ bool BaseXRHandler::Create(const char* appName)
 		logHandler.Print("OpenXR: the runtime's extensions cannot be read\n");
 		return false;
 	}
-	if (not HasExtension(extensions, GraphicsExtension())) {
-		logHandler.Print("OpenXR: the runtime has no %s\n", GraphicsExtension());
+	if (not HasExtension(extensions, graphicsExtension)) {
+		logHandler.Print("OpenXR: the runtime has no %s\n", graphicsExtension);
 		return false;
 	}
 	s.hasDepthExtension = HasExtension(extensions, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
@@ -728,7 +722,7 @@ bool BaseXRHandler::Create(const char* appName)
 	const char*	enabledExtensions[5]{};
 	uint32_t	enabledCount = 0;
 
-	enabledExtensions[enabledCount++] = GraphicsExtension();
+	enabledExtensions[enabledCount++] = graphicsExtension;
 	if (s.hasDepthExtension)
 		enabledExtensions[enabledCount++] = XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME;
 	if (s.hasVisibilityMaskExtension)
@@ -754,16 +748,160 @@ bool BaseXRHandler::Create(const char* appName)
 		s.instance = XR_NULL_HANDLE;
 		return false;
 	}
+	return true;
+}
+
+
+struct XRSystemQuery {
+	std::thread			thread;
+	std::atomic<bool>	isDone{ false };
+	bool				isRunning{ false };
+	bool				isCheck{ false };
+	XRState*			pending{ nullptr };
+	XrInstance			instance{ XR_NULL_HANDLE };
+	String				appName;
+	const char*			graphicsExtension{ nullptr };
+	XrSystemId			systemId{ XR_NULL_SYSTEM_ID };
+	XrResult			result{ XR_SUCCESS };
+
+	~XRSystemQuery()
+	{
+		if (thread.joinable())
+			thread.join();
+	}
+};
+
+static XRSystemQuery xrSystemQuery;
+
+
+static void RunSystemQuery(XRSystemQuery* query)
+{
+	if (not query->isCheck) {
+		XRState& s = *query->pending;
+
+		if ((s.instance == XR_NULL_HANDLE) and not CreateXrInstance(s, static_cast<const char*>(query->appName), query->graphicsExtension)) {
+			query->result = XR_ERROR_INITIALIZATION_FAILED;
+			query->isDone = true;
+			return;
+		}
+		query->instance = s.instance;
+	}
 
 	XrSystemGetInfo systemInfo{ XR_TYPE_SYSTEM_GET_INFO };
 
 	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-	if (not XrSucceeded(s.instance, xrGetSystem(s.instance, &systemInfo, &s.systemId), "xrGetSystem (no headset connected?)")) {
-		Destroy();
+	query->systemId = XR_NULL_SYSTEM_ID;
+	query->result = xrGetSystem(query->instance, &systemInfo, &query->systemId);
+	if (not query->isCheck) {
+		XrSucceeded(query->instance, query->result, "xrGetSystem (no headset connected?)");
+		if (query->result == XR_ERROR_INSTANCE_LOST) {
+			xrDestroyInstance(query->instance);
+			query->pending->instance = XR_NULL_HANDLE;
+		}
+	}
+	query->isDone = true;
+}
+
+
+static void JoinSystemQuery(void)
+noexcept
+{
+	if (xrSystemQuery.thread.joinable())
+		xrSystemQuery.thread.join();
+	xrSystemQuery.isRunning = false;
+}
+
+// =================================================================================================
+
+bool BaseXRHandler::Create(const char* appName)
+{
+	if (IsAvailable())
+		return true;
+	JoinSystemQuery();
+	if (not m_state) {
+		m_state = xrSystemQuery.pending;
+		xrSystemQuery.pending = nullptr;
+	}
+	if (not (m_state or (m_state = new (std::nothrow) XRState())))
+		return false;
+
+	XRState&	s = *m_state;
+
+	if ((s.instance == XR_NULL_HANDLE) and not CreateXrInstance(s, appName, GraphicsExtension())) {
+		xrSystemQuery.pending = m_state;
+		m_state = nullptr;
 		return false;
 	}
 
-	uint32_t viewCount = 0;
+	XrSystemGetInfo	systemInfo{ XR_TYPE_SYSTEM_GET_INFO };
+	XrSystemId		systemId = XR_NULL_SYSTEM_ID;
+
+	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+
+	XrResult result = xrGetSystem(s.instance, &systemInfo, &systemId);
+
+	if (not XrSucceeded(s.instance, result, "xrGetSystem (no headset connected?)")) {
+		if (result == XR_ERROR_INSTANCE_LOST)
+			Destroy();
+		else {
+			xrSystemQuery.pending = m_state;
+			m_state = nullptr;
+		}
+		return false;
+	}
+	s.systemId = systemId;
+	return SetupSystem();
+}
+
+
+bool BaseXRHandler::StartSystemQuery(const char* appName)
+{
+	XRSystemQuery& q = xrSystemQuery;
+
+	if (q.isRunning)
+		return true;
+	q.isCheck = IsAvailable();
+	if (q.isCheck)
+		q.instance = m_state->instance;
+	else if (not (q.pending or (q.pending = new (std::nothrow) XRState())))
+		return false;
+	q.appName = String((appName and *appName) ? appName : "rendertools");
+	q.graphicsExtension = GraphicsExtension();
+	q.isDone = false;
+	q.thread = std::thread(RunSystemQuery, &q);
+	q.isRunning = true;
+	return true;
+}
+
+
+int BaseXRHandler::SystemQueryResult(void)
+{
+	XRSystemQuery& q = xrSystemQuery;
+
+	if (not q.isRunning)
+		return xqNone;
+	if (not q.isDone)
+		return xqPending;
+	q.thread.join();
+	q.isRunning = false;
+	if (q.isCheck) {
+		if (q.result == XR_ERROR_INSTANCE_LOST)
+			m_state->instanceLost = true;
+		return (XR_SUCCEEDED(q.result) and (q.systemId == m_state->systemId)) ? xqAvailable : xqUnavailable;
+	}
+	if (XR_FAILED(q.result))
+		return xqUnavailable;
+	m_state = q.pending;
+	q.pending = nullptr;
+	m_state->systemId = q.systemId;
+	return SetupSystem() ? xqAvailable : xqUnavailable;
+}
+
+
+bool BaseXRHandler::SetupSystem(void)
+{
+	XRState&	s = *m_state;
+	uint32_t	viewCount = 0;
 
 	if (not XrSucceeded(s.instance,
 						xrEnumerateViewConfigurationViews(s.instance, s.systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &viewCount, nullptr),
@@ -830,6 +968,13 @@ bool BaseXRHandler::Create(const char* appName)
 void BaseXRHandler::Destroy(void)
 noexcept
 {
+	JoinSystemQuery();
+	if (xrSystemQuery.pending) {
+		if (xrSystemQuery.pending->instance != XR_NULL_HANDLE)
+			xrDestroyInstance(xrSystemQuery.pending->instance);
+		delete xrSystemQuery.pending;
+		xrSystemQuery.pending = nullptr;
+	}
 	if (not m_state)
 		return;
 	DestroySession();
@@ -1326,7 +1471,12 @@ noexcept
 	XrSystemId		systemId = XR_NULL_SYSTEM_ID;
 
 	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-	if (XR_FAILED(xrGetSystem(m_state->instance, &systemInfo, &systemId)))
+
+	XrResult result = xrGetSystem(m_state->instance, &systemInfo, &systemId);
+
+	if (result == XR_ERROR_INSTANCE_LOST)
+		m_state->instanceLost = true;
+	if (XR_FAILED(result))
 		return false;
 	return systemId == m_state->systemId;
 }

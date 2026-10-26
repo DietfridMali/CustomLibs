@@ -543,30 +543,31 @@ int XRView::PollHeadset(void)
 		m_suspended = true;
 		return srOff;
 	}
-	if (xrHandler.RuntimeMissing())
-		return srNone;
 
-	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	int query = xrHandler.SystemQueryResult();
 
-	if (now < m_nextPoll)
+	if (query == BaseXRHandler::xqPending)
 		return srNone;
-	m_nextPoll = now + std::chrono::milliseconds(kPollInterval);
-	if (xrHandler.IsAvailable()) {
+	if (query == BaseXRHandler::xqNone) {
+		if (xrHandler.RuntimeMissing())
+			return srNone;
+
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
+		if (now < m_nextPoll)
+			return srNone;
+		m_nextPoll = now + std::chrono::milliseconds(kPollInterval);
 		if (xrHandler.InstanceLost())
 			xrHandler.Destroy();
-		else if (xrHandler.SystemAvailable()) {
-			if (m_suspended and xrHandler.HeadsetReady())
-				m_suspended = false;
-		}
-		else {
-			m_suspended = false;
-			return srNone;
-		}
+		xrHandler.StartSystemQuery(static_cast<const char*>(m_appName));
+		return srNone;
 	}
-	if (not (xrHandler.IsAvailable() or xrHandler.Create(static_cast<const char*>(m_appName)))) {
+	if (query == BaseXRHandler::xqUnavailable) {
 		m_suspended = false;
 		return srNone;
 	}
+	if (m_suspended and xrHandler.HeadsetReady())
+		m_suspended = false;
 	return m_suspended ? srNone : srOn;
 }
 

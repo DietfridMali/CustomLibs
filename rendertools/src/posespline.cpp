@@ -6,11 +6,12 @@
 // =================================================================================================
 
 static glm::vec3 LogRotation(const glm::quat& q) {
-	glm::vec3 axis(q.x, q.y, q.z);
+	glm::quat r = (q.w < 0.0f) ? -q : q;
+	glm::vec3 axis(r.x, r.y, r.z);
 	float sine = glm::length(axis);
 	if (sine < PoseSpline::cAngleTolerance)
 		return glm::vec3(0.0f);
-	return axis * (atan2f(sine, q.w) / sine);
+	return axis * (atan2f(sine, r.w) / sine);
 }
 
 
@@ -19,17 +20,6 @@ static glm::quat ExpRotation(const glm::vec3& v) {
 	if (angle < PoseSpline::cAngleTolerance)
 		return glm::quat::wxyz(1.0f, 0.0f, 0.0f, 0.0f);
 	return glm::quat(cosf(angle), v * (sinf(angle) / angle));
-}
-
-
-static glm::quat Intermediate(const glm::quat& previous, const glm::quat& current, const glm::quat& next) {
-	glm::quat inverse = glm::conjugate(current);
-	return glm::normalize(current * ExpRotation((LogRotation(inverse * next) + LogRotation(inverse * previous)) * -0.25f));
-}
-
-
-static glm::quat Squad(const glm::quat& q0, const glm::quat& q1, const glm::quat& s0, const glm::quat& s1, float t) {
-	return glm::normalize(glm::mix(glm::mix(q0, q1, t), glm::mix(s0, s1, t), 2.0f * t * (1.0f - t)));
 }
 
 
@@ -58,7 +48,6 @@ bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 	int32_t segmentCount = std::max(keyCount - 1, 0);
 	m_segments.Resize(segmentCount);
 	m_rotations.Resize(keyCount);
-	m_controls.Resize(keyCount);
 	m_arcLengths.Resize(segmentCount * (cArcSamples + 1));
 	m_starts.Clear();
 	m_distances.Clear();
@@ -70,11 +59,48 @@ bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 			q = -q;
 		m_rotations[i] = q;
 	}
-	for (int32_t i = 0; i < keyCount; ++i)
-		m_controls[i] = ((i == 0) or (i == keyCount - 1)) ? m_rotations[i] : Intermediate(m_rotations[i - 1], m_rotations[i], m_rotations[i + 1]);
 	for (int32_t i = 0; i < segmentCount; ++i)
 		SetupSegment(keys, i);
+	SetupTurns();
 	return segmentCount > 0;
+}
+
+
+void PoseSpline::SetupTurns(void) {
+	int32_t segmentCount = m_segments.Length();
+	if (segmentCount == 0)
+		return;
+	AutoArray<glm::vec3> secants(segmentCount);
+	AutoArray<glm::vec3> rates(segmentCount + 1);
+	for (int32_t k = 0; k < segmentCount; ++k) {
+		float length = m_segments[k].length;
+		secants[k] = (length > cPointTolerance) ? LogRotation(glm::conjugate(m_rotations[k]) * m_rotations[k + 1]) / length : glm::vec3(0.0f);
+	}
+	rates[0] = secants[0];
+	rates[segmentCount] = secants[segmentCount - 1];
+	for (int32_t k = 1; k < segmentCount; ++k) {
+		float before = m_segments[k - 1].length;
+		float after = m_segments[k].length;
+		float sum = before + after;
+		rates[k] = (sum > cPointTolerance) ? (secants[k - 1] * after + secants[k] * before) / sum : glm::vec3(0.0f);
+	}
+	for (int32_t k = 0; k < segmentCount; ++k) {
+		Segment& segment = m_segments[k];
+		float third = segment.length / 3.0f;
+		glm::quat start = m_rotations[k] * ExpRotation(rates[k] * third);
+		glm::quat end = m_rotations[k + 1] * ExpRotation(rates[k + 1] * -third);
+		segment.turns[0] = rates[k] * third;
+		segment.turns[1] = LogRotation(glm::conjugate(start) * end);
+		segment.turns[2] = rates[k + 1] * third;
+	}
+}
+
+
+glm::quat PoseSpline::Turn(int32_t segment, float t) const {
+	const Segment& s = m_segments[segment];
+	float v = 1.0f - t;
+	glm::quat q = m_rotations[segment] * ExpRotation(s.turns[0] * (1.0f - v * v * v)) * ExpRotation(s.turns[1] * (t * t * (3.0f - 2.0f * t))) * ExpRotation(s.turns[2] * (t * t * t));
+	return glm::normalize(q);
 }
 
 
@@ -183,14 +209,21 @@ float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime
 }
 
 
-bool PoseSpline::Evaluate(float time, Vector3f& position, Matrix4f& orientation) const {
+float PoseSpline::Distance(float time) const {
 	int32_t sampleCount = m_distances.Length();
 	if (sampleCount < 2)
-		return false;
+		return 0.0f;
 	float step = std::clamp(time, 0.0f, m_duration) / cTimeStep;
 	int32_t i = std::min(int32_t(step), sampleCount - 2);
 	float f = std::min(step - float(i), 1.0f);
-	float distance = m_distances[i] + (m_distances[i + 1] - m_distances[i]) * f;
+	return m_distances[i] + (m_distances[i + 1] - m_distances[i]) * f;
+}
+
+
+bool PoseSpline::Evaluate(float time, Vector3f& position, Matrix4f& orientation) const {
+	if (m_distances.Length() < 2)
+		return false;
+	float distance = Distance(time);
 	const float* starts = m_starts.Data();
 	int32_t count = m_starts.Length() - 1;
 	int32_t k = std::clamp(int32_t(std::upper_bound(starts + 1, starts + count + 1, distance) - starts) - 1, 0, count - 1);
@@ -199,7 +232,7 @@ bool PoseSpline::Evaluate(float time, Vector3f& position, Matrix4f& orientation)
 	float local = std::clamp(distance - starts[k], 0.0f, s.length);
 	float fraction = (s.length > cPointTolerance) ? local / s.length : 0.0f;
 	position = Point(segment, ArcParameter(segment, local));
-	orientation = Orientation(Squad(m_rotations[segment], m_rotations[segment + 1], m_controls[segment], m_controls[segment + 1], fraction));
+	orientation = Orientation(Turn(segment, fraction));
 	return time < m_duration;
 }
 

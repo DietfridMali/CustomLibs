@@ -31,6 +31,13 @@ public:
 		xbThumbstick = 8u
 	};
 
+	enum eSystemQuery {
+		xqNone = 0,
+		xqPending,
+		xqAvailable,
+		xqUnavailable
+	};
+
 	struct ControllerState {
 		Vector2f	thumbstick{ 0.0f, 0.0f };
 		float		trigger{ 0.0f };
@@ -95,6 +102,10 @@ public:
 
 	bool HeadsetReady(void)
 	noexcept;
+
+	bool StartSystemQuery(const char* appName);
+
+	int SystemQueryResult(void);
 
 	bool WaitUntilRunning(int timeout)
 	noexcept;
@@ -229,6 +240,8 @@ protected:
 	noexcept = 0;
 
 private:
+	bool SetupSystem(void);
+
 	bool CreateSwapchain(XRSwapchain& swapchain, int64_t format, uint64_t usage, int width, int height, int layers, bool isDepth, const char* name);
 
 	void SetLayerRect(int width, int height)

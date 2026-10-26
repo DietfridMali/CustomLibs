@@ -31,6 +31,8 @@ public:
 
 	float StartTiming(int32_t firstKey, float speedScale, float rampTime);
 
+	float Distance(float time) const;
+
 	bool Evaluate(float time, Vector3f& position, Matrix4f& orientation) const;
 
 	Vector3f Point(int32_t segment, float t) const;
@@ -53,13 +55,13 @@ private:
 		Vector3f	p1;
 		Vector3f	t0;
 		Vector3f	t1;
+		glm::vec3	turns[3]{};
 		float		length{ 0.0f };
 		float		speed{ 0.0f };
 	};
 
 	AutoArray<Segment>		m_segments;
 	AutoArray<glm::quat>	m_rotations;
-	AutoArray<glm::quat>	m_controls;
 	AutoArray<float>		m_arcLengths;
 	AutoArray<float>		m_starts;
 	AutoArray<float>		m_distances;
@@ -67,6 +69,10 @@ private:
 	float					m_duration{ 0.0f };
 
 	void SetupSegment(const AutoArray<Key>& keys, int32_t i);
+
+	void SetupTurns(void);
+
+	glm::quat Turn(int32_t segment, float t) const;
 
 	float ArcParameter(int32_t segment, float distance) const;
 };
