@@ -18,7 +18,7 @@ static glm::vec3 LogRotation(const glm::quat& q) {
 static glm::quat ExpRotation(const glm::vec3& v) {
 	float angle = glm::length(v);
 	if (angle < PoseSpline::cAngleTolerance)
-		return glm::quat::wxyz(1.0f, 0.0f, 0.0f, 0.0f);
+		return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	return glm::quat(cosf(angle), v * (sinf(angle) / angle));
 }
 
