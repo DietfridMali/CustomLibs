@@ -173,6 +173,7 @@
     <ClInclude Include="..\..\include\lightningnoise.h" />
     <ClInclude Include="..\..\include\lightningbolt.h" />
     <ClInclude Include="..\..\include\linerenderer.h" />
+    <ClInclude Include="..\..\include\posespline.h" />
     <ClInclude Include="..\..\include\lightningemitter.h" />
     <ClInclude Include="..\..\include\lightningsystem.h" />
     <ClInclude Include="..\..\include\noise.h" />
@@ -285,6 +286,7 @@
     <ClCompile Include="..\..\src\lightningnoise.cpp" />
     <ClCompile Include="..\..\src\lightningbolt.cpp" />
     <ClCompile Include="..\..\src\linerenderer.cpp" />
+    <ClCompile Include="..\..\src\posespline.cpp" />
     <ClCompile Include="..\..\src\lightningemitter.cpp" />
     <ClCompile Include="..\..\src\lightningsystem.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />

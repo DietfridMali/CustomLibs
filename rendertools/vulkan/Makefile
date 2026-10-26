@@ -103,6 +103,7 @@ COMMON_FILES := \
  noise \
  objloader \
  oceanfft \
+ posespline \
  prerenderedtexture \
  projector \
  quad \

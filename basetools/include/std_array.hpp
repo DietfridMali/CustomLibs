@@ -359,6 +359,15 @@ public:
 	}
 
 
+	bool Insert(int32_t i, const DATA_T& data)
+	{
+		if ((i < 0) or (i > Length()) or (Length() == MaxIndex))
+			return false;
+		m_arrayPtr->insert(m_arrayPtr->begin() + i, data);
+		return true;
+	}
+
+
 	template <typename... Args>
 	DATA_T* Append(Args&&... args)
 	{
