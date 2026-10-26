@@ -13,12 +13,13 @@ public:
 	struct Key {
 		Vector3f	position;
 		glm::quat	orientation;
-		float		duration;
+		float		speed;
 	};
 
 	static constexpr int32_t	cArcSamples = 64;
 	static constexpr float		cPointTolerance = 1.0e-4f;
 	static constexpr float		cAngleTolerance = 1.0e-6f;
+	static constexpr float		cTimeStep = 0.002f;
 
 	static glm::quat Rotation(const Matrix4f& orientation)
 	noexcept;
@@ -28,7 +29,7 @@ public:
 
 	bool Setup(const AutoArray<Key>& keys);
 
-	float StartTiming(int32_t firstKey);
+	float StartTiming(int32_t firstKey, float speedScale, float rampTime);
 
 	bool Evaluate(float time, Vector3f& position, Matrix4f& orientation) const;
 
@@ -53,15 +54,15 @@ private:
 		Vector3f	t0;
 		Vector3f	t1;
 		float		length{ 0.0f };
-		float		duration{ 0.0f };
+		float		speed{ 0.0f };
 	};
 
 	AutoArray<Segment>		m_segments;
 	AutoArray<glm::quat>	m_rotations;
 	AutoArray<glm::quat>	m_controls;
 	AutoArray<float>		m_arcLengths;
-	AutoArray<float>		m_times;
-	AutoArray<float>		m_slopes;
+	AutoArray<float>		m_starts;
+	AutoArray<float>		m_distances;
 	int32_t					m_firstKey{ 0 };
 	float					m_duration{ 0.0f };
 

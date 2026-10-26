@@ -60,8 +60,8 @@ bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 	m_rotations.Resize(keyCount);
 	m_controls.Resize(keyCount);
 	m_arcLengths.Resize(segmentCount * (cArcSamples + 1));
-	m_times.Clear();
-	m_slopes.Clear();
+	m_starts.Clear();
+	m_distances.Clear();
 	m_firstKey = 0;
 	m_duration = 0.0f;
 	for (int32_t i = 0; i < keyCount; ++i) {
@@ -87,7 +87,7 @@ void PoseSpline::SetupSegment(const AutoArray<Key>& keys, int32_t i) {
 	Segment& segment = m_segments[i];
 	segment.p0 = p1;
 	segment.p1 = p2;
-	segment.duration = keys[i].duration;
+	segment.speed = keys[i].speed;
 	if ((p2 - p1).Length() < cPointTolerance) {
 		segment.t0 = Vector3f::ZERO;
 		segment.t1 = Vector3f::ZERO;
@@ -130,52 +130,76 @@ float PoseSpline::ArcParameter(int32_t segment, float distance) const {
 }
 
 
-float PoseSpline::StartTiming(int32_t firstKey) {
+float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime) {
 	int32_t segmentCount = m_segments.Length();
 	m_firstKey = std::clamp(firstKey, 0, segmentCount);
 	int32_t count = segmentCount - m_firstKey;
-	m_times.Resize(count + 1);
-	m_slopes.Resize(count + 1);
-	m_times[0] = 0.0f;
-	m_slopes[0] = 0.0f;
-	m_slopes[count] = 0.0f;
+	m_starts.Resize(count + 1);
+	m_starts[0] = 0.0f;
 	for (int32_t k = 0; k < count; ++k)
-		m_times[k + 1] = m_times[k] + m_segments[m_firstKey + k].duration;
-	for (int32_t k = 1; k < count; ++k) {
-		const Segment& a = m_segments[m_firstKey + k - 1];
-		const Segment& b = m_segments[m_firstKey + k];
-		float speedA = a.length / a.duration;
-		float speedB = b.length / b.duration;
-		if ((speedA <= 0.0f) or (speedB <= 0.0f))
-			m_slopes[k] = 0.0f;
-		else {
-			float weightA = 2.0f * b.duration + a.duration;
-			float weightB = b.duration + 2.0f * a.duration;
-			m_slopes[k] = (weightA + weightB) / (weightA / speedA + weightB / speedB);
+		m_starts[k + 1] = m_starts[k] + m_segments[m_firstKey + k].length;
+	m_distances.Clear();
+	m_duration = 0.0f;
+	if (count == 0)
+		return 0.0f;
+	float total = m_starts[count];
+	float time = 0.0f;
+	float distance = 0.0f;
+	float speed = 0.0f;
+	float rampStart = 0.0f;
+	float rampFrom = 0.0f;
+	float rampTo = m_segments[m_firstKey].speed * speedScale;
+	bool isBraking = false;
+	int32_t k = 0;
+	m_distances.Append(0.0f);
+	for (;;) {
+		time += cTimeStep;
+		float x = std::clamp((time - rampStart) / rampTime, 0.0f, 1.0f);
+		float nextSpeed = rampFrom + (rampTo - rampFrom) * x * x * (3.0f - 2.0f * x);
+		distance += 0.5f * (speed + nextSpeed) * cTimeStep;
+		speed = nextSpeed;
+		if ((distance >= total) or (isBraking and (x >= 1.0f))) {
+			m_distances.Append(total);
+			break;
+		}
+		m_distances.Append(distance);
+		while ((k + 1 < count) and (distance >= m_starts[k + 1])) {
+			++k;
+			if (not isBraking) {
+				rampStart = time;
+				rampFrom = speed;
+				rampTo = m_segments[m_firstKey + k].speed * speedScale;
+			}
+		}
+		if (not isBraking and (total - distance <= 0.5f * speed * rampTime)) {
+			isBraking = true;
+			rampStart = time;
+			rampFrom = speed;
+			rampTo = 0.0f;
 		}
 	}
-	m_duration = m_times[count];
+	m_duration = float(m_distances.Length() - 1) * cTimeStep;
 	return m_duration;
 }
 
 
 bool PoseSpline::Evaluate(float time, Vector3f& position, Matrix4f& orientation) const {
-	int32_t count = m_times.Length() - 1;
-	if (count < 1)
+	int32_t sampleCount = m_distances.Length();
+	if (sampleCount < 2)
 		return false;
-	time = std::clamp(time, 0.0f, m_duration);
-	const float* times = m_times.Data();
-	int32_t k = std::clamp(int32_t(std::upper_bound(times + 1, times + count + 1, time) - times) - 1, 0, count - 1);
-	int32_t i = m_firstKey + k;
-	const Segment& segment = m_segments[i];
-	float u = (time - times[k]) / segment.duration;
-	float u2 = u * u;
-	float u3 = u2 * u;
-	float distance = (u3 - 2.0f * u2 + u) * segment.duration * m_slopes[k] + (3.0f * u2 - 2.0f * u3) * segment.length + (u3 - u2) * segment.duration * m_slopes[k + 1];
-	distance = std::clamp(distance, 0.0f, segment.length);
-	float fraction = (segment.length > cPointTolerance) ? distance / segment.length : u;
-	position = Point(i, ArcParameter(i, distance));
-	orientation = Orientation(Squad(m_rotations[i], m_rotations[i + 1], m_controls[i], m_controls[i + 1], fraction));
+	float step = std::clamp(time, 0.0f, m_duration) / cTimeStep;
+	int32_t i = std::min(int32_t(step), sampleCount - 2);
+	float f = std::min(step - float(i), 1.0f);
+	float distance = m_distances[i] + (m_distances[i + 1] - m_distances[i]) * f;
+	const float* starts = m_starts.Data();
+	int32_t count = m_starts.Length() - 1;
+	int32_t k = std::clamp(int32_t(std::upper_bound(starts + 1, starts + count + 1, distance) - starts) - 1, 0, count - 1);
+	int32_t segment = m_firstKey + k;
+	const Segment& s = m_segments[segment];
+	float local = std::clamp(distance - starts[k], 0.0f, s.length);
+	float fraction = (s.length > cPointTolerance) ? local / s.length : 0.0f;
+	position = Point(segment, ArcParameter(segment, local));
+	orientation = Orientation(Squad(m_rotations[segment], m_rotations[segment + 1], m_controls[segment], m_controls[segment + 1], fraction));
 	return time < m_duration;
 }
 
