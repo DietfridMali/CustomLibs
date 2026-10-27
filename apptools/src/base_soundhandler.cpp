@@ -335,6 +335,31 @@ bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime)
 }
 
 
+void BaseSoundHandler::DuckMusic(float gain, int fadeTime)
+{
+	if (gain == m_musicDuckTarget)
+		return;
+	m_musicDuckStart = m_musicDuck;
+	m_musicDuckTarget = gain;
+	m_musicDuckTime = SDL_GetTicks();
+	m_musicDuckFadeTime = fadeTime;
+	UpdateMusicDuck();
+}
+
+
+void BaseSoundHandler::UpdateMusicDuck(void)
+{
+	if (m_musicDuck == m_musicDuckTarget)
+		return;
+	uint64_t elapsed = SDL_GetTicks() - m_musicDuckTime;
+	if ((m_musicDuckFadeTime <= 0) or (elapsed >= uint64_t(m_musicDuckFadeTime)))
+		m_musicDuck = m_musicDuckTarget;
+	else
+		m_musicDuck = m_musicDuckStart + (m_musicDuckTarget - m_musicDuckStart) * float(elapsed) / float(m_musicDuckFadeTime);
+	SetMusicVolume(m_musicVolume);
+}
+
+
 void BaseSoundHandler::SetMusicPlayback(bool play)
 {
 	if (m_playMusic != play) {

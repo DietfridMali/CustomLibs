@@ -80,6 +80,11 @@ public:
 	int								m_soundLevel{ 0 }; // maximum
 	float							m_masterVolume{ 1.0f };
 	float							m_musicVolume{ 1.0f };
+	float							m_musicDuck{ 1.0f };
+	float							m_musicDuckStart{ 1.0f };
+	float							m_musicDuckTarget{ 1.0f };
+	uint64_t						m_musicDuckTime{ 0 };
+	int								m_musicDuckFadeTime{ 0 };
 	float							m_maxAudibleDistance{ 0.0f };
 	int								m_channelCount{ 0 };
 	bool							m_haveAudio{ false };
@@ -214,13 +219,17 @@ public:
 	void SetMusicVolume(float volume) {
 		m_musicVolume = volume;
 		if (m_haveAudio)
-			MIX_SetTrackGain(m_musicTrack, std::clamp(volume, 0.0f, 1.0f));
+			MIX_SetTrackGain(m_musicTrack, std::clamp(volume, 0.0f, 1.0f) * m_musicDuck);
 	}
 
 	void FadeOutMusic(int duration = 1000) {
 		if (m_haveAudio)
 			MIX_StopTrack(m_musicTrack, MIX_TrackMSToFrames(m_musicTrack, duration));
 	}
+
+	void DuckMusic(float gain, int fadeTime);
+
+	void UpdateMusicDuck(void);
 
 	inline bool SupportsMP3(void)
 	noexcept
