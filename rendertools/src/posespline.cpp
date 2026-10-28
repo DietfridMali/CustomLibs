@@ -27,6 +27,20 @@ static float KnotDistance(const Vector3f& a, const Vector3f& b) {
 	return sqrtf((b - a).Length());
 }
 
+
+static void ArcTangents(Vector3f chord, Vector3f& given, Vector3f& mirrored) {
+	float tangentLength = given.Length();
+	if (tangentLength < PoseSpline::cPointTolerance)
+		return;
+	float chordLength = chord.Length();
+	Vector3f direction = chord / chordLength;
+	Vector3f tangent = given / tangentLength;
+	float alignment = tangent.Dot(direction);
+	float length = 2.0f * chordLength / (1.0f + std::max(alignment, 0.0f));
+	given = tangent * length;
+	mirrored = (direction * (2.0f * alignment) - tangent) * length;
+}
+
 // =================================================================================================
 
 glm::quat PoseSpline::Rotation(const Matrix4f& orientation)
@@ -124,6 +138,10 @@ void PoseSpline::SetupSegment(const AutoArray<Key>& keys, int32_t i) {
 		float d2 = ((p3 - p2).Length() < cPointTolerance) ? d1 : KnotDistance(p2, p3);
 		segment.t0 = ((p1 - p0) / d0 - (p2 - p0) / (d0 + d1) + (p2 - p1) / d1) * d1;
 		segment.t1 = ((p2 - p1) / d1 - (p3 - p1) / (d1 + d2) + (p3 - p2) / d2) * d1;
+		if ((i == 0) and (i + 2 < keyCount))
+			ArcTangents(p2 - p1, segment.t1, segment.t0);
+		else if ((i > 0) and (i + 2 == keyCount))
+			ArcTangents(p2 - p1, segment.t0, segment.t1);
 	}
 	float* arc = m_arcLengths.Data() + i * (cArcSamples + 1);
 	Vector3f previous = p1;
