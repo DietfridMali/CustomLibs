@@ -1958,35 +1958,72 @@ bool BaseXRHandler::RenderImageToEyesAt(Texture* source, float distance, float w
 }
 
 
+bool BaseXRHandler::RenderImageToEyes(Texture* source, const Matrix4f* imageToClip, bool bFlipVertically)
+{
+	if (not (source and imageToClip and m_state and m_state->eyesRendered))
+		return false;
+	return DrawToEyes(source, imageToClip, false, 0.0f, 0.0f, 0.0f, bFlipVertically);
+}
+
+
+bool BaseXRHandler::EyeImageCenter(int view, float distance, Vector2f& ndc) const
+noexcept
+{
+	if (not (m_state and (distance > 0.0f) and (view >= 0) and (view < kMaxRenderViews)))
+		return false;
+
+	Vector4f clip = AppToClip(view, distance * kLayerZNearScale, distance * kLayerZFarScale) * Vector4f(0.0f, 0.0f, -distance, 1.0f);
+
+	if (clip.w <= 0.0f)
+		return false;
+	ndc = Vector2f(clip.x / clip.w, clip.y / clip.w);
+	return true;
+}
+
+
+Matrix4f BaseXRHandler::AppToClip(int view, float zNear, float zFar) const
+noexcept
+{
+	const XRState&	s = *m_state;
+	const XrFovf&	fov = s.views[view].fov;
+	float			tanScale = s.layerFovScale * zNear;
+	glm::mat4		stretch = glm::scale(glm::mat4(1.0f), glm::vec3(s.layerFovScale, s.layerFovScale, 1.0f));
+
+	return Matrix4f(glm::frustum(std::tan(fov.angleLeft) * tanScale, std::tan(fov.angleRight) * tanScale,
+								 std::tan(fov.angleDown) * tanScale, std::tan(fov.angleUp) * tanScale, zNear, zFar) *
+					glm::inverse(PoseMatrix(s.views[view].pose)) * stretch);
+}
+
+
 bool BaseXRHandler::RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically)
+{
+	if (not (width > 0.0f))
+		return false;
+
+	float		zNear = distance * kLayerZNearScale;
+	float		zFar = distance * kLayerZFarScale;
+	glm::mat4	layerToApp = curved ? glm::mat4(1.0f)
+									: glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -distance)), glm::vec3(width, height, 1.0f));
+	Matrix4f	layerToClip[kMaxRenderViews];
+
+	for (int i = 0; i < kMaxRenderViews; ++i)
+		layerToClip[i] = AppToClip(i, zNear, zFar) * layerToApp;
+	return DrawToEyes(source, layerToClip, curved, distance, width, height, bFlipVertically);
+}
+
+
+bool BaseXRHandler::DrawToEyes(Texture* source, const Matrix4f* layerToClip, bool curved, float distance, float width, float height, bool bFlipVertically)
 {
 	XRState&		s = *m_state;
 	RenderTarget*	eyes = EyeTarget();
 
-	if (not (eyes and (width > 0.0f)))
+	if (not eyes)
 		return false;
 
 	Shader* shader = baseShaderHandler.SetupRenderShader("xrLayerEyes");
 
 	if (not (shader and eyes->Activate({ .clear = false })))
 		return false;
-
-	float		zNear = distance * kLayerZNearScale;
-	float		zFar = distance * kLayerZFarScale;
-	float		tanScale = s.layerFovScale * zNear;
-	glm::mat4	stretch = glm::scale(glm::mat4(1.0f), glm::vec3(s.layerFovScale, s.layerFovScale, 1.0f));
-	glm::mat4	layerToApp = curved ? stretch
-									: stretch * glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -distance)),
-														   glm::vec3(width, height, 1.0f));
-	Matrix4f	layerToClip[kMaxRenderViews];
-
-	for (int i = 0; i < kMaxRenderViews; ++i) {
-		const XrFovf& fov = s.views[i].fov;
-
-		layerToClip[i] = Matrix4f(glm::frustum(std::tan(fov.angleLeft) * tanScale, std::tan(fov.angleRight) * tanScale,
-											   std::tan(fov.angleDown) * tanScale, std::tan(fov.angleUp) * tanScale, zNear, zFar) *
-								  glm::inverse(PoseMatrix(s.views[i].pose)) * layerToApp);
-	}
 	baseRenderer.Set2DRenderStates();
 	gfxStates.SetBlending(1);
 	gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);

@@ -191,6 +191,11 @@ public:
 
 	bool RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically);
 
+	bool RenderImageToEyes(Texture* source, const Matrix4f* imageToClip, bool bFlipVertically);
+
+	bool EyeImageCenter(int view, float distance, Vector2f& ndc) const
+	noexcept;
+
 	void SetTestPattern(bool enable)
 	noexcept;
 
@@ -250,6 +255,11 @@ private:
 	bool RenderLayerToEyes(Texture* source, bool bFlipVertically);
 
 	bool RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically);
+
+	Matrix4f AppToClip(int view, float zNear, float zFar) const
+	noexcept;
+
+	bool DrawToEyes(Texture* source, const Matrix4f* layerToClip, bool curved, float distance, float width, float height, bool bFlipVertically);
 };
 
 // =================================================================================================
