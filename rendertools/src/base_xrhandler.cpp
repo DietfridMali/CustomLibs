@@ -42,6 +42,16 @@ static float xrViewPitch = 0.0f;
 static int xrLayerWidth = 0;
 static int xrLayerHeight = 0;
 
+static constexpr int	kSettleTime = 3000;
+static constexpr float	kSettleAngle = 2.0f;
+static constexpr float	kSettleDistance = 0.02f;
+
+static bool xrSettleRecenter = false;
+static bool xrHasSettlePose = false;
+static glm::quat xrSettleOrientation{ 1.0f, 0.0f, 0.0f, 0.0f };
+static glm::vec3 xrSettlePosition{ 0.0f, 0.0f, 0.0f };
+static std::chrono::steady_clock::time_point xrSettleStart{};
+
 static const BaseXRHandler::ControllerState kNoController{};
 
 
@@ -102,6 +112,14 @@ noexcept
 
 	result.orientation = { pitched.x, pitched.y, pitched.z, pitched.w };
 	return result;
+}
+
+
+static bool HeadMoved(const glm::quat& orientation, const glm::vec3& position)
+noexcept
+{
+	return (std::fabs(glm::dot(xrSettleOrientation, orientation)) < std::cos(glm::radians(0.5f * kSettleAngle))) or
+		   (glm::length(position - xrSettlePosition) > kSettleDistance);
 }
 
 
@@ -1391,6 +1409,39 @@ noexcept
 		logHandler.Print("OpenXR: recenter requested\n");
 		m_state->recenterPending = true;
 	}
+}
+
+
+void BaseXRHandler::ArmSettleRecenter(bool arm)
+noexcept
+{
+	xrSettleRecenter = arm;
+	xrHasSettlePose = false;
+}
+
+
+void BaseXRHandler::UpdateSettleRecenter(void)
+noexcept
+{
+	if (not (xrSettleRecenter and IsRunning()))
+		return;
+
+	const XrPosef&							head = m_state->headPose;
+	glm::quat								orientation(head.orientation.w, head.orientation.x, head.orientation.y, head.orientation.z);
+	glm::vec3								position(head.position.x, head.position.y, head.position.z);
+	std::chrono::steady_clock::time_point	now = std::chrono::steady_clock::now();
+
+	if (not xrHasSettlePose or HeadMoved(orientation, position)) {
+		xrSettleOrientation = orientation;
+		xrSettlePosition = position;
+		xrSettleStart = now;
+		xrHasSettlePose = true;
+		return;
+	}
+	if (now - xrSettleStart < std::chrono::milliseconds(kSettleTime))
+		return;
+	Recenter();
+	xrSettleRecenter = false;
 }
 
 

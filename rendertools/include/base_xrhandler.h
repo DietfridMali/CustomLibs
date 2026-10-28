@@ -76,6 +76,12 @@ public:
 	void Recenter(void)
 	noexcept;
 
+	void ArmSettleRecenter(bool arm)
+	noexcept;
+
+	void UpdateSettleRecenter(void)
+	noexcept;
+
 	void SetViewPitch(float degrees)
 	noexcept;
 

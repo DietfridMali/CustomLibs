@@ -58,6 +58,7 @@ bool XRView::Start(int timeout)
 	}
 	baseRenderer.SetViewCount(xrHandler.HasSession() ? kMaxRenderViews : 1);
 	m_nextPoll = std::chrono::steady_clock::now() + std::chrono::milliseconds(kPollInterval);
+	xrHandler.ArmSettleRecenter(xrHandler.HasSession());
 	return xrHandler.HasSession();
 }
 
@@ -690,6 +691,7 @@ void XRView::EndSwitch(void)
 	baseDisplayHandler.SetVSync(m_vSync and not xrHandler.HasSession());
 	if (xrHandler.HasSession())
 		xrHandler.Recenter();
+	xrHandler.ArmSettleRecenter(xrHandler.HasSession());
 	m_switching = false;
 	if (m_switchClient)
 		m_switchClient->FinishSwitch();
