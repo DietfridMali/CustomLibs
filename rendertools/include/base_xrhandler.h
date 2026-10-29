@@ -237,7 +237,7 @@ protected:
 	virtual const char* GraphicsExtension(void) const
 	noexcept = 0;
 
-	virtual bool LoadGraphics(String& info) = 0;
+	virtual bool LoadGraphics(void) = 0;
 
 	virtual const void* GraphicsBinding(void)
 	noexcept = 0;

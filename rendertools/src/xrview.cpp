@@ -51,7 +51,6 @@ bool XRView::Create(const char* appName, XRSwitchClient* switchClient, const Gfx
 bool XRView::Start(int timeout)
 {
 	if (xrHandler.HasSession() and not xrHandler.WaitUntilRunning(timeout)) {
-		logHandler.Print("VR: the headset is not active, starting without VR\n");
 		xrHandler.DestroySession();
 		xrHandler.EnableSession(false);
 		m_suspended = true;
@@ -582,7 +581,6 @@ int XRView::BeginSwitch(bool on)
 	m_switchStep = 0;
 	m_switchFull = on and not xrHandler.DeviceCreated();
 	m_switchSteps = m_switchFull ? 2 : baseShaderHandler.ShaderCount() + 2;
-	logHandler.Print("VR: switching %s%s\n", on ? "on" : "off", m_switchFull ? " with a new graphics device" : "");
 	return m_switchSteps;
 }
 
@@ -695,7 +693,6 @@ void XRView::EndSwitch(void)
 	m_switching = false;
 	if (m_switchClient)
 		m_switchClient->FinishSwitch();
-	logHandler.Print("VR: %s\n", xrHandler.HasSession() ? "on" : "off");
 }
 
 

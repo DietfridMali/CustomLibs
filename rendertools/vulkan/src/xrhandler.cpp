@@ -54,7 +54,7 @@ noexcept
 }
 
 
-bool GfxXRHandler::LoadGraphics(String& info)
+bool GfxXRHandler::LoadGraphics(void)
 {
 	XRState& s = *m_state;
 
@@ -68,17 +68,8 @@ bool GfxXRHandler::LoadGraphics(String& info)
 
 	XrGraphicsRequirementsVulkan2KHR requirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN2_KHR };
 
-	if (not XrSucceeded(s.instance, xrVulkan.pfnGetVulkanGraphicsRequirements2(s.instance, s.systemId, &requirements),
-						"xrGetVulkanGraphicsRequirements2KHR"))
-		return false;
-
-	char text[64];
-
-	snprintf(text, sizeof(text), "Vulkan %u.%u .. %u.%u", unsigned(XR_VERSION_MAJOR(requirements.minApiVersionSupported)),
-			 unsigned(XR_VERSION_MINOR(requirements.minApiVersionSupported)), unsigned(XR_VERSION_MAJOR(requirements.maxApiVersionSupported)),
-			 unsigned(XR_VERSION_MINOR(requirements.maxApiVersionSupported)));
-	info = String(text);
-	return true;
+	return XrSucceeded(s.instance, xrVulkan.pfnGetVulkanGraphicsRequirements2(s.instance, s.systemId, &requirements),
+					   "xrGetVulkanGraphicsRequirements2KHR");
 }
 
 

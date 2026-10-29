@@ -69,7 +69,7 @@ noexcept
 }
 
 
-bool GfxXRHandler::LoadGraphics(String& info)
+bool GfxXRHandler::LoadGraphics(void)
 {
 	XRState& s = *m_state;
 
@@ -87,12 +87,6 @@ bool GfxXRHandler::LoadGraphics(String& info)
 	xrD3D12.minFeatureLevel = requirements.minFeatureLevel;
 	if (DeviceMeetsRequirements())
 		SetDeviceCreated();
-
-	char text[64];
-
-	snprintf(text, sizeof(text), "Direct3D 12 feature level %u.%u or higher", (unsigned(requirements.minFeatureLevel) >> 12) & 0xFu,
-			 (unsigned(requirements.minFeatureLevel) >> 8) & 0xFu);
-	info = String(text);
 	return true;
 }
 

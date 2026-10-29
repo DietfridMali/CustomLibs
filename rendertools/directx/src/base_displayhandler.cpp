@@ -190,7 +190,6 @@ bool BaseDisplayHandler::CreateSwapChain(void)
 		exit(1);
 	}
 	m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-	logHandler.Print("Swapchain: vertical sync %s\n", m_vSync ? "on, sync interval 1" : "off, sync interval 0 with tearing");
 	return true;
 }
 
@@ -525,7 +524,6 @@ bool BaseDisplayHandler::ResizeSwapChain(void)
 	}
 	AcquireBackBuffers();
 	m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-	logHandler.Print("Swapchain: vertical sync %s\n", m_vSync ? "on, sync interval 1" : "off, sync interval 0 with tearing");
 	return true;
 }
 

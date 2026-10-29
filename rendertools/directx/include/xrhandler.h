@@ -24,7 +24,7 @@ protected:
 	virtual const char* GraphicsExtension(void) const
 	noexcept override;
 
-	virtual bool LoadGraphics(String& info) override;
+	virtual bool LoadGraphics(void) override;
 
 	virtual const void* GraphicsBinding(void)
 	noexcept override;

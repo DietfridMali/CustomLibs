@@ -35,19 +35,6 @@
 
 #include <cstdio>
 
-#include "loghandler.h"
-
-#ifdef LOG
-#undef LOG
-#endif
-
-#if 1 //def _DEBUG
-#define LOG(msg, ...) logHandler.Print(msg, ##__VA_ARGS__)
-#else
-#define LOG(msg, ...) \
-	{}
-#endif
-
 // =================================================================================================
 // PlatformHandler
 
@@ -66,10 +53,7 @@ bool PlatformHandler::Init(PlatformType type)
 
 bool PlatformHandler::Init(void)
 {
-	if (Init(PlatformType::Steam) or Init(PlatformType::XBox))
-		return true;
-	LOG("PlatformHandler::Init: no platform available\n");
-	return false;
+	return Init(PlatformType::Steam) or Init(PlatformType::XBox);
 }
 
 

@@ -278,8 +278,6 @@ noexcept
 	if (not CreateAppSpace(s, PitchedPose(pose, xrViewPitch)))
 		return false;
 	s.appliedViewPitch = xrViewPitch;
-	logHandler.Print("OpenXR: reference pose set (head orientation %.3f %.3f %.3f %.3f, yaw %.1f, view pitch %+.0f)\n", head.x, head.y, head.z,
-					 head.w, glm::degrees(yaw), xrViewPitch);
 	return true;
 }
 
@@ -297,10 +295,7 @@ noexcept
 static bool ApplyLocalChange(XRState& s)
 noexcept
 {
-	if (not CreateAppSpace(s, MatrixPose(glm::inverse(PoseMatrix(s.localChange)) * PoseMatrix(s.appPose))))
-		return false;
-	logHandler.Print("OpenXR: reference pose kept across the change of the local space\n");
-	return true;
+	return CreateAppSpace(s, MatrixPose(glm::inverse(PoseMatrix(s.localChange)) * PoseMatrix(s.appPose)));
 }
 
 
@@ -613,32 +608,6 @@ noexcept
 }
 
 
-static const char* SessionStateName(XrSessionState state)
-noexcept
-{
-	switch (state) {
-		case XR_SESSION_STATE_IDLE:
-			return "idle";
-		case XR_SESSION_STATE_READY:
-			return "ready";
-		case XR_SESSION_STATE_SYNCHRONIZED:
-			return "synchronized";
-		case XR_SESSION_STATE_VISIBLE:
-			return "visible";
-		case XR_SESSION_STATE_FOCUSED:
-			return "focused";
-		case XR_SESSION_STATE_STOPPING:
-			return "stopping";
-		case XR_SESSION_STATE_LOSS_PENDING:
-			return "loss pending";
-		case XR_SESSION_STATE_EXITING:
-			return "exiting";
-		default:
-			return "unknown";
-	}
-}
-
-
 static void PollEvents(XRState& s)
 noexcept
 {
@@ -651,7 +620,6 @@ noexcept
 
 				if (changed.session != s.session)
 					break;
-				logHandler.Print("OpenXR: session state %s\n", SessionStateName(changed.state));
 				s.sessionState = changed.state;
 				if (changed.state == XR_SESSION_STATE_READY) {
 					XrSessionBeginInfo beginInfo{ XR_TYPE_SESSION_BEGIN_INFO };
@@ -672,7 +640,6 @@ noexcept
 			}
 
 			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
-				logHandler.Print("OpenXR: instance loss pending\n");
 				s.isRunning = false;
 				s.instanceLost = true;
 				s.sessionStopped = true;
@@ -683,9 +650,6 @@ noexcept
 					*reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(&event);
 				const XrPosef& change = changed.poseInPreviousSpace;
 
-				logHandler.Print("OpenXR: reference space %d change pending (pose valid %d, orientation %.3f %.3f %.3f %.3f, position %.3f %.3f %.3f)\n",
-								 int(changed.referenceSpaceType), int(changed.poseValid), change.orientation.x, change.orientation.y,
-								 change.orientation.z, change.orientation.w, change.position.x, change.position.y, change.position.z);
 				if ((changed.referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL) and changed.poseValid) {
 					s.localChange = s.localChangePending ? MatrixPose(PoseMatrix(s.localChange) * PoseMatrix(change)) : change;
 					s.localChangeTime = changed.changeTime;
@@ -712,10 +676,8 @@ static bool CreateXrInstance(XRState& s, const char* appName, const char* graphi
 	XrResult	result = xrEnumerateInstanceExtensionProperties(nullptr, 0, &extensionCount, nullptr);
 
 	xrRuntimeMissing = (result == XR_ERROR_RUNTIME_UNAVAILABLE);
-	if (XR_FAILED(result)) {
-		logHandler.Print("OpenXR: no runtime found\n");
+	if (XR_FAILED(result))
 		return false;
-	}
 
 	AutoArray<XrExtensionProperties> extensions;
 
@@ -726,10 +688,8 @@ static bool CreateXrInstance(XRState& s, const char* appName, const char* graphi
 		logHandler.Print("OpenXR: the runtime's extensions cannot be read\n");
 		return false;
 	}
-	if (not HasExtension(extensions, graphicsExtension)) {
-		logHandler.Print("OpenXR: the runtime has no %s\n", graphicsExtension);
+	if (not HasExtension(extensions, graphicsExtension))
 		return false;
-	}
 	s.hasDepthExtension = HasExtension(extensions, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
 	s.hasVisibilityMaskExtension = HasExtension(extensions, XR_KHR_VISIBILITY_MASK_EXTENSION_NAME);
 #if LOG_FRAME_METRICS
@@ -965,20 +925,10 @@ bool BaseXRHandler::SetupSystem(void)
 		s.hasPerformanceMetricsExtension = false;
 #endif
 
-	String graphicsInfo;
-
-	if (not LoadGraphics(graphicsInfo)) {
+	if (not LoadGraphics()) {
 		Destroy();
 		return false;
 	}
-
-	XrSystemProperties systemProperties{ XR_TYPE_SYSTEM_PROPERTIES };
-	int eyeWidth = 0;
-	int eyeHeight = 0;
-
-	RecommendedEyeSize(s, eyeWidth, eyeHeight);
-	if (XR_SUCCEEDED(xrGetSystemProperties(s.instance, s.systemId, &systemProperties)))
-		logHandler.Print("OpenXR: %s, eye %d x %d, %s\n", systemProperties.systemName, eyeWidth, eyeHeight, static_cast<const char*>(graphicsInfo));
 	return true;
 }
 
@@ -1058,13 +1008,6 @@ bool BaseXRHandler::CreateSession(int layerWidth, int layerHeight)
 		return false;
 	}
 
-	char	formatText[512];
-	int		formatLength = snprintf(formatText, sizeof(formatText), "OpenXR: swapchain formats of the runtime:");
-
-	for (int i = 0; (i < formats.Length()) and (formatLength < int(sizeof(formatText))); ++i)
-		formatLength += snprintf(formatText + formatLength, sizeof(formatText) - size_t(formatLength), " %lld", static_cast<long long>(formats[i]));
-	logHandler.Print("%s\n", formatText);
-
 	const int64_t*	colorFormats = nullptr;
 	const int64_t*	depthFormats = nullptr;
 	int				colorFormatCount = 0;
@@ -1116,9 +1059,6 @@ bool BaseXRHandler::CreateSession(int layerWidth, int layerHeight)
 	if (xrPerformanceMetrics)
 		EnablePerformanceMetrics(true);
 #endif
-	logHandler.Print("OpenXR: session created, eye buffers %d x %d (format %lld), depth layer %s, visibility mask %s, cylinder layer %s\n", eyeWidth,
-					 eyeHeight, static_cast<long long>(colorFormat), s.hasDepthExtension ? "on" : "off", s.hasVisibilityMaskExtension ? "on" : "off",
-					 s.hasCylinderExtension ? "on" : "off");
 	return true;
 }
 
@@ -1146,7 +1086,6 @@ noexcept
 		if (s.isRunning)
 			xrEndSession(s.session);
 		xrDestroySession(s.session);
-		logHandler.Print("OpenXR: session destroyed\n");
 	}
 	s.session = XR_NULL_HANDLE;
 	s.isRunning = false;
@@ -1172,7 +1111,6 @@ void BaseXRHandler::SetLayerSize(int width, int height)
 							XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT,
 							LayerWidth(), LayerHeight(), 1, false, "xr layer buffer"))
 		DestroySwapchain(s.layer);
-	logHandler.Print("OpenXR: hud layer %d x %d\n", s.layer.width, s.layer.height);
 }
 
 
@@ -1405,10 +1343,8 @@ bool BaseXRHandler::EndFrame(void)
 void BaseXRHandler::Recenter(void)
 noexcept
 {
-	if (HasSession()) {
-		logHandler.Print("OpenXR: recenter requested\n");
+	if (HasSession())
 		m_state->recenterPending = true;
-	}
 }
 
 
@@ -1570,7 +1506,6 @@ noexcept
 			s.probeSession = XR_NULL_HANDLE;
 			return false;
 		}
-		logHandler.Print("OpenXR: waiting for the headset\n");
 	}
 
 	XrEventDataBuffer	event{ XR_TYPE_EVENT_DATA_BUFFER };
@@ -1590,7 +1525,6 @@ noexcept
 	if (not ready)
 		return false;
 	DestroyProbeSession(s);
-	logHandler.Print("OpenXR: headset ready again\n");
 	return true;
 }
 
@@ -1796,12 +1730,6 @@ noexcept
 {
 	if (not m_state)
 		return;
-	if ((scale > 1.0f) != (m_state->layerFovScale > 1.0f)) {
-		if (scale > 1.0f)
-			logHandler.Print("OpenXR: hud rendered into the eye images (field of view scale %.2f)\n", scale);
-		else
-			logHandler.Print("OpenXR: hud submitted as composition layer\n");
-	}
 	m_state->layerFovScale = scale;
 }
 
