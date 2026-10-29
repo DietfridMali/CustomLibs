@@ -59,10 +59,12 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 	TextureList textures;
 	for (auto& name : textureNames) {
 		List<String>	fileNames; // must be local here so it gets reset every loop iteration
-		Texture*		t = FindTexture(name);
+		String			key = params.keyDecoration;
+		key = key.IsEmpty() ? name : key.Replace("{}", (const char*) name);
+		Texture*		t = FindTexture(key);
 		if (not t) {
 			fileNames.Append(name);
-			if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
+			if (not ((t = getTexture(key)) and t->CreateFromFile(textureFolder, fileNames, params))) {
 				if (t) {
 					delete t;
 					t = nullptr;

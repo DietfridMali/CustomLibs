@@ -144,6 +144,9 @@
     <ClInclude Include="..\include\random.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\randomsequence.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\noise.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -43,6 +43,7 @@
     <ClInclude Include="..\include\matrix.hpp" />
     <ClInclude Include="..\include\noise.hpp" />
     <ClInclude Include="..\include\random.hpp" />
+    <ClInclude Include="..\include\randomsequence.hpp" />
     <ClInclude Include="..\include\segmentedlist.hpp" />
     <ClInclude Include="..\include\sharedgfxhandle.hpp" />
     <ClInclude Include="..\include\sharedpointer.hpp" />

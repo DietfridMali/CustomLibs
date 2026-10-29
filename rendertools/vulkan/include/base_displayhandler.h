@@ -254,8 +254,7 @@ public:
 	}
 
 	inline bool IsFullScreen(void)
-	noexcept
-	{
+	noexcept	{
 		return m_isFullscreen;
 	}
 
