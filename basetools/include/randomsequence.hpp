@@ -27,6 +27,10 @@ public:
 		return float(Next() >> 8) * (1.0f / 16777216.0f);
 	}
 
+	float Float(float scale) {
+		return Float() * scale;
+	}
+
 	float Float(float minValue, float maxValue) {
 		return minValue + Float() * (maxValue - minValue);
 	}
