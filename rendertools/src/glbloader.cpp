@@ -15,6 +15,7 @@
 #pragma warning(pop)
 #endif
 #include "conversions.hpp"
+#include "ddsloader.h"
 #include "loghandler.h"
 #include "missingfiles.h"
 
@@ -293,14 +294,15 @@ void GLBLoader::LoadImages(const std::filesystem::path& folder)
 	for (auto& source : m_model.images) {
 		AutoArray<uint8_t>*		image = m_data.images.Append();
 		std::filesystem::path	path = folder / std::filesystem::path(source.uri);
-		m_data.imageNames.Append(source.uri.empty() ? String("") : String(path.generic_string().c_str()));
+		String					imageName = source.uri.empty() ? String("") : String(path.generic_string().c_str());
+		m_data.imageNames.Append(imageName);
 		if (not isUsed[imageIndex++])
 			continue;
 		if (not source.image.empty()) {
 			image->Resize(int32_t(source.image.size()));
 			memcpy(image->DataPtr(), source.image.data(), source.image.size());
 		}
-		else if (not source.uri.empty() and not ReadImageFile(path, *image)) {
+		else if (not source.uri.empty() and not HasCompressedImage(imageName) and not ReadImageFile(path, *image)) {
 			logHandler.Print("GLBLoader: cannot read image '%s'\n", path.generic_string().c_str());
 			missingFiles.Report(path.generic_string().c_str());
 		}

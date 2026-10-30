@@ -1,7 +1,9 @@
 #pragma once
 
+#include "array.hpp"
 #include "string.hpp"
 
+#include <cstdint>
 #include <cstring>
 #include <string>
 
@@ -39,6 +41,12 @@ bool LoadDDS(const String& path, TextureBuffer& buf)
 noexcept;
 
 void SetUseFileColorEncoding(bool use)
+noexcept;
+
+bool HasCompressedImage(const String& imageName)
+noexcept;
+
+bool LoadCompressedAlpha(const String& imageName, AutoArray<uint8_t>& alpha, int32_t& width, int32_t& height)
 noexcept;
 
 bool ReadPNGText(const String& path, const char* keyword, std::string& text)

@@ -298,6 +298,171 @@ noexcept
 } // namespace
 
 
+namespace {
+
+constexpr uint8_t kBC7Weights2[4] = { 0, 21, 43, 64 };
+constexpr uint8_t kBC7Weights3[8] = { 0, 9, 18, 27, 37, 46, 55, 64 };
+constexpr uint8_t kBC7Weights4[16] = { 0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64 };
+
+constexpr uint16_t kBC7Partitions[64] = {
+	0xCCCC, 0x8888, 0xEEEE, 0xECC8, 0xC880, 0xFEEC, 0xFEC8, 0xEC80, 0xC800, 0xFFEC, 0xFE80, 0xE800, 0xFFE8, 0xFF00, 0xFFF0, 0xF000,
+	0xF710, 0x008E, 0x7100, 0x08CE, 0x008C, 0x7310, 0x3100, 0x8CCE, 0x088C, 0x3110, 0x6666, 0x366C, 0x17E8, 0x0FF0, 0x718E, 0x399C,
+	0xAAAA, 0xF0F0, 0x5A5A, 0x33CC, 0x3C3C, 0x55AA, 0x9696, 0xA55A, 0x73CE, 0x13C8, 0x324C, 0x3BDC, 0x6996, 0xC33C, 0x9966, 0x0660,
+	0x0272, 0x04E4, 0x4E40, 0x2720, 0xC936, 0x936C, 0x39C6, 0x639C, 0x9336, 0x9CC6, 0x817E, 0xE718, 0xCCF0, 0x0FCC, 0x7744, 0xEE22
+};
+
+constexpr uint8_t kBC7Anchors[64] = {
+	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+	15, 2, 8, 2, 2, 8, 8, 15, 2, 8, 2, 2, 8, 8, 2, 2,
+	15, 15, 6, 8, 2, 8, 15, 15, 2, 8, 2, 2, 2, 15, 15, 6,
+	6, 2, 6, 8, 15, 15, 2, 2, 15, 15, 15, 15, 15, 2, 2, 15
+};
+
+class BC7BitReader {
+public:
+	explicit BC7BitReader(const uint8_t* block)
+	noexcept
+		: m_block(block)
+	{
+	}
+
+	uint32_t Read(uint32_t count)
+	noexcept
+	{
+		uint32_t value = 0;
+		for (uint32_t i = 0; i < count; ++i, ++m_position)
+			value |= uint32_t((m_block[m_position >> 3] >> (m_position & 7u)) & 1u) << i;
+		return value;
+	}
+
+private:
+	const uint8_t*	m_block;
+	uint32_t		m_position{ 0 };
+};
+
+inline uint32_t BC7Expand(uint32_t value, uint32_t bits)
+noexcept
+{
+	return (value << (8u - bits)) | (value >> (2u * bits - 8u));
+}
+
+inline uint8_t BC7Interpolate(uint32_t end0, uint32_t end1, uint32_t weight)
+noexcept
+{
+	return uint8_t(((64u - weight) * end0 + weight * end1 + 32u) >> 6);
+}
+
+inline const uint8_t* BC7Weights(uint32_t bits)
+noexcept
+{
+	return (bits == 2u) ? kBC7Weights2 : (bits == 3u) ? kBC7Weights3 : kBC7Weights4;
+}
+
+void ReadBC7Indices(BC7BitReader& reader, uint32_t bits, uint8_t* indices)
+noexcept
+{
+	for (uint32_t i = 0; i < 16u; ++i)
+		indices[i] = uint8_t(reader.Read((i == 0u) ? bits - 1u : bits));
+}
+
+void DecodeBC7SingleSubsetAlpha(const uint8_t* block, uint32_t mode, uint8_t* alpha)
+noexcept
+{
+	BC7BitReader	reader(block);
+	reader.Read(mode + 1u);
+	const uint32_t	rotation = (mode == 6u) ? 0u : reader.Read(2u);
+	const bool		swapsIndices = (mode == 4u) and (reader.Read(1u) != 0u);
+	uint32_t		colorBits = (mode == 4u) ? 5u : 7u;
+	uint32_t		alphaBits = (mode == 4u) ? 6u : (mode == 5u) ? 8u : 7u;
+	uint32_t		colorEnds[3][2];
+	uint32_t		alphaEnds[2];
+	for (auto& channel : colorEnds) {
+		channel[0] = reader.Read(colorBits);
+		channel[1] = reader.Read(colorBits);
+	}
+	alphaEnds[0] = reader.Read(alphaBits);
+	alphaEnds[1] = reader.Read(alphaBits);
+	if (mode == 6u) {
+		const uint32_t p0 = reader.Read(1u);
+		const uint32_t p1 = reader.Read(1u);
+		for (auto& channel : colorEnds) {
+			channel[0] = (channel[0] << 1) | p0;
+			channel[1] = (channel[1] << 1) | p1;
+		}
+		alphaEnds[0] = (alphaEnds[0] << 1) | p0;
+		alphaEnds[1] = (alphaEnds[1] << 1) | p1;
+		colorBits = 8u;
+		alphaBits = 8u;
+	}
+	for (auto& channel : colorEnds) {
+		channel[0] = BC7Expand(channel[0], colorBits);
+		channel[1] = BC7Expand(channel[1], colorBits);
+	}
+	alphaEnds[0] = BC7Expand(alphaEnds[0], alphaBits);
+	alphaEnds[1] = BC7Expand(alphaEnds[1], alphaBits);
+	uint8_t first[16];
+	uint8_t second[16];
+	if (mode == 6u) {
+		ReadBC7Indices(reader, 4u, first);
+		for (uint32_t i = 0; i < 16u; ++i)
+			alpha[i] = BC7Interpolate(alphaEnds[0], alphaEnds[1], kBC7Weights4[first[i]]);
+		return;
+	}
+	const uint32_t secondBits = (mode == 4u) ? 3u : 2u;
+	ReadBC7Indices(reader, 2u, first);
+	ReadBC7Indices(reader, secondBits, second);
+	if (rotation == 0u) {
+		const uint8_t* indices = swapsIndices ? first : second;
+		const uint8_t* weights = BC7Weights(swapsIndices ? 2u : secondBits);
+		for (uint32_t i = 0; i < 16u; ++i)
+			alpha[i] = BC7Interpolate(alphaEnds[0], alphaEnds[1], weights[indices[i]]);
+		return;
+	}
+	const uint8_t*	indices = swapsIndices ? second : first;
+	const uint8_t*	weights = BC7Weights(swapsIndices ? secondBits : 2u);
+	const uint32_t*	channel = colorEnds[rotation - 1u];
+	for (uint32_t i = 0; i < 16u; ++i)
+		alpha[i] = BC7Interpolate(channel[0], channel[1], weights[indices[i]]);
+}
+
+void DecodeBC7TwoSubsetAlpha(const uint8_t* block, uint8_t* alpha)
+noexcept
+{
+	BC7BitReader reader(block);
+	reader.Read(8u);
+	const uint32_t partition = reader.Read(6u);
+	for (uint32_t i = 0; i < 12u; ++i)
+		reader.Read(5u);
+	uint32_t ends[4];
+	for (auto& end : ends)
+		end = reader.Read(5u);
+	for (auto& end : ends)
+		end = BC7Expand((end << 1) | reader.Read(1u), 6u);
+	const uint32_t anchor = kBC7Anchors[partition];
+	for (uint32_t texel = 0; texel < 16u; ++texel) {
+		const uint32_t index = reader.Read(((texel == 0u) or (texel == anchor)) ? 1u : 2u);
+		const uint32_t subset = (uint32_t(kBC7Partitions[partition]) >> texel) & 1u;
+		alpha[texel] = BC7Interpolate(ends[2u * subset], ends[2u * subset + 1u], kBC7Weights2[index]);
+	}
+}
+
+void DecodeBC7Alpha(const uint8_t* block, uint8_t* alpha)
+noexcept
+{
+	uint32_t mode = 0;
+	while ((mode < 8u) and (((block[0] >> mode) & 1u) == 0u))
+		++mode;
+	if (mode == 7u)
+		DecodeBC7TwoSubsetAlpha(block, alpha);
+	else if ((mode >= 4u) and (mode <= 6u))
+		DecodeBC7SingleSubsetAlpha(block, mode, alpha);
+	else
+		std::memset(alpha, 255, 16);
+}
+
+} // namespace
+
+
 TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
 							   bool premultiply, bool flipVertically, bool isRequired,
 							   bool allowDDS)
@@ -341,6 +506,47 @@ noexcept
 	buf->Create(image, premultiply, flipVertically);
 	ReadPNGColorEncoding(full, buf->m_info);
 	return buf;
+}
+
+
+bool HasCompressedImage(const String& imageName)
+noexcept
+{
+	if (imageName.IsEmpty() or not baseRenderer.HasFeature(GfxFeature::BlockCompression))
+		return false;
+	return IsDDSFile(String(PreferDDSName(nullptr, static_cast<const char*>(imageName)).c_str()));
+}
+
+
+bool LoadCompressedAlpha(const String& imageName, AutoArray<uint8_t>& alpha, int32_t& width, int32_t& height)
+noexcept
+{
+	const String	path(PreferDDSName(nullptr, static_cast<const char*>(imageName)).c_str());
+	TextureBuffer	buffer;
+	if (not LoadDDS(path, buffer))
+		return false;
+	const GfxPixelFormat format = buffer.m_info.m_gfxFormat;
+	if ((format != GfxPixelFormat::BC7_UNorm) and (format != GfxPixelFormat::BC7_UNorm_SRGB)) {
+		logHandler.Print("LoadCompressedAlpha: '%s' is not BC7\n", static_cast<const char*>(path));
+		return false;
+	}
+	width = buffer.m_info.m_width;
+	height = buffer.m_info.m_height;
+	alpha.Resize(width * height);
+	const uint8_t*	block = buffer.m_data.Data();
+	const int32_t	blocksAcross = int32_t(BlocksAcross(uint32_t(width)));
+	const int32_t	blocksDown = int32_t(BlocksAcross(uint32_t(height)));
+	for (int32_t y = 0; y < blocksDown; ++y) {
+		for (int32_t x = 0; x < blocksAcross; ++x, block += 16) {
+			uint8_t texels[16];
+			DecodeBC7Alpha(block, texels);
+			for (int32_t j = 0, row = y * 4; (j < 4) and (row < height); ++j, ++row) {
+				for (int32_t i = 0, column = x * 4; (i < 4) and (column < width); ++i, ++column)
+					alpha[row * width + column] = texels[j * 4 + i];
+			}
+		}
+	}
+	return true;
 }
 
 
