@@ -2,8 +2,12 @@
 #include <cmath>
 
 #include "posespline.h"
+#include "conversions.hpp"
 
 // =================================================================================================
+
+static constexpr float cMaxRateScale = 3.0f;
+
 
 static glm::vec3 LogRotation(const glm::quat& q) {
 	glm::quat r = (q.w < 0.0f) ? -q : q;
@@ -20,6 +24,38 @@ static glm::quat ExpRotation(const glm::vec3& v) {
 	if (angle < PoseSpline::cAngleTolerance)
 		return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	return glm::quat(cosf(angle), v * (sinf(angle) / angle));
+}
+
+
+static glm::vec3 ViewDirection(const glm::quat& rotation) {
+	return rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+}
+
+
+static glm::quat LookRotation(const glm::vec3& view, float roll) {
+	glm::vec3 right = glm::normalize(glm::cross(view, glm::vec3(0.0f, 1.0f, 0.0f)));
+	glm::vec3 up = glm::cross(right, view);
+	return glm::normalize(glm::quat_cast(glm::mat3(right, up, -view))) * ExpRotation(glm::vec3(0.0f, 0.0f, 0.5f * roll));
+}
+
+
+static float ViewRoll(const glm::quat& rotation) {
+	return 2.0f * LogRotation(glm::conjugate(LookRotation(ViewDirection(rotation), 0.0f)) * rotation).z;
+}
+
+
+static glm::vec3 TurnRate(const glm::vec3& before, const glm::vec3& after, float lengthBefore, float lengthAfter) {
+	glm::vec3 rate(0.0f);
+	float sum = lengthBefore + lengthAfter;
+	if (sum <= PoseSpline::cPointTolerance)
+		return rate;
+	for (int32_t i = 0; i < 3; ++i) {
+		if (before[i] * after[i] <= 0.0f)
+			continue;
+		float limit = cMaxRateScale * std::min(fabsf(before[i]), fabsf(after[i]));
+		rate[i] = std::clamp((before[i] * lengthAfter + after[i] * lengthBefore) / sum, -limit, limit);
+	}
+	return rate;
 }
 
 
@@ -60,6 +96,7 @@ noexcept
 bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 	int32_t keyCount = keys.Length();
 	int32_t segmentCount = std::max(keyCount - 1, 0);
+	m_isLoop = (keyCount >= cMinLoopKeys) and ((keys[keyCount - 1].position - keys[0].position).Length() < cLoopDistance);
 	m_segments.Resize(segmentCount);
 	m_rotations.Resize(keyCount);
 	m_arcLengths.Resize(segmentCount * (cArcSamples + 1));
@@ -68,13 +105,15 @@ bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 	m_firstKey = 0;
 	m_duration = 0.0f;
 	for (int32_t i = 0; i < keyCount; ++i) {
-		glm::quat q = glm::normalize(keys[i].orientation);
+		glm::quat q = glm::normalize(keys[(m_isLoop and (i + 1 == keyCount)) ? 0 : i].orientation);
 		if ((i > 0) and (glm::dot(m_rotations[i - 1], q) < 0.0f))
 			q = -q;
 		m_rotations[i] = q;
 	}
 	for (int32_t i = 0; i < segmentCount; ++i)
 		SetupSegment(keys, i);
+	for (int32_t i = 0; i < segmentCount; ++i)
+		SetupView(i);
 	SetupTurns();
 	return segmentCount > 0;
 }
@@ -88,16 +127,13 @@ void PoseSpline::SetupTurns(void) {
 	AutoArray<glm::vec3> rates(segmentCount + 1);
 	for (int32_t k = 0; k < segmentCount; ++k) {
 		float length = m_segments[k].length;
-		secants[k] = (length > cPointTolerance) ? LogRotation(glm::conjugate(m_rotations[k]) * m_rotations[k + 1]) / length : glm::vec3(0.0f);
+		bool isTurning = (length > cPointTolerance) and (m_segments[k].view != ViewMode::Swing);
+		secants[k] = isTurning ? LogRotation(glm::conjugate(m_rotations[k]) * m_rotations[k + 1]) / length : glm::vec3(0.0f);
 	}
-	rates[0] = secants[0];
-	rates[segmentCount] = secants[segmentCount - 1];
-	for (int32_t k = 1; k < segmentCount; ++k) {
-		float before = m_segments[k - 1].length;
-		float after = m_segments[k].length;
-		float sum = before + after;
-		rates[k] = (sum > cPointTolerance) ? (secants[k - 1] * after + secants[k] * before) / sum : glm::vec3(0.0f);
-	}
+	rates[0] = m_isLoop ? TurnRate(secants[segmentCount - 1], secants[0], m_segments[segmentCount - 1].length, m_segments[0].length) : secants[0];
+	rates[segmentCount] = m_isLoop ? rates[0] : secants[segmentCount - 1];
+	for (int32_t k = 1; k < segmentCount; ++k)
+		rates[k] = TurnRate(secants[k - 1], secants[k], m_segments[k - 1].length, m_segments[k].length);
 	for (int32_t k = 0; k < segmentCount; ++k) {
 		Segment& segment = m_segments[k];
 		float third = segment.length / 3.0f;
@@ -107,6 +143,87 @@ void PoseSpline::SetupTurns(void) {
 		segment.turns[1] = LogRotation(glm::conjugate(start) * end);
 		segment.turns[2] = rates[k + 1] * third;
 	}
+}
+
+
+void PoseSpline::SetupView(int32_t i) {
+	Segment& segment = m_segments[i];
+	segment.view = ViewMode::Turn;
+	glm::vec3 viewStart = ViewDirection(m_rotations[i]);
+	glm::vec3 viewEnd = ViewDirection(m_rotations[i + 1]);
+	float flatStart = hypotf(viewStart.x, viewStart.z);
+	float flatEnd = hypotf(viewEnd.x, viewEnd.z);
+	if ((flatStart < cParallelTolerance) or (flatEnd < cParallelTolerance))
+		return;
+	float startX = viewStart.x / flatStart;
+	float startZ = viewStart.z / flatStart;
+	float endX = viewEnd.x / flatEnd;
+	float endZ = viewEnd.z / flatEnd;
+	float chordX = segment.p1.x - segment.p0.x;
+	float chordZ = segment.p1.z - segment.p0.z;
+	float det = endX * startZ - startX * endZ;
+	if (fabsf(det) < cParallelTolerance)
+		return;
+	float t0 = (endX * chordZ - endZ * chordX) / det;
+	float t1 = (startX * chordZ - startZ * chordX) / det;
+	if ((fabsf(t0) < cMinFocusDistance) or (fabsf(t1) < cMinFocusDistance) or ((t0 > 0.0f) and (t1 < 0.0f)))
+		return;
+	segment.view = (t0 * t1 < 0.0f) ? ViewMode::Swing : ViewMode::Focus;
+	segment.focusSign = (t0 < 0.0f) ? -1.0f : 1.0f;
+	segment.focusStart = glm::vec3(segment.p0.x + t0 * startX, segment.p0.y + t0 * viewStart.y / flatStart, segment.p0.z + t0 * startZ);
+	segment.focusEnd = glm::vec3(segment.focusStart.x, segment.p1.y + t1 * viewEnd.y / flatEnd, segment.focusStart.z);
+	segment.rollStart = ViewRoll(m_rotations[i]);
+	segment.rollEnd = ViewRoll(m_rotations[i + 1]);
+	segment.swingAngle = (startZ * chordX - startX * chordZ >= 0.0f) ? float(Conversions::Pi) : -float(Conversions::Pi);
+}
+
+
+glm::quat PoseSpline::FocusRotation(int32_t segment, float t, const Vector3f& position) const {
+	const Segment& s = m_segments[segment];
+	glm::vec3 target = s.focusStart + (s.focusEnd - s.focusStart) * t;
+	glm::vec3 view = (target - glm::vec3(position.x, position.y, position.z)) * s.focusSign;
+	if (hypotf(view.x, view.z) < cPointTolerance)
+		return Turn(segment, t);
+	return LookRotation(glm::normalize(view), s.rollStart + (s.rollEnd - s.rollStart) * t);
+}
+
+
+float PoseSpline::SwingProgress(int32_t i, float time) const {
+	float keyTime = KeyTime(i);
+	float nextTime = KeyTime(i + 1);
+	float end = std::min(keyTime + 0.5f * m_swingTime, nextTime);
+	float begin = end - m_swingTime;
+	if (begin < 0.0f) {
+		begin = 0.0f;
+		end = std::min(m_swingTime, nextTime);
+	}
+	float x = std::clamp((time - begin) / (end - begin), 0.0f, 1.0f);
+	return x * x * (3.0f - 2.0f * x);
+}
+
+
+glm::quat PoseSpline::SwingRotation(const glm::quat& rotation, int32_t k, float time) const {
+	int32_t count = m_starts.Length() - 1;
+	float angle = 0.0f;
+	float lift = 1.0f;
+	bool isSwinging = false;
+	for (int32_t i = k; (m_isLoop or (i < count)) and (KeyTime(i) - m_swingTime <= time); ++i) {
+		const Segment& s = m_segments[SegmentIndex(i)];
+		if (s.view != ViewMode::Swing)
+			continue;
+		float x = SwingProgress(i, time);
+		if (x > 0.0f) {
+			angle += s.swingAngle * x;
+			lift *= 1.0f - 2.0f * x;
+			isSwinging = true;
+		}
+	}
+	glm::vec3 view = ViewDirection(rotation);
+	if (not isSwinging or (hypotf(view.x, view.z) < cParallelTolerance))
+		return rotation;
+	glm::vec3 swung = ExpRotation(glm::vec3(0.0f, 0.5f * angle, 0.0f)) * glm::vec3(view.x, 0.0f, view.z);
+	swung.y = view.y * lift;
+	return LookRotation(glm::normalize(swung), ViewRoll(rotation));
 }
 
 
@@ -120,10 +237,11 @@ glm::quat PoseSpline::Turn(int32_t segment, float t) const {
 
 void PoseSpline::SetupSegment(const AutoArray<Key>& keys, int32_t i) {
 	int32_t keyCount = keys.Length();
+	int32_t loopCount = keyCount - 1;
 	const Vector3f& p1 = keys[i].position;
-	const Vector3f& p2 = keys[i + 1].position;
-	Vector3f p0 = (i > 0) ? keys[i - 1].position : p1 * 2.0f - p2;
-	Vector3f p3 = (i + 2 < keyCount) ? keys[i + 2].position : p2 * 2.0f - p1;
+	const Vector3f& p2 = keys[m_isLoop ? (i + 1) % loopCount : i + 1].position;
+	Vector3f p0 = m_isLoop ? keys[(i + loopCount - 1) % loopCount].position : (i > 0) ? keys[i - 1].position : p1 * 2.0f - p2;
+	Vector3f p3 = m_isLoop ? keys[(i + 2) % loopCount].position : (i + 2 < keyCount) ? keys[i + 2].position : p2 * 2.0f - p1;
 	Segment& segment = m_segments[i];
 	segment.p0 = p1;
 	segment.p1 = p2;
@@ -138,9 +256,9 @@ void PoseSpline::SetupSegment(const AutoArray<Key>& keys, int32_t i) {
 		float d2 = ((p3 - p2).Length() < cPointTolerance) ? d1 : KnotDistance(p2, p3);
 		segment.t0 = ((p1 - p0) / d0 - (p2 - p0) / (d0 + d1) + (p2 - p1) / d1) * d1;
 		segment.t1 = ((p2 - p1) / d1 - (p3 - p1) / (d1 + d2) + (p3 - p2) / d2) * d1;
-		if ((i == 0) and (i + 2 < keyCount))
+		if (not m_isLoop and (i == 0) and (i + 2 < keyCount))
 			ArcTangents(p2 - p1, segment.t1, segment.t0);
-		else if ((i > 0) and (i + 2 == keyCount))
+		else if (not m_isLoop and (i > 0) and (i + 2 == keyCount))
 			ArcTangents(p2 - p1, segment.t0, segment.t1);
 	}
 	float* arc = m_arcLengths.Data() + i * (cArcSamples + 1);
@@ -174,14 +292,28 @@ float PoseSpline::ArcParameter(int32_t segment, float distance) const {
 }
 
 
-float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime) {
+int32_t PoseSpline::SegmentIndex(int32_t k) const {
+	return (m_firstKey + k) % m_segments.Length();
+}
+
+
+float PoseSpline::KeyTime(int32_t i) const {
+	return (i < m_keyTimes.Length()) ? m_keyTimes[i] : KeyTime(i - m_segments.Length()) + m_duration - m_loopStart;
+}
+
+
+float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime, float swingTime) {
 	int32_t segmentCount = m_segments.Length();
 	m_firstKey = std::clamp(firstKey, 0, segmentCount);
-	int32_t count = segmentCount - m_firstKey;
+	m_swingTime = swingTime;
+	int32_t leadIn = segmentCount - m_firstKey;
+	int32_t count = m_isLoop ? leadIn + segmentCount : leadIn;
 	m_starts.Resize(count + 1);
+	m_keyTimes.Resize(count + 1);
 	m_starts[0] = 0.0f;
+	m_keyTimes[0] = 0.0f;
 	for (int32_t k = 0; k < count; ++k)
-		m_starts[k + 1] = m_starts[k] + m_segments[m_firstKey + k].length;
+		m_starts[k + 1] = m_starts[k] + m_segments[SegmentIndex(k)].length;
 	m_distances.Clear();
 	m_duration = 0.0f;
 	if (count == 0)
@@ -191,14 +323,15 @@ float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime
 	float distance = 0.0f;
 	float speed = 0.0f;
 	float rampStart = 0.0f;
+	float rampLength = rampTime;
 	float rampFrom = 0.0f;
-	float rampTo = m_segments[m_firstKey].speed * speedScale;
+	float rampTo = m_segments[SegmentIndex(0)].speed * speedScale;
 	bool isBraking = false;
 	int32_t k = 0;
 	m_distances.Append(0.0f);
 	for (;;) {
 		time += cTimeStep;
-		float x = std::clamp((time - rampStart) / rampTime, 0.0f, 1.0f);
+		float x = std::clamp((time - rampStart) / rampLength, 0.0f, 1.0f);
 		float nextSpeed = rampFrom + (rampTo - rampFrom) * x * x * (3.0f - 2.0f * x);
 		distance += 0.5f * (speed + nextSpeed) * cTimeStep;
 		speed = nextSpeed;
@@ -209,20 +342,24 @@ float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime
 		m_distances.Append(distance);
 		while ((k + 1 < count) and (distance >= m_starts[k + 1])) {
 			++k;
+			m_keyTimes[k] = float(m_distances.Length() - 1) * cTimeStep;
 			if (not isBraking) {
 				rampStart = time;
 				rampFrom = speed;
-				rampTo = m_segments[m_firstKey + k].speed * speedScale;
+				rampTo = m_segments[SegmentIndex(k)].speed * speedScale;
 			}
 		}
-		if (not isBraking and (total - distance <= 0.5f * speed * rampTime)) {
+		if (not m_isLoop and not isBraking and (total - distance <= 0.5f * speed * rampTime)) {
 			isBraking = true;
 			rampStart = time;
+			rampLength = 2.0f * (total - distance) / speed;
 			rampFrom = speed;
 			rampTo = 0.0f;
 		}
 	}
 	m_duration = float(m_distances.Length() - 1) * cTimeStep;
+	m_keyTimes[count] = m_duration;
+	m_loopStart = m_keyTimes[leadIn];
 	return m_duration;
 }
 
@@ -241,17 +378,21 @@ float PoseSpline::Distance(float time) const {
 bool PoseSpline::Evaluate(float time, Vector3f& position, Matrix4f& orientation) const {
 	if (m_distances.Length() < 2)
 		return false;
+	bool isRunning = m_isLoop or (time < m_duration);
+	if (m_isLoop and (time > m_duration))
+		time = m_loopStart + fmodf(time - m_loopStart, m_duration - m_loopStart);
 	float distance = Distance(time);
 	const float* starts = m_starts.Data();
 	int32_t count = m_starts.Length() - 1;
 	int32_t k = std::clamp(int32_t(std::upper_bound(starts + 1, starts + count + 1, distance) - starts) - 1, 0, count - 1);
-	int32_t segment = m_firstKey + k;
+	int32_t segment = SegmentIndex(k);
 	const Segment& s = m_segments[segment];
 	float local = std::clamp(distance - starts[k], 0.0f, s.length);
 	float fraction = (s.length > cPointTolerance) ? local / s.length : 0.0f;
 	position = Point(segment, ArcParameter(segment, local));
-	orientation = Orientation(Turn(segment, fraction));
-	return time < m_duration;
+	glm::quat rotation = (s.view == ViewMode::Turn) ? Turn(segment, fraction) : FocusRotation(segment, fraction, position);
+	orientation = Orientation(SwingRotation(rotation, k, time));
+	return isRunning;
 }
 
 // =================================================================================================
