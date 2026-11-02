@@ -264,7 +264,8 @@ public:
 
 	bool UpdateWindowSize(int width, int height);
 
-	virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
+	virtual void RequestDisplayChange(int /*displayMode*/, bool /*useFullscreen*/)
+	{}
 
 private:
 	bool BackBufferListIsOpen(void) const
