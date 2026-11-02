@@ -164,11 +164,18 @@ bool BaseDisplayHandler::CreateSwapChain(void)
 	scDesc.Scaling = DXGI_SCALING_STRETCH;
 	scDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	scDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-	scDesc.Flags = m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
 	ComPtr<IDXGISwapChain1>	swapChain1;
 	IDXGIFactory4*			factory = dx12Context.m_factory.Get();
 	ID3D12CommandQueue*		queue = commandListHandler.GetQueue();
+	ComPtr<IDXGIFactory5>	tearingFactory;
+	BOOL					allowTearing = FALSE;
+
+	if (SUCCEEDED(dx12Context.m_factory.As(&tearingFactory)) and
+		FAILED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing))))
+		allowTearing = FALSE;
+	m_swapChainFlags = allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+	scDesc.Flags = m_swapChainFlags;
 
 	HRESULT hr = factory->CreateSwapChainForHwnd(queue, m_hwnd, &scDesc, nullptr, nullptr, &swapChain1);
 	if (FAILED(hr)) {
@@ -401,7 +408,7 @@ void BaseDisplayHandler::EndFrame(void)
 	xrHandler.EndFrame();
 	commandListHandler.EndFrame();
 	UINT	syncInterval = m_vSync ? 1 : 0;
-	UINT	presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
+	UINT	presentFlags = (m_vSync or not m_swapChainFlags) ? 0 : DXGI_PRESENT_ALLOW_TEARING;
 	HRESULT	hr = m_swapChain->Present(syncInterval, presentFlags);
 	if (FAILED(hr)) {
 		logHandler.Print("BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
@@ -516,8 +523,7 @@ bool BaseDisplayHandler::ResizeSwapChain(void)
 	// GPU must be idle before resize
 	commandListHandler.CmdQueue().WaitIdle();
 	ReleaseBackBuffers();
-	HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT,
-											m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+	HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, m_swapChainFlags);
 	if (FAILED(hr)) {
 		logHandler.Print("BaseDisplayHandler::ResizeSwapChain: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
 		return false;
@@ -530,13 +536,8 @@ bool BaseDisplayHandler::ResizeSwapChain(void)
 
 bool BaseDisplayHandler::SetVSync(bool vSync)
 {
-	if (vSync == m_vSync)
-		return true;
 	m_vSync = vSync;
-	// Present () reads the sync interval per frame, but DXGI_PRESENT_ALLOW_TEARING may only be
-	// passed if the swap chain was created with DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING - so the back
-	// buffers have to be rebuilt with the flag the new setting needs.
-	return ResizeSwapChain();
+	return true;
 }
 
 

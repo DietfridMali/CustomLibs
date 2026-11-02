@@ -103,6 +103,9 @@ public:
 	bool SessionStopped(void) const
 	noexcept;
 
+	bool SessionExited(void) const
+	noexcept;
+
 	bool SystemAvailable(void)
 	noexcept;
 

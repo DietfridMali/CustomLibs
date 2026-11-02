@@ -543,6 +543,8 @@ int XRView::PollHeadset(void)
 		m_suspended = true;
 		return srOff;
 	}
+	if (not baseRenderer.HasFeature(GfxFeature::Multiview))
+		return srNone;
 
 	int query = xrHandler.SystemQueryResult();
 
@@ -566,7 +568,7 @@ int XRView::PollHeadset(void)
 		m_suspended = false;
 		return srNone;
 	}
-	if (m_suspended and xrHandler.HeadsetReady())
+	if (m_suspended and (not xrHandler.DeviceCreated() or xrHandler.HeadsetReady()))
 		m_suspended = false;
 	return m_suspended ? srNone : srOn;
 }

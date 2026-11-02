@@ -37,6 +37,7 @@ public:
 	bool	m_vSync;
 	bool	m_isLandscape;
 	float	m_aspectRatio;
+	UINT	m_swapChainFlags{ 0 };
 
 	SDL_Window*				m_window;
 	HWND					m_hwnd;

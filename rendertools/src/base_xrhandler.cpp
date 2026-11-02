@@ -608,12 +608,26 @@ noexcept
 }
 
 
+static bool XrFrameSucceeded(XRState& s, XrResult result, const char* what)
+noexcept
+{
+	if (result == XR_ERROR_INSTANCE_LOST)
+		s.instanceLost = true;
+	if ((result == XR_ERROR_INSTANCE_LOST) or (result == XR_ERROR_SESSION_LOST)) {
+		s.isRunning = false;
+		s.sessionStopped = true;
+	}
+	return XrSucceeded(s.instance, result, what);
+}
+
+
 static void PollEvents(XRState& s)
 noexcept
 {
-	XrEventDataBuffer event{ XR_TYPE_EVENT_DATA_BUFFER };
+	XrEventDataBuffer	event{ XR_TYPE_EVENT_DATA_BUFFER };
+	XrResult			result;
 
-	while (xrPollEvent(s.instance, &event) == XR_SUCCESS) {
+	while ((result = xrPollEvent(s.instance, &event)) == XR_SUCCESS) {
 		switch (event.type) {
 			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
 				const XrEventDataSessionStateChanged& changed = *reinterpret_cast<const XrEventDataSessionStateChanged*>(&event);
@@ -635,6 +649,7 @@ noexcept
 				else if ((changed.state == XR_SESSION_STATE_EXITING) or (changed.state == XR_SESSION_STATE_LOSS_PENDING)) {
 					s.isRunning = false;
 					s.sessionStopped = true;
+					s.sessionExited = (changed.state == XR_SESSION_STATE_EXITING);
 				}
 				break;
 			}
@@ -667,6 +682,8 @@ noexcept
 		}
 		event = XrEventDataBuffer{ XR_TYPE_EVENT_DATA_BUFFER };
 	}
+	if (result == XR_ERROR_INSTANCE_LOST)
+		XrFrameSucceeded(s, result, "xrPollEvent");
 }
 
 
@@ -966,6 +983,7 @@ bool BaseXRHandler::CreateSession(int layerWidth, int layerHeight)
 
 	DestroyProbeSession(s);
 	s.sessionStopped = false;
+	s.sessionExited = false;
 	s.recenterPending = true;
 	s.localChangePending = false;
 	XrSessionCreateInfo				sessionInfo{ XR_TYPE_SESSION_CREATE_INFO };
@@ -1145,7 +1163,7 @@ bool BaseXRHandler::BeginFrame(void)
 #endif
 
 	s.frameState = XrFrameState{ XR_TYPE_FRAME_STATE };
-	if (not XrSucceeded(s.instance, xrWaitFrame(s.session, &waitInfo, &s.frameState), "xrWaitFrame"))
+	if (not XrFrameSucceeded(s, xrWaitFrame(s.session, &waitInfo, &s.frameState), "xrWaitFrame"))
 		return false;
 #if LOG_FRAME_METRICS
 	s.waitTime = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - waitStart).count();
@@ -1153,7 +1171,7 @@ bool BaseXRHandler::BeginFrame(void)
 
 	XrFrameBeginInfo beginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
 
-	if (not XrSucceeded(s.instance, xrBeginFrame(s.session, &beginInfo), "xrBeginFrame"))
+	if (not XrFrameSucceeded(s, xrBeginFrame(s.session, &beginInfo), "xrBeginFrame"))
 		return false;
 	s.frameBegun = true;
 	if (s.localChangePending and (s.frameState.predictedDisplayTime >= s.localChangeTime) and ApplyLocalChange(s))
@@ -1336,7 +1354,7 @@ bool BaseXRHandler::EndFrame(void)
 	endInfo.layerCount = layerCount;
 	endInfo.layers = layers;
 	s.frameBegun = false;
-	return XrSucceeded(s.instance, xrEndFrame(s.session, &endInfo), "xrEndFrame");
+	return XrFrameSucceeded(s, xrEndFrame(s.session, &endInfo), "xrEndFrame");
 }
 
 
@@ -1443,6 +1461,13 @@ bool BaseXRHandler::SessionStopped(void) const
 noexcept
 {
 	return HasSession() and m_state->sessionStopped;
+}
+
+
+bool BaseXRHandler::SessionExited(void) const
+noexcept
+{
+	return HasSession() and m_state->sessionExited;
 }
 
 

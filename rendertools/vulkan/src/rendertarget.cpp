@@ -723,6 +723,14 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 	m_cubeMapCount = params.cubeMapCount;
 	m_cubeFace = 0;
 
+	for (int i = 0; i < m_bufferCount; ++i) {
+		if (m_bufferInfo[i].m_image == VK_NULL_HANDLE) {
+			logHandler.Print("RenderTarget::Create: buffer %d of '%s' could not be created\n", i, static_cast<const char*>(m_name));
+			Destroy();
+			return false;
+		}
+	}
+
 	int w = width * scale;
 	int h = height * scale;
 	m_viewport = Viewport(0, 0, w, h);

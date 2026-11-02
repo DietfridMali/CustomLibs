@@ -35,6 +35,7 @@ struct XRState {
 	bool							isRunning{ false };
 	bool							instanceLost{ false };
 	bool							sessionStopped{ false };
+	bool							sessionExited{ false };
 	bool							recenterPending{ false };
 	float							appliedViewPitch{ 0.0f };
 	bool							localChangePending{ false };

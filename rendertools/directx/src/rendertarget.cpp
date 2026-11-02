@@ -670,6 +670,12 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 		m_cmdList->Flush();
 	m_cmdList = nullptr;
 
+	if (m_bufferCount != m_colorBufferCount + params.vertexBufferCount + params.idBufferCount + depthBufferCount + params.skyMapCount + params.cubeMapCount) {
+		logHandler.Print("RenderTarget::Create: only %d buffers of '%s' could be created\n", m_bufferCount, static_cast<const char*>(m_name));
+		Destroy();
+		return false;
+	}
+
 	int w = width * scale;
 	int h = height * scale;
 	m_viewport = Viewport(0, 0, w, h);
