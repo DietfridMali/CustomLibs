@@ -632,6 +632,12 @@ public:
 		return m_frameCounter.GetFps();
 	}
 
+	inline ::Viewport FpsViewport(void) const
+	noexcept
+	{
+		return m_frameCounter.GetViewport();
+	}
+
 	virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
 	virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);

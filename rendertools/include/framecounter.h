@@ -36,6 +36,12 @@ public:
 		m_color = color;
 	}
 
+	inline Viewport GetViewport(void) const
+	noexcept
+	{
+		return m_viewport;
+	}
+
 	virtual void Draw(bool update);
 
 	virtual bool Start(void)
