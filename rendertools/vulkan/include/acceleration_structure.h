@@ -49,6 +49,7 @@ struct AccelInstance {
 	// started inside it. Everything else is hit from either side whatever the ray asks for - an open
 	// model made of single polygons has to cast its shadow in every direction.
 	bool								singleSided{ false };
+	bool								forceNonOpaque{ false };
 	const class AccelerationStructure*	blas{ nullptr };
 };
 

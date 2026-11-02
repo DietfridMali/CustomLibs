@@ -671,6 +671,8 @@ noexcept
 		dst.InstanceContributionToHitGroupIndex = 0;
 		dst.Flags = src.singleSided ? UINT(D3D12_RAYTRACING_INSTANCE_FLAG_NONE)
 									: UINT(D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE);
+		if (src.forceNonOpaque)
+			dst.Flags |= UINT(D3D12_RAYTRACING_INSTANCE_FLAG_FORCE_NON_OPAQUE);
 		dst.AccelerationStructure = src.blas->DeviceAddress();
 		std::memcpy(pInstance + written, &dst, sizeof(dst));
 		++written;

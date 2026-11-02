@@ -28,6 +28,7 @@ struct AccelInstance {
 	uint32_t							customIndex{ 0 };
 	uint32_t							mask{ 0xFFu };
 	bool								singleSided{ false };
+	bool								forceNonOpaque{ false };
 	const class AccelerationStructure*	blas{ nullptr };
 };
 

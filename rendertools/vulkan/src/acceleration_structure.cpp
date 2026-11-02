@@ -52,8 +52,7 @@ constexpr VmaAllocationCreateFlags	kHostWrite = VMA_ALLOCATION_CREATE_HOST_ACCES
 bool RayTracingApi::Load(VkDevice device, VkPhysicalDevice physicalDevice)
 noexcept
 {
-	if (g_loaded)
-		return true;
+	g_loaded = false;
 	if ((device == VK_NULL_HANDLE) or (physicalDevice == VK_NULL_HANDLE))
 		return false;
 
@@ -409,6 +408,8 @@ noexcept
 		dst.instanceShaderBindingTableRecordOffset = 0;
 		dst.flags = src.singleSided ? VkGeometryInstanceFlagsKHR(0)
 									: VkGeometryInstanceFlagsKHR(VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR);
+		if (src.forceNonOpaque)
+			dst.flags |= VkGeometryInstanceFlagsKHR(VK_GEOMETRY_INSTANCE_FORCE_NO_OPAQUE_BIT_KHR);
 		dst.accelerationStructureReference = uint64_t(src.blas->DeviceAddress());
 		++written;
 	}
