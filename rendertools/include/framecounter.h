@@ -143,7 +143,11 @@ public:
 
 	virtual void Update(void);
 
-	virtual float GetFps(int i = -1) const {
+	virtual float GetFps(void) const {
+		return GetFps(1);
+	}
+
+	virtual float GetFps(int i) const {
 		return m_fps[i];
 	}
 };
