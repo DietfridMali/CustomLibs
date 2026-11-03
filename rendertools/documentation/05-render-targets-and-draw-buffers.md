@@ -54,24 +54,28 @@ that is rendering into a target. The count is nested.
 
 ### What activation actually does
 
-`RenderTarget::Activate` is the call an application makes. It is a strict sequence:
+`RenderTarget::Activate` is the call an application makes. In Vulkan and DirectX it is a strict
+sequence:
 
-1. `Enable(params)` - bind the target, select its draw buffers, and in VK/DX open its command list and
-   rendering scope;
+1. `PushViewport` - unless this is a reactivation, which has no `Deactivate` of its own and must not
+   push, or the target is already activated; a reactivation of a target that is not enabled restores
+   the render states its `Disable` saved instead;
 2. `baseRenderer.ActivateDrawBuffer(this)` - push it onto the stack;
-3. `PushViewport` - unless this is a reactivation, which has no `Deactivate` of its own and must not
-   push;
-4. `SetViewport(true)` - which, per [03](03-renderer-and-frame.md), sets the native viewport to the
-   *whole* target;
-5. `Clear(params)`.
+3. `Enable(params)` - open its command list and select its draw buffers; Vulkan opens the rendering
+   scope here as well and folds the activation's clear into its load operations;
+4. `Clear(params)` - DirectX only;
+5. `SetViewport`, which, per [03](03-renderer-and-frame.md), sets the native viewport to the *whole*
+   target.
+
+OpenGL runs `Enable` first and then `ActivateDrawBuffer`, `PushViewport`, `SetViewport` and `Clear`.
 
 `Deactivate` is the mirror: `DeactivateDrawBuffer` (which disables and pops) followed by
 `PopViewport`. Activate and Deactivate are a balanced push/pop pair, and a reactivation deliberately
 breaks the symmetry in exactly one place - it does not push, because the pop that follows belongs to
 the original activation.
 
-`DrawBufferHandler::SetActiveDrawBuffers` runs after a target has been pushed and before its own
-`Enable`, and it is where the back buffer is told what is happening: in Vulkan and DirectX the back
+In Vulkan and DirectX `DrawBufferHandler::SetActiveDrawBuffers` runs after a target has been pushed
+and before its own `Enable`, and it is where the back buffer is told what is happening: the back
 buffer needs its own binding or rendering scope, and a render target's scope must not sit inside it.
 So the call suspends the back buffer when a target becomes active and re-enables it when the stack
 empties. Both calls are idempotent and both do nothing while no frame is being recorded, which is what
@@ -87,13 +91,19 @@ nothing else is needed.
 | Kind | Meaning |
 | --- | --- |
 | `btColor` | ordinary color attachments, up to `RT_MAX_COLOR_BUFFERS` (4), all in one format |
+| `btVertex` | additional MRT outputs for geometry data (world normals, world positions) |
+| `btId` | `R32_UINT` outputs for per pixel ids (Vulkan and DirectX) |
 | `btDepth` | one depth attachment |
 | `btStencil` | never a buffer of its own - see below |
-| `btVertex` | additional MRT outputs for geometry data (world normals, world positions) |
-| `btSkyMap` | compute-only storage textures, HDR format, color + sampled + storage usage |
+| `btSkyMap` | compute storage textures in `skyMapFormat` (default RGBA16F), color + sampled + storage usage |
 | `btCubemap` | a cube map rendered into, one face at a time |
 
-Two of these carry decisions worth stating:
+The buffers are created in this order - color, vertex, id, depth, sky map, cube map - so the color
+buffers start at index 0 and every group the draw buffer selection walks is contiguous;
+`ExtraBufferIndex()`, `IdBufferIndex()`, `DepthBufferIndex()` and `CubeMapIndex()` say where a kind
+begins.
+
+Several of these carry decisions worth stating:
 
 **Stencil is a plane of the depth buffer, not a buffer.** The hardware interleaves them and a
 stencil-only format is optional and rarely exposed. `stencilBufferCount > 0` therefore changes the
@@ -109,7 +119,35 @@ respect; only its views differ.
 That view distinction is the recurring theme for cube maps and arrays in Vulkan and DirectX: an
 attachment addresses exactly one layer, while sampling wants a view over all of them. So a cube map
 buffer carries seven views (six to render into, one cube view to sample) and an array buffer carries
-one view per layer plus the array view. `AttachmentView(bufferIndex)` is what resolves it.
+one view per layer plus the array view (and a single layer view that is sampled while the renderer
+runs with two views). In Vulkan `AttachmentView(bufferIndex)` resolves which view is attached; in
+DirectX the buffer's RTV is an alias that `SelectCubeFace` and `SelectArrayLayer` move to the
+selected face or layer.
+
+**Id buffers are integer outputs the standard groups leave alone.** `idBufferCount` adds `R32_UINT`
+buffers behind the vertex buffers (`IdBufferIndex()`). `dbAll`, `dbColor` and `dbExtra` never draw
+into them - a pass that writes ids names them in a custom draw buffer list - while `dbSingle` and
+`Disable` put them into the shader-readable state like every other buffer. The pipeline key carries
+their own format, Vulkan clears them with an integer clear value, and they are always point sampled,
+whatever filter is asked for. Vulkan and DirectX only.
+
+**Mip levels belong to the color buffers and are filled by the owner.** `mipLevels` gives the plain
+color buffers a mip chain, clamped to what the size allows and forced to one for array and multiview
+targets; `MipLevels()` reports the result. Rendering goes into level 0 only - the attachment view
+addresses that level - while sampling sees all of them: Vulkan adds a view over the whole chain
+(`BufferInfo::m_mipView`), DirectX creates the SRV over all levels, and the buffer's texture wrapper
+filters between levels. The target never builds the chain itself: the owner reads level 0 back and
+writes the other levels with `WriteBuffer`, which takes a mip level for that purpose
+(`TextureAtlas::BuildMipMaps`). OpenGL accepts the parameter and has no levels.
+
+Three more aspects of a target are covered elsewhere and only named here. With `viewCount` 2 (VR)
+every attachment buffer becomes an array of layer groups times views, one layer group is attached at
+a time for both views (view mask in Vulkan, view instancing in DirectX), and the pipeline key carries
+the view count. `CreateExternal` wraps images the target does not own - the OpenXR swapchain images -
+and `PrepareExternalRelease` puts them back into the attachment layout or state before an image is
+handed back. And a Vulkan or DirectX target is a `GpuResource`: when the graphics device is restarted
+it is created again from its creation parameters, with empty contents; an external target is not. All
+three are described in [10-vr-and-openxr.md](10-vr-and-openxr.md).
 
 ## Draw buffer selection
 
@@ -117,13 +155,13 @@ Which of a target's buffers receive fragment output is chosen per activation, by
 
 | Group | Meaning |
 | --- | --- |
-| `dbAll` | every buffer |
+| `dbAll` | the color and vertex buffers |
 | `dbColor` | the color buffers |
 | `dbExtra` | the extra (vertex/geometry) buffers |
 | `dbSingle` | exactly one buffer, named by `bufferIndex` |
-| `dbCustom` | an explicit slot-to-buffer mapping |
+| `dbCustom` | an explicit slot-to-buffer mapping - the only group that draws into id buffers |
 | `dbDepth` | no color output at all - depth only |
-| `dbNone` | unset |
+| `dbNone` | unset; selecting it means `dbAll` |
 
 `dbSingle` is the one that exposes an API difference the library cannot fully hide. In DirectX and
 Vulkan the selected buffer becomes output slot 0 (RTV 0 / color attachment 0), so a shader with one
@@ -140,23 +178,42 @@ shader-readable state. The list is deliberately API-neutral, in the shared `Draw
 OpenGL backend turns the indices into attachment points, DX and Vulkan into RTVs / color attachments,
 and one and the same list works everywhere.
 
+**Clears reach the draw buffers of the current group only.** `ClearColorBuffer` clears one of them to
+a value of its own (WBOIT accumulation and revealage want different values), and a second overload
+limits that clear to a rectangle, clamped to the target: Vulkan passes it as the clear rectangle of
+`vkCmdClearAttachments`, DirectX as the rectangle of `ClearRenderTargetView`, OpenGL as a scissor
+around the clear, with the scissor test restored afterwards.
+
 **`dbmReadOnly`** is the depth mode that lets a pass test against the depth buffer while sampling it -
-soft particles, weighted blended OIT. Each backend reaches it differently and the neutral requirement
-is the same: depth (and stencil) writes off. OpenGL has no read-only depth view, so turning the writes
-off *is* the mechanism; DX and Vulkan additionally reject a writing pipeline over a read-only depth
-view, so it is not optional there either. `dbmWrite` deliberately restores nothing - the render state
-contract says every stage sets what it needs.
+soft particles, weighted blended OIT. The neutral part is the same everywhere: `SetDepthMode` turns
+depth (and, where the active depth buffer has a stencil plane, stencil) writes off, and an activation
+in this mode never clears the depth. OpenGL has no read-only depth view, so turning the writes off
+*is* the mechanism. DirectX binds the read-only DSV and puts the resource into the depth read plus
+shader read state; Vulkan keeps the image in `DEPTH_STENCIL_READ_ONLY_OPTIMAL`, as attachment and for
+sampling, and issues that transition in `SelectDrawBuffers`, outside the rendering scope. Both reject
+a writing pipeline over a read-only depth view, so turning the writes off is not optional there
+either. Since no barrier may be issued inside an open Vulkan rendering scope, a pass that samples the
+depth of the target it draws into switches to read-only depth before it fetches the depth texture; a
+change of the depth mode while the target is enabled re-selects its draw buffers (Vulkan and
+DirectX). `dbmWrite` deliberately restores no render state - the render state contract says every
+stage sets what it needs - but it does put the depth resource back into its writable layout or state.
 
 **`SetDepthSource`** lets one target borrow another's depth buffer: while set, activating this target
-binds the source's depth view instead of an own one. The foreign depth is never cleared - the load
-operation is forced to LOAD even when the activation clears - and all `Clear*` / `GetDepth*` paths stay
-on the target's own buffer. An overlay pass can hardware-depth-test against the scene this way.
+binds the source's depth instead of an own one, and the depth format in the pipeline key follows the
+source. By default the borrowed depth is read-only - Vulkan attaches it in the read-only layout with
+its load operation forced to LOAD, DirectX binds the source's read-only DSV - so the pass can test
+against it and sample it at the same time; an overlay pass hardware-depth-tests against the scene this
+way. With `writable` set (and no `dbmReadOnly`) the borrowed depth is bound writable instead and first
+taken out of the sampled image bindings. The depth `Clear*` / `GetDepth*` paths stay on the target's
+own buffer. The stencil clear does not in Vulkan and OpenGL, where it clears the plane of whatever
+depth is attached; DirectX clears only the target's own plane, and only while it is bound writable.
 
 ## The render pass scope in Vulkan and DirectX
 
-Every render target owns a `CommandList`, created on first `Enable` and named after the target.
-`Enable` opens it; `Disable` closes it. One activation scope is therefore one command list, which is
-one render task in the sense of [04-command-lists.md](04-command-lists.md).
+A render target records into a `CommandList` of its own, named after the target: `Enable` takes one
+from the handler when the target has none open, and `Disable` closes it and lets go of it. One
+activation scope is therefore one command list, which is one render task in the sense of
+[04-command-lists.md](04-command-lists.md).
 
 Inside that, Vulkan has a second scope: `vkCmdBeginRendering` / `vkCmdEndRendering`, tracked by
 `m_isInRendering` and managed by `BeginRendering` / `EndRendering`. Two Vulkan rules shape the code
@@ -168,12 +225,12 @@ around it:
   self-management is a no-op there and never double-begins.
 - **No second scope inside one.** Which is why the back buffer must be suspended when a target becomes
   active (above), and why copies and fills go through `SuspendRendering` / `ResumeRendering` or the
-  separate upload command buffer.
+  frame's upload list.
 
 DirectX has no equivalent of the inner scope - `OMSetRenderTargets` is a command like any other - but
 it needs something Vulkan does not: the RTV and DSV *formats* of the bound target are part of the PSO
-key, filled from the target by `FillPipelineFormats`. Vulkan's equivalent, `FillPipelineKey`, serves
-the pipeline cache the same way.
+key, filled from the target by `FillPipelineFormats`, together with the view count. Vulkan's
+equivalent, `FillPipelineKey`, serves the pipeline cache the same way.
 
 In OpenGL, `Enable` binds a framebuffer object and `Disable` binds framebuffer 0. There is no scope
 and no list.
@@ -183,14 +240,18 @@ and no list.
 - **`GetAsTexture`** wraps a color buffer as a `Texture` so a later pass can sample it. The wrapper is
   per color buffer, not per target - one wrapper had its handle rehung on every call, so two buffers of
   the same target came back as the same pointer carrying the wrong handle. The array is sized once at
-  creation and never grown, because its element addresses are handed out.
+  creation and never grown, because its element addresses are handed out. For a target with mip
+  levels the wrapper sees all of them.
 - **`GetDepthAsTexture`** and **`GetDepthAsShadowTexture`** do the same for depth, the latter with a
   comparison sampler for hardware PCF.
-- **`ReadBuffer`** copies one color buffer's texels to CPU memory. It drains the pipeline and is meant
-  for saving a baked result or for diagnosis, never per frame. In Vulkan it may be called mid-frame,
-  but the target must not be enabled: what is read is what the *closed* command lists produce, and a
-  list that is still recording is not among them. `WriteBuffer` is the other direction, for restoring
-  a baked result from a file. `ReadBufferAsync` goes through `GfxReadTarget`.
+- **`ReadBuffer`** copies one color buffer's texels (level 0, one layer) to CPU memory. It drains the
+  pipeline and is meant for saving a baked result or for diagnosis, never per frame. In Vulkan and
+  DirectX it may be called mid-frame, but the target must not be enabled: what is read is what the
+  *closed* command lists produce, and a list that is still recording is not among them.
+  `WriteBuffer` is the other direction, for restoring a baked result or filling a mip level; Vulkan
+  submits and waits for it, DirectX records it into the current list. `ReadBufferAsync` records the
+  copy into the list that is recording and hands it to a `GfxReadTarget`, which is polled. All three
+  address color buffers only.
 - **`Render` / `RenderAsTexture` / `AutoRender`** draw the target (or a given texture) onto the render
   quad, with `RTRenderParams` carrying source and destination buffer, clear, flip, rotation, scale and
   an optional shader. `destination >= 0` is the ping-pong case: the destination buffer is transitioned
@@ -199,8 +260,9 @@ and no list.
 ## Sampling a render target's buffer
 
 `BindBuffer(bufferIndex, tmuIndex)` binds a buffer for sampling. There is a second overload taking a
-`GfxFilterMode`, and the one without it applies a **type rule**: color, vertex and cube map buffers are
-sampled `Nearest`, everything else `Linear`. An integer color format forces `Nearest` regardless.
+`GfxFilterMode`, and the one without it applies a **type rule**: color, vertex, id and cube map
+buffers are sampled `Nearest`, everything else `Linear`. An integer color format - and an id buffer
+always - forces `Nearest` regardless, in the overload with an explicit filter as well.
 
 The rule exists because most render target buffers are read texel for texel by the pass that consumes
 them, and filtering them silently loses data. A target that *is* rescaled on its way out sets
@@ -210,13 +272,32 @@ In OpenGL the filter is state of the texture object rather than of a sampler, so
 with `glTexParameteri` on every bind. The per-target `m_filtering` is handed down to each color
 buffer's texture wrapper by `SetFiltering`.
 
+Textures stay bound after the draw that used them (see [06](06-buffers-and-meshes.md)), so a render
+target buffer can still sit in a sampled slot when it becomes an attachment again or is released.
+Vulkan and DirectX therefore take its views out of the sampled image bindings
+(`CommandListHandler::UnbindImage`) whenever `AttachBuffer` makes it an attachment - DirectX also when
+a depth buffer goes back to the writable state - and on every release, although the GPU objects
+themselves go through the deferred release. `Destroy(true)` skips that deferral: it executes the
+pending command lists, drains the queue and frees the buffers at once, so no list that is still
+recording may use the target. OpenGL takes the flag and ignores it.
+
 ## Divergences
 
-- `dbmReadOnly` is **not implemented in the Vulkan backend**: the enum and the `SetDepthMode` write
-  suppression exist, but the header states the read-only depth view itself has not been ported and the
-  target keeps a normal writable depth attachment.
-- `RenderTarget::ReleaseBuffers` is an empty inline in Vulkan and does real work in OpenGL.
+- The Vulkan header still says `dbmReadOnly` is not yet acted on and names `D24_UNORM_S8_UINT` as the
+  depth format; the backend implements read-only depth and uses `D32_SFLOAT`, with `S8_UINT` for a
+  stencil plane. The DirectX header still names a `BindRenderTargets` that does not exist.
+- `RenderTarget::ReleaseBuffers` is an empty inline in Vulkan and DirectX and does real work in
+  OpenGL.
 - `BufferInfo::btStencil` exists in the enum in all backends and is never created as a buffer.
+- Id buffers, `skyMapFormat`, `CreateExternal` and `PrepareExternalRelease` exist only in Vulkan and
+  DirectX; OpenGL has neither the parameters nor stubs. Mip levels and the view count are compile stubs
+  there (`MipLevels()` and `ViewCount()` are 1, `WriteBuffer` refuses any level but 0),
+  `Destroy(immediate)` ignores its flag and `SetDepthSource` only stores `writable`.
+- A writable borrowed depth is cleared by a Vulkan activation that clears - its load operation is
+  CLEAR then - while DirectX and OpenGL never clear a borrowed depth. `ClearStencilBuffer` clears the
+  borrowed stencil plane in Vulkan and OpenGL, only the own one in DirectX.
+- The activation order differs: OpenGL enables before it pushes, DirectX clears explicitly, Vulkan
+  clears through the load operations.
 - The OpenGL `Disable` keeps its buffer detach loop inside an `#if 1`; the surrounding code depends on
   it running.
 - The Vulkan header still documents `BufferHandle` as returning a "logical id, kept for source
