@@ -172,7 +172,7 @@ void ShadowMap::UpdateTransformation(void)
 //   #else        viewer-aligned PERSPECTIVE frustum -- the previous default. At lightDistance 1000 and
 //                radius <= 15 its halfFov is ~0.86 deg, i.e. numerically indistinguishable from ortho;
 //                the density is uniform, which is what leaves the near-field stair-stepping in place.
-void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance,
+void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& viewDirection, const Vector3f& lightDirection, float lightDistance,
 												  const Vector3f& worldMin, const Vector3f& worldMax)
 {
 	Matrix4f lightView, lightProj;
@@ -194,7 +194,7 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	float worldRadius = std::min(Vector3f::Abs(worldMax - worldMin).Length() * 0.5f, m_maxLightRadius);
 	if (lightDistance <= 0.0f)
 		lightDistance = 100.0f * worldRadius;
-	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	Vector3f viewDir = viewDirection;
 	viewDir.Normalize();
 	center += viewDir * worldRadius * 0.8f; // viewer near rear edge
 
@@ -296,7 +296,7 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	float coverage = m_maxLightRadius;
 	if (lightDistance <= 0.0f)
 		lightDistance = 100.0f * coverage;
-	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	Vector3f viewDir = viewDirection;
 	viewDir.Normalize();
 	center += viewDir * coverage * 0.8f; // viewer near rear edge
 	m_lightPosition = center + lightDirection * lightDistance;
@@ -325,7 +325,7 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	float worldRadius = std::min(Vector3f::Abs(worldMax - worldMin).Length() * 0.5f, m_maxLightRadius);
 	if (lightDistance <= 0.0f)
 		lightDistance = 100.0f * worldRadius;
-	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	Vector3f viewDir = viewDirection;
 	viewDir.Normalize();
 	center += viewDir * worldRadius * 0.8f;
 	Vector3f	f = -lightDirection;
@@ -412,7 +412,7 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 }
 
 
-bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax)
+bool ShadowMap::Update(Vector3f center, Vector3f viewDirection, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax)
 {
 	if (m_status < 0)
 		return false;
@@ -437,7 +437,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	static int trafoType = 2;
 	if (trafoType == 2) {
 		if (baseRenderer.HasPerspective(BaseRenderer::rpForward))
-			CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldMin, worldMax);
+			CreateViewerAlignedTransformation(center, viewDirection, lightDirection, lightOffset, worldMin, worldMax);
 		else
 			CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 	}
@@ -447,7 +447,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #else
 	if (baseRenderer.HasPerspective(BaseRenderer::rpForward))
-		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldMin, worldMax);
+		CreateViewerAlignedTransformation(center, viewDirection, lightDirection, lightOffset, worldMin, worldMax);
 	else
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #endif

@@ -35,7 +35,7 @@ private:
 public:
 	bool Setup(void);
 
-	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
+	bool Update(Vector3f center, Vector3f viewDirection, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
 	void UpdateTransformation(void);
 
@@ -193,7 +193,7 @@ private:
 
 	void Stabilize(float shadowMapSize);
 
-	void CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance,
+	void CreateViewerAlignedTransformation(Vector3f center, const Vector3f& viewDirection, const Vector3f& lightDirection, float lightDistance,
 										   const Vector3f& worldMin, const Vector3f& worldMax);
 
 	void CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
