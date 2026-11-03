@@ -11,8 +11,10 @@
 // =================================================================================================
 // DX12 Cubemap implementation
 
-void Cubemap::SetParams(void)
+void Cubemap::SetParams(bool forceUpdate)
 {
+	if (m_hasParams and not forceUpdate)
+		return;
 	m_hasParams = true;
 	m_sampling.minFilter = GfxFilterMode::Linear;
 	m_sampling.magFilter = GfxFilterMode::Linear;

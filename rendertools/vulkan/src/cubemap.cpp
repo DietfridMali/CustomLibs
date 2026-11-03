@@ -10,8 +10,10 @@
 // =================================================================================================
 // Vulkan Cubemap implementation
 
-void Cubemap::SetParams(void)
+void Cubemap::SetParams(bool forceUpdate)
 {
+	if (not (forceUpdate or not m_hasParams))
+		return;
 	m_hasParams = true;
 	m_sampling.minFilter = GfxFilterMode::Linear;
 	m_sampling.magFilter = GfxFilterMode::Linear;

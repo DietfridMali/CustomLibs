@@ -11,7 +11,7 @@ public:
 		: Texture(0, TextureType::CubeMap)
 	{}
 
-	virtual void SetParams(void);
+	virtual void SetParams(bool forceUpdate = false) override;
 
 	virtual bool Deploy(int bufferIndex = 0);
 };
