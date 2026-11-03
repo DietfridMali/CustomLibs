@@ -1951,14 +1951,15 @@ bool BaseXRHandler::RenderImageToEyes(Texture* source, float widthScale, float a
 }
 
 
-bool BaseXRHandler::RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically)
+bool BaseXRHandler::RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically, const Vector2f& layerOffset)
 {
 	if (not (source and m_state and m_state->eyesRendered and (distance > 0.0f) and (aspect > 0.0f)))
 		return false;
 
-	float width = m_state->layerWidth * widthScale * distance / m_state->layerDistance;
+	float layerScale = m_state->layerWidth * distance / m_state->layerDistance;
+	float width = layerScale * widthScale;
 
-	return RenderPlaneToEyes(source, distance, width, width / aspect, false, bFlipVertically);
+	return RenderPlaneToEyes(source, distance, width, width / aspect, false, bFlipVertically, layerOffset * layerScale);
 }
 
 
@@ -1999,7 +2000,7 @@ noexcept
 }
 
 
-bool BaseXRHandler::RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically)
+bool BaseXRHandler::RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically, const Vector2f& offset)
 {
 	if (not (width > 0.0f))
 		return false;
@@ -2007,7 +2008,7 @@ bool BaseXRHandler::RenderPlaneToEyes(Texture* source, float distance, float wid
 	float		zNear = distance * kLayerZNearScale;
 	float		zFar = distance * kLayerZFarScale;
 	glm::mat4	layerToApp = curved ? glm::mat4(1.0f)
-									: glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -distance)), glm::vec3(width, height, 1.0f));
+									: glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(offset.x, offset.y, -distance)), glm::vec3(width, height, 1.0f));
 	Matrix4f	layerToClip[kMaxRenderViews];
 
 	for (int i = 0; i < kMaxRenderViews; ++i)

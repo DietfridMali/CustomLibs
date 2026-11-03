@@ -198,7 +198,7 @@ public:
 
 	bool RenderImageToEyes(Texture* source, float widthScale, float aspect, bool bFlipVertically);
 
-	bool RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically);
+	bool RenderImageToEyesAt(Texture* source, float distance, float widthScale, float aspect, bool bFlipVertically, const Vector2f& layerOffset = Vector2f::ZERO);
 
 	bool RenderImageToEyes(Texture* source, const Matrix4f* imageToClip, bool bFlipVertically);
 
@@ -263,7 +263,7 @@ private:
 
 	bool RenderLayerToEyes(Texture* source, bool bFlipVertically);
 
-	bool RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically);
+	bool RenderPlaneToEyes(Texture* source, float distance, float width, float height, bool curved, bool bFlipVertically, const Vector2f& offset = Vector2f::ZERO);
 
 	Matrix4f AppToClip(int view, float zNear, float zFar) const
 	noexcept;
