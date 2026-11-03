@@ -76,30 +76,25 @@ noexcept
 }
 
 
-bool LoadDDS(const String& path, TextureBuffer& buf)
+namespace {
+
+constexpr size_t kDDSHeaderSize = 4 + 124;
+constexpr size_t kDDSHeaderDX10Size = 20;
+
+struct DDSLayout {
+	GfxPixelFormat	format{ GfxPixelFormat::RGBA8_UNorm };
+	uint32_t		width{ 0 };
+	uint32_t		height{ 0 };
+	uint32_t		mipCount{ 1 };
+	size_t			payloadOffset{ 0 };
+	size_t			payloadSize{ 0 };
+	eColorEncoding	colorEncoding{ ecLinear };
+	bool			hasColorEncoding{ false };
+};
+
+bool ParseDDSHeader(const char* name, const uint8_t* header, size_t headerSize, size_t fileSize, DDSLayout& layout)
 noexcept
 {
-	const char* name = (const char*)path;
-
-	std::ifstream f(name, std::ios::binary | std::ios::ate);
-	if (not f.is_open()) {
-		logHandler.Print("LoadDDS: cannot open '%s'\n", name);
-		return false;
-	}
-	const std::streamoff fileSize = f.tellg();
-	if (fileSize < std::streamoff(4 + 124)) {
-		logHandler.Print("LoadDDS: '%s' is too small to be a DDS file\n", name);
-		return false;
-	}
-	f.seekg(0, std::ios::beg);
-
-	// Magic + fixed 124-byte header. A DX10 header (if present) and the payload follow.
-	uint8_t header[4 + 124];
-	f.read(reinterpret_cast<char*>(header), std::streamsize(sizeof(header)));
-	if (not f) {
-		logHandler.Print("LoadDDS: '%s' header read failed\n", name);
-		return false;
-	}
 	if (ReadU32(header) != kDDSMagic) {
 		logHandler.Print("LoadDDS: '%s' is not a DDS file (bad magic)\n", name);
 		return false;
@@ -136,14 +131,12 @@ noexcept
 		format = GfxPixelFormat::BC5_UNorm;
 	}
 	else if (fourCC == kFourCC_DX10) {
-		extraHeader = 20;
-		uint8_t dx10[20];
-		f.read(reinterpret_cast<char*>(dx10), std::streamsize(sizeof(dx10)));
-		if (not f) {
+		extraHeader = kDDSHeaderDX10Size;
+		if (headerSize < kDDSHeaderSize + kDDSHeaderDX10Size) {
 			logHandler.Print("LoadDDS: '%s' DX10 header read failed\n", name);
 			return false;
 		}
-		const uint32_t dxgiFormat = ReadU32(dx10);
+		const uint32_t dxgiFormat = ReadU32(header + kDDSHeaderSize);
 		hasColorEncoding = true;
 		if (dxgiFormat == kDXGI_BC1_UNORM)
 			format = GfxPixelFormat::BC1_UNorm;
@@ -186,39 +179,105 @@ noexcept
 		h = (h > 1u) ? (h >> 1) : 1u;
 	}
 
-	const std::streamoff	payloadOffset = std::streamoff(4 + 124) + std::streamoff(extraHeader);
-	const size_t			available = size_t(fileSize - payloadOffset);
+	const size_t payloadOffset = kDDSHeaderSize + extraHeader;
+	const size_t available = (fileSize > payloadOffset) ? fileSize - payloadOffset : 0;
 	if (available < expected) {
 		logHandler.Print("LoadDDS: '%s' payload too small (%llu < %llu bytes)\n",
 						 name, (unsigned long long)available, (unsigned long long)expected);
 		return false;
 	}
 
-	// Keep exactly the expected mip-chain bytes; ignore any trailing padding the encoder may add.
-	buf.m_info.m_width = int32_t(width);
-	buf.m_info.m_height = int32_t(height);
+	layout.format = format;
+	layout.width = width;
+	layout.height = height;
+	layout.mipCount = mipCount;
+	layout.payloadOffset = payloadOffset;
+	layout.payloadSize = expected;
+	layout.colorEncoding = colorEncoding;
+	layout.hasColorEncoding = hasColorEncoding;
+	return true;
+}
+
+// Keep exactly the expected mip-chain bytes; ignore any trailing padding the encoder may add.
+bool SetDDSBuffer(const char* name, const DDSLayout& layout, TextureBuffer& buf)
+noexcept
+{
+	buf.m_info.m_width = int32_t(layout.width);
+	buf.m_info.m_height = int32_t(layout.height);
 	buf.m_info.m_componentCount = 0; // not applicable to block-compressed data
 	buf.m_info.m_internalFormat = 0;
 	buf.m_info.m_format = 0;
-	buf.m_info.m_gfxFormat = format;
-	buf.m_info.m_mipCount = int32_t(mipCount);
-	buf.m_info.m_dataSize = int32_t(expected);
-	buf.m_info.m_colorEncoding = colorEncoding;
-	buf.m_info.m_hasColorEncoding = hasColorEncoding and useFileColorEncoding;
+	buf.m_info.m_gfxFormat = layout.format;
+	buf.m_info.m_mipCount = int32_t(layout.mipCount);
+	buf.m_info.m_dataSize = int32_t(layout.payloadSize);
+	buf.m_info.m_colorEncoding = layout.colorEncoding;
+	buf.m_info.m_hasColorEncoding = layout.hasColorEncoding and useFileColorEncoding;
 
-	buf.m_data.Resize(uint32_t(expected));
-	if (uint32_t(buf.m_data.Length()) < uint32_t(expected)) {
-		logHandler.Print("LoadDDS: '%s' out of memory for %llu bytes\n", name, (unsigned long long)expected);
+	buf.m_data.Resize(uint32_t(layout.payloadSize));
+	if (uint32_t(buf.m_data.Length()) < uint32_t(layout.payloadSize)) {
+		logHandler.Print("LoadDDS: '%s' out of memory for %llu bytes\n", name, (unsigned long long)layout.payloadSize);
+		return false;
+	}
+	return true;
+}
+
+} // namespace
+
+
+bool LoadDDS(const String& path, TextureBuffer& buf)
+noexcept
+{
+	const char* name = (const char*)path;
+
+	std::ifstream f(name, std::ios::binary | std::ios::ate);
+	if (not f.is_open()) {
+		logHandler.Print("LoadDDS: cannot open '%s'\n", name);
+		return false;
+	}
+	const std::streamoff fileSize = f.tellg();
+	if (fileSize < std::streamoff(kDDSHeaderSize)) {
+		logHandler.Print("LoadDDS: '%s' is too small to be a DDS file\n", name);
+		return false;
+	}
+	f.seekg(0, std::ios::beg);
+
+	// Magic + fixed 124-byte header, and the DX10 header where the file is long enough to hold one.
+	uint8_t			header[kDDSHeaderSize + kDDSHeaderDX10Size];
+	const size_t	headerSize = (fileSize < std::streamoff(sizeof(header))) ? size_t(fileSize) : sizeof(header);
+	f.read(reinterpret_cast<char*>(header), std::streamsize(headerSize));
+	if (not f) {
+		logHandler.Print("LoadDDS: '%s' header read failed\n", name);
 		return false;
 	}
 
-	f.seekg(payloadOffset, std::ios::beg);
-	f.read(reinterpret_cast<char*>(buf.m_data.Data()), std::streamsize(expected));
+	DDSLayout layout;
+	if (not (ParseDDSHeader(name, header, headerSize, size_t(fileSize), layout) and SetDDSBuffer(name, layout, buf)))
+		return false;
+
+	f.seekg(std::streamoff(layout.payloadOffset), std::ios::beg);
+	f.read(reinterpret_cast<char*>(buf.m_data.Data()), std::streamsize(layout.payloadSize));
 	if (not f) {
 		logHandler.Print("LoadDDS: '%s' payload read failed\n", name);
 		return false;
 	}
 
+	return true;
+}
+
+
+bool LoadDDS(const uint8_t* data, size_t size, const char* name, TextureBuffer& buf)
+noexcept
+{
+	if (size < kDDSHeaderSize) {
+		logHandler.Print("LoadDDS: '%s' is too small to be a DDS file\n", name);
+		return false;
+	}
+
+	DDSLayout		layout;
+	const size_t	headerSize = (size < kDDSHeaderSize + kDDSHeaderDX10Size) ? size : kDDSHeaderSize + kDDSHeaderDX10Size;
+	if (not (ParseDDSHeader(name, data, headerSize, size, layout) and SetDDSBuffer(name, layout, buf)))
+		return false;
+	std::memcpy(buf.m_data.Data(), data + layout.payloadOffset, layout.payloadSize);
 	return true;
 }
 
@@ -460,6 +519,245 @@ noexcept
 		std::memset(alpha, 255, 16);
 }
 
+constexpr uint8_t kBC7Partitions3[64][16] = {
+	{ 0, 0, 1, 1, 0, 0, 1, 1, 0, 2, 2, 1, 2, 2, 2, 2 },
+	{ 0, 0, 0, 1, 0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 2, 1 },
+	{ 0, 0, 0, 0, 2, 0, 0, 1, 2, 2, 1, 1, 2, 2, 1, 1 },
+	{ 0, 2, 2, 2, 0, 0, 2, 2, 0, 0, 1, 1, 0, 1, 1, 1 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 1, 1, 2, 2 },
+	{ 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 2, 2, 0, 0, 2, 2 },
+	{ 0, 0, 2, 2, 0, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1 },
+	{ 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2 },
+	{ 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2 },
+	{ 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2 },
+	{ 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2 },
+	{ 0, 1, 1, 2, 0, 1, 1, 2, 0, 1, 1, 2, 0, 1, 1, 2 },
+	{ 0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2 },
+	{ 0, 0, 1, 1, 0, 1, 1, 2, 1, 1, 2, 2, 1, 2, 2, 2 },
+	{ 0, 0, 1, 1, 2, 0, 0, 1, 2, 2, 0, 0, 2, 2, 2, 0 },
+	{ 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 2, 1, 1, 2, 2 },
+	{ 0, 1, 1, 1, 0, 0, 1, 1, 2, 0, 0, 1, 2, 2, 0, 0 },
+	{ 0, 0, 0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2 },
+	{ 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 1, 1, 1, 1 },
+	{ 0, 1, 1, 1, 0, 1, 1, 1, 0, 2, 2, 2, 0, 2, 2, 2 },
+	{ 0, 0, 0, 1, 0, 0, 0, 1, 2, 2, 2, 1, 2, 2, 2, 1 },
+	{ 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 2, 2, 0, 1, 2, 2 },
+	{ 0, 0, 0, 0, 1, 1, 0, 0, 2, 2, 1, 0, 2, 2, 1, 0 },
+	{ 0, 1, 2, 2, 0, 1, 2, 2, 0, 0, 1, 1, 0, 0, 0, 0 },
+	{ 0, 0, 1, 2, 0, 0, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2 },
+	{ 0, 1, 1, 0, 1, 2, 2, 1, 1, 2, 2, 1, 0, 1, 1, 0 },
+	{ 0, 0, 0, 0, 0, 1, 1, 0, 1, 2, 2, 1, 1, 2, 2, 1 },
+	{ 0, 0, 2, 2, 1, 1, 0, 2, 1, 1, 0, 2, 0, 0, 2, 2 },
+	{ 0, 1, 1, 0, 0, 1, 1, 0, 2, 0, 0, 2, 2, 2, 2, 2 },
+	{ 0, 0, 1, 1, 0, 1, 2, 2, 0, 1, 2, 2, 0, 0, 1, 1 },
+	{ 0, 0, 0, 0, 2, 0, 0, 0, 2, 2, 1, 1, 2, 2, 2, 1 },
+	{ 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 2, 2, 1, 2, 2, 2 },
+	{ 0, 2, 2, 2, 0, 0, 2, 2, 0, 0, 1, 2, 0, 0, 1, 1 },
+	{ 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 2, 0, 2, 2, 2 },
+	{ 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0 },
+	{ 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 0, 0, 0, 0 },
+	{ 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0 },
+	{ 0, 1, 2, 0, 2, 0, 1, 2, 1, 2, 0, 1, 0, 1, 2, 0 },
+	{ 0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2, 0, 0, 1, 1 },
+	{ 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 0, 0, 0, 0, 1, 1 },
+	{ 0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 2, 1, 2, 1, 2, 1 },
+	{ 0, 0, 2, 2, 1, 1, 2, 2, 0, 0, 2, 2, 1, 1, 2, 2 },
+	{ 0, 0, 2, 2, 0, 0, 1, 1, 0, 0, 2, 2, 0, 0, 1, 1 },
+	{ 0, 2, 2, 0, 1, 2, 2, 1, 0, 2, 2, 0, 1, 2, 2, 1 },
+	{ 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 0, 1, 0, 1 },
+	{ 0, 0, 0, 0, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1 },
+	{ 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2 },
+	{ 0, 2, 2, 2, 0, 1, 1, 1, 0, 2, 2, 2, 0, 1, 1, 1 },
+	{ 0, 0, 0, 2, 1, 1, 1, 2, 0, 0, 0, 2, 1, 1, 1, 2 },
+	{ 0, 0, 0, 0, 2, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2 },
+	{ 0, 2, 2, 2, 0, 1, 1, 1, 0, 1, 1, 1, 0, 2, 2, 2 },
+	{ 0, 0, 0, 2, 1, 1, 1, 2, 1, 1, 1, 2, 0, 0, 0, 2 },
+	{ 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 2, 2, 2, 2 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 2, 2, 1, 1, 2 },
+	{ 0, 1, 1, 0, 0, 1, 1, 0, 2, 2, 2, 2, 2, 2, 2, 2 },
+	{ 0, 0, 2, 2, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 2, 2 },
+	{ 0, 0, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2, 0, 0, 2, 2 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 2 },
+	{ 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1 },
+	{ 0, 2, 2, 2, 1, 2, 2, 2, 0, 2, 2, 2, 1, 2, 2, 2 },
+	{ 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 },
+	{ 0, 1, 1, 1, 2, 0, 1, 1, 2, 2, 0, 1, 2, 2, 2, 0 }
+};
+
+constexpr uint8_t kBC7Anchors3Second[64] = {
+	3, 3, 15, 15, 8, 3, 15, 15, 8, 8, 6, 6, 6, 5, 3, 3,
+	3, 3, 8, 15, 3, 3, 6, 10, 5, 8, 8, 6, 8, 5, 15, 15,
+	8, 15, 3, 5, 6, 10, 8, 15, 15, 3, 15, 5, 15, 15, 15, 15,
+	3, 15, 5, 5, 5, 8, 5, 10, 5, 10, 8, 13, 15, 12, 3, 3
+};
+
+constexpr uint8_t kBC7Anchors3Third[64] = {
+	15, 8, 8, 3, 15, 15, 3, 8, 15, 15, 15, 15, 15, 15, 15, 8,
+	15, 8, 15, 3, 15, 8, 15, 8, 3, 15, 6, 10, 15, 15, 10, 8,
+	15, 3, 15, 10, 10, 8, 9, 10, 6, 15, 8, 15, 3, 6, 6, 8,
+	15, 3, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 3, 15, 15, 8
+};
+
+struct BC7Mode {
+	uint8_t subsets;
+	uint8_t partitionBits;
+	uint8_t rotationBits;
+	uint8_t indexModeBits;
+	uint8_t colorBits;
+	uint8_t alphaBits;
+	uint8_t endpointPBits;
+	uint8_t sharedPBits;
+	uint8_t indexBits;
+	uint8_t index2Bits;
+};
+
+constexpr BC7Mode kBC7Modes[8] = {
+	{ 3, 4, 0, 0, 4, 0, 1, 0, 3, 0 },
+	{ 2, 6, 0, 0, 6, 0, 0, 1, 3, 0 },
+	{ 3, 6, 0, 0, 5, 0, 0, 0, 2, 0 },
+	{ 2, 6, 0, 0, 7, 0, 1, 0, 2, 0 },
+	{ 1, 0, 2, 1, 5, 6, 0, 0, 2, 3 },
+	{ 1, 0, 2, 0, 7, 8, 0, 0, 2, 2 },
+	{ 1, 0, 0, 0, 7, 7, 1, 0, 4, 0 },
+	{ 2, 6, 0, 0, 5, 5, 1, 0, 2, 0 }
+};
+
+inline uint32_t BC7Subset(uint32_t subsets, uint32_t partition, uint32_t texel)
+noexcept
+{
+	if (subsets == 2u)
+		return (uint32_t(kBC7Partitions[partition]) >> texel) & 1u;
+	if (subsets == 3u)
+		return kBC7Partitions3[partition][texel];
+	return 0u;
+}
+
+inline bool BC7IsAnchor(uint32_t subsets, uint32_t partition, uint32_t texel)
+noexcept
+{
+	if (texel == 0u)
+		return true;
+	if (subsets == 2u)
+		return texel == kBC7Anchors[partition];
+	if (subsets == 3u)
+		return (texel == kBC7Anchors3Second[partition]) or (texel == kBC7Anchors3Third[partition]);
+	return false;
+}
+
+void DecodeBC7Block(const uint8_t* block, uint8_t* rgba)
+noexcept
+{
+	uint32_t mode = 0;
+	while ((mode < 8u) and (((block[0] >> mode) & 1u) == 0u))
+		++mode;
+	if (mode == 8u) {
+		std::memset(rgba, 0, 64);
+		return;
+	}
+	const BC7Mode&	m = kBC7Modes[mode];
+	BC7BitReader	reader(block);
+	reader.Read(mode + 1u);
+	const uint32_t	partition = reader.Read(m.partitionBits);
+	const uint32_t	rotation = reader.Read(m.rotationBits);
+	const uint32_t	indexMode = reader.Read(m.indexModeBits);
+	const uint32_t	endpoints = 2u * m.subsets;
+	uint32_t		ends[6][4];
+	uint32_t		colorBits = m.colorBits;
+	uint32_t		alphaBits = m.alphaBits;
+	for (uint32_t c = 0; c < 3u; ++c)
+		for (uint32_t e = 0; e < endpoints; ++e)
+			ends[e][c] = reader.Read(colorBits);
+	for (uint32_t e = 0; e < endpoints; ++e)
+		ends[e][3] = alphaBits ? reader.Read(alphaBits) : 255u;
+	if (m.endpointPBits) {
+		for (uint32_t e = 0; e < endpoints; ++e) {
+			const uint32_t p = reader.Read(1u);
+			for (uint32_t c = 0; c < 3u; ++c)
+				ends[e][c] = (ends[e][c] << 1) | p;
+			if (alphaBits)
+				ends[e][3] = (ends[e][3] << 1) | p;
+		}
+		++colorBits;
+		if (alphaBits)
+			++alphaBits;
+	}
+	else if (m.sharedPBits) {
+		for (uint32_t s = 0; s < m.subsets; ++s) {
+			const uint32_t p = reader.Read(1u);
+			for (uint32_t e = 2u * s; e < 2u * s + 2u; ++e)
+				for (uint32_t c = 0; c < 3u; ++c)
+					ends[e][c] = (ends[e][c] << 1) | p;
+		}
+		++colorBits;
+	}
+	for (uint32_t e = 0; e < endpoints; ++e) {
+		for (uint32_t c = 0; c < 3u; ++c)
+			ends[e][c] = BC7Expand(ends[e][c], colorBits);
+		if (alphaBits)
+			ends[e][3] = BC7Expand(ends[e][3], alphaBits);
+	}
+	uint8_t indices[16];
+	uint8_t indices2[16];
+	for (uint32_t texel = 0; texel < 16u; ++texel)
+		indices[texel] = uint8_t(reader.Read(BC7IsAnchor(m.subsets, partition, texel) ? m.indexBits - 1u : m.indexBits));
+	if (m.index2Bits)
+		for (uint32_t texel = 0; texel < 16u; ++texel)
+			indices2[texel] = uint8_t(reader.Read((texel == 0u) ? m.index2Bits - 1u : m.index2Bits));
+	const uint8_t* weights = BC7Weights(m.indexBits);
+	const uint8_t* weights2 = BC7Weights(m.index2Bits);
+	for (uint32_t texel = 0; texel < 16u; ++texel) {
+		const uint32_t	subset = BC7Subset(m.subsets, partition, texel);
+		const uint32_t*	end0 = ends[2u * subset];
+		const uint32_t*	end1 = ends[2u * subset + 1u];
+		uint32_t		colorWeight = weights[indices[texel]];
+		uint32_t		alphaWeight = colorWeight;
+		if (m.index2Bits) {
+			if (indexMode) {
+				colorWeight = weights2[indices2[texel]];
+				alphaWeight = weights[indices[texel]];
+			}
+			else
+				alphaWeight = weights2[indices2[texel]];
+		}
+		uint8_t* texelRGBA = rgba + 4u * texel;
+		for (uint32_t c = 0; c < 3u; ++c)
+			texelRGBA[c] = BC7Interpolate(end0[c], end1[c], colorWeight);
+		texelRGBA[3] = BC7Interpolate(end0[3], end1[3], alphaWeight);
+		if (rotation) {
+			const uint8_t swap = texelRGBA[3];
+			texelRGBA[3] = texelRGBA[rotation - 1u];
+			texelRGBA[rotation - 1u] = swap;
+		}
+	}
+}
+
+void DecodeBC4Block(const uint8_t* block, uint8_t* values)
+noexcept
+{
+	const uint32_t	r0 = block[0];
+	const uint32_t	r1 = block[1];
+	uint8_t			palette[8];
+	palette[0] = uint8_t(r0);
+	palette[1] = uint8_t(r1);
+	if (r0 > r1) {
+		for (uint32_t i = 1; i < 7u; ++i)
+			palette[i + 1u] = uint8_t(((7u - i) * r0 + i * r1) / 7u);
+	}
+	else {
+		for (uint32_t i = 1; i < 5u; ++i)
+			palette[i + 1u] = uint8_t(((5u - i) * r0 + i * r1) / 5u);
+		palette[6] = 0;
+		palette[7] = 255;
+	}
+	uint64_t bits = 0;
+	for (uint32_t i = 0; i < 6u; ++i)
+		bits |= uint64_t(block[2u + i]) << (8u * i);
+	for (uint32_t texel = 0; texel < 16u; ++texel)
+		values[texel] = palette[(bits >> (3u * texel)) & 7u];
+}
+
 } // namespace
 
 
@@ -509,6 +807,31 @@ noexcept
 }
 
 
+TextureBuffer* LoadTextureMemory(const uint8_t* data, size_t size, const char* name)
+noexcept
+{
+	TextureBuffer* buf = new TextureBuffer();
+
+	if ((size >= 4) and (ReadU32(data) == kDDSMagic)) {
+		if (not LoadDDS(data, size, name, *buf)) {
+			delete buf;
+			return nullptr;
+		}
+		return buf;
+	}
+
+	SDL_IOStream*	stream = SDL_IOFromConstMem(data, size);
+	SDL_Surface*	image = stream ? IMG_Load_IO(stream, true) : nullptr;
+	if (not image) {
+		logHandler.Print("LoadTextureMemory: failed to load '%s'\n", name);
+		delete buf;
+		return nullptr;
+	}
+	buf->Create(image, false, false);
+	return buf;
+}
+
+
 bool HasCompressedImage(const String& imageName)
 noexcept
 {
@@ -550,6 +873,43 @@ noexcept
 }
 
 
+bool DecodeCompressedRows(const TextureBuffer& buf, int32_t firstBlockRow, int32_t blockRows, uint8_t* rgba)
+noexcept
+{
+	const GfxPixelFormat	format = buf.m_info.m_gfxFormat;
+	const bool				isBC7 = (format == GfxPixelFormat::BC7_UNorm) or (format == GfxPixelFormat::BC7_UNorm_SRGB);
+	if (not (isBC7 or (format == GfxPixelFormat::BC4_UNorm)))
+		return false;
+	const int32_t	width = buf.m_info.m_width;
+	const int32_t	height = buf.m_info.m_height;
+	const int32_t	blocksAcross = int32_t(BlocksAcross(uint32_t(width)));
+	const int32_t	blocksDown = int32_t(BlocksAcross(uint32_t(height)));
+	const size_t	blockBytes = GfxBlockBytes(format);
+	const int32_t	lastBlockRow = (firstBlockRow + blockRows < blocksDown) ? firstBlockRow + blockRows : blocksDown;
+	for (int32_t y = (firstBlockRow > 0) ? firstBlockRow : 0; y < lastBlockRow; ++y) {
+		const uint8_t* block = buf.m_data.Data() + size_t(y) * size_t(blocksAcross) * blockBytes;
+		for (int32_t x = 0; x < blocksAcross; ++x, block += blockBytes) {
+			uint8_t texels[64];
+			if (isBC7)
+				DecodeBC7Block(block, texels);
+			else {
+				uint8_t values[16];
+				DecodeBC4Block(block, values);
+				for (int32_t i = 0; i < 16; ++i) {
+					texels[4 * i] = texels[4 * i + 1] = texels[4 * i + 2] = values[i];
+					texels[4 * i + 3] = 255;
+				}
+			}
+			for (int32_t j = 0, row = y * 4; (j < 4) and (row < height); ++j, ++row) {
+				for (int32_t i = 0, column = x * 4; (i < 4) and (column < width); ++i, ++column)
+					std::memcpy(rgba + (size_t(row) * size_t(width) + size_t(column)) * 4, texels + (j * 4 + i) * 4, 4);
+			}
+		}
+	}
+	return true;
+}
+
+
 bool ReadPNGText(const String& path, const char* keyword, std::string& text)
 noexcept
 {
@@ -579,6 +939,50 @@ noexcept
 			continue;
 		}
 		f.seekg(std::streamoff(length) + 4, std::ios::cur);
+	}
+	return false;
+}
+
+
+static bool IsTGAFile(const char* name)
+noexcept
+{
+	const size_t n = std::strlen(name);
+	if (n < 4)
+		return false;
+	const char*	t = name + (n - 4);
+	auto		lower = [](char c) noexcept { return ((c >= 'A') and (c <= 'Z')) ? char(c - 'A' + 'a') : c; };
+	return (t[0] == '.') and (lower(t[1]) == 't') and (lower(t[2]) == 'g') and (lower(t[3]) == 'a');
+}
+
+
+bool ReadImageExtent(const String& path, int32_t& width, int32_t& height)
+noexcept
+{
+	const char* name = static_cast<const char*>(path);
+	if (name == nullptr)
+		return false;
+	std::ifstream f(name, std::ios::binary);
+	if (not f.is_open())
+		return false;
+	static constexpr uint8_t	signature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+	uint8_t						head[24];
+	f.read(reinterpret_cast<char*>(head), std::streamsize(sizeof(head)));
+	const std::streamsize length = f.gcount();
+	if ((length >= std::streamsize(sizeof(head))) and (std::memcmp(head, signature, sizeof(signature)) == 0) and (std::memcmp(head + 12, "IHDR", 4) == 0)) {
+		width = int32_t((uint32_t(head[16]) << 24) | (uint32_t(head[17]) << 16) | (uint32_t(head[18]) << 8) | uint32_t(head[19]));
+		height = int32_t((uint32_t(head[20]) << 24) | (uint32_t(head[21]) << 16) | (uint32_t(head[22]) << 8) | uint32_t(head[23]));
+		return true;
+	}
+	if ((length >= std::streamsize(4 + kOffWidth + 4)) and (ReadU32(head) == kDDSMagic)) {
+		height = int32_t(ReadU32(head + 4 + kOffHeight));
+		width = int32_t(ReadU32(head + 4 + kOffWidth));
+		return true;
+	}
+	if ((length >= 16) and IsTGAFile(name)) {
+		width = int32_t(head[12]) | (int32_t(head[13]) << 8);
+		height = int32_t(head[14]) | (int32_t(head[15]) << 8);
+		return true;
 	}
 	return false;
 }

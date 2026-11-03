@@ -40,6 +40,12 @@ noexcept
 bool LoadDDS(const String& path, TextureBuffer& buf)
 noexcept;
 
+bool LoadDDS(const uint8_t* data, size_t size, const char* name, TextureBuffer& buf)
+noexcept;
+
+bool DecodeCompressedRows(const TextureBuffer& buf, int32_t firstBlockRow, int32_t blockRows, uint8_t* rgba)
+noexcept;
+
 void SetUseFileColorEncoding(bool use)
 noexcept;
 
@@ -50,6 +56,9 @@ bool LoadCompressedAlpha(const String& imageName, AutoArray<uint8_t>& alpha, int
 noexcept;
 
 bool ReadPNGText(const String& path, const char* keyword, std::string& text)
+noexcept;
+
+bool ReadImageExtent(const String& path, int32_t& width, int32_t& height)
 noexcept;
 
 // =================================================================================================
@@ -64,6 +73,9 @@ noexcept;
 TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
 							   bool premultiply, bool flipVertically, bool isRequired,
 							   bool allowDDS)
+noexcept;
+
+TextureBuffer* LoadTextureMemory(const uint8_t* data, size_t size, const char* name)
 noexcept;
 
 // =================================================================================================
