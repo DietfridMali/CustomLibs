@@ -35,6 +35,7 @@ public:
 		GfxWrapMode	wrapV{ GfxWrapMode::Repeat };
 		float		alphaCutoff{ 0.0f };
 		bool		doubleSided{ false };
+		bool		isBlend{ false };
 	};
 
 	struct PartData {

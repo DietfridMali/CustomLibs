@@ -266,6 +266,7 @@ void GLBLoader::LoadMaterials(void)
 		MaterialData&		material = m_data.materials[int32_t(i)];
 		material.doubleSided = source.doubleSided;
 		material.alphaCutoff = (source.alphaMode == "OPAQUE") ? 0.0f : float(source.alphaCutoff);
+		material.isBlend = (source.alphaMode == "BLEND");
 		int textureIndex = source.pbrMetallicRoughness.baseColorTexture.index;
 		if ((textureIndex < 0) or (textureIndex >= int(m_model.textures.size())))
 			continue;
