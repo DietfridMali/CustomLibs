@@ -43,7 +43,7 @@ public:
 	{
 	}
 
-	// Konstruktor f�r 2D-AutoArray
+	// Konstruktor fuer 2D-AutoArray
 	inline AutoArray(int32_t width, int32_t height)
 		: m_array(ValidatedSize2D(width, height, 0))
 	{
