@@ -84,6 +84,7 @@ private:
 	AutoArray<float>		m_distances;
 	AutoArray<float>		m_keyTimes;
 	int32_t					m_firstKey{ 0 };
+	int32_t					m_loopKey{ 0 };
 	float					m_swingTime{ 0.0f };
 	float					m_loopStart{ 0.0f };
 	float					m_duration{ 0.0f };

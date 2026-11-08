@@ -64,6 +64,13 @@ static float KnotDistance(const Vector3f& a, const Vector3f& b) {
 }
 
 
+static Vector3f KnotVelocity(const Vector3f& previous, const Vector3f& knot, const Vector3f& next, float fallback) {
+	float before = ((knot - previous).Length() < PoseSpline::cPointTolerance) ? fallback : KnotDistance(previous, knot);
+	float after = ((next - knot).Length() < PoseSpline::cPointTolerance) ? fallback : KnotDistance(knot, next);
+	return (knot - previous) / before - (next - previous) / (before + after) + (next - knot) / after;
+}
+
+
 static void ArcTangents(Vector3f chord, Vector3f& given, Vector3f& mirrored) {
 	float tangentLength = given.Length();
 	if (tangentLength < PoseSpline::cPointTolerance)
@@ -96,7 +103,17 @@ noexcept
 bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 	int32_t keyCount = keys.Length();
 	int32_t segmentCount = std::max(keyCount - 1, 0);
-	m_isLoop = (keyCount >= cMinLoopKeys) and ((keys[keyCount - 1].position - keys[0].position).Length() < cLoopDistance);
+	m_isLoop = false;
+	m_loopKey = 0;
+	float nearest = cLoopDistance;
+	for (int32_t i = 0; i + cMinLoopKeys <= keyCount; ++i) {
+		float distance = (keys[keyCount - 1].position - keys[i].position).Length();
+		if (distance < nearest) {
+			nearest = distance;
+			m_loopKey = i;
+			m_isLoop = true;
+		}
+	}
 	m_segments.Resize(segmentCount);
 	m_rotations.Resize(keyCount);
 	m_arcLengths.Resize(segmentCount * (cArcSamples + 1));
@@ -105,7 +122,7 @@ bool PoseSpline::Setup(const AutoArray<Key>& keys) {
 	m_firstKey = 0;
 	m_duration = 0.0f;
 	for (int32_t i = 0; i < keyCount; ++i) {
-		glm::quat q = glm::normalize(keys[(m_isLoop and (i + 1 == keyCount)) ? 0 : i].orientation);
+		glm::quat q = glm::normalize(keys[(m_isLoop and (i + 1 == keyCount)) ? m_loopKey : i].orientation);
 		if ((i > 0) and (glm::dot(m_rotations[i - 1], q) < 0.0f))
 			q = -q;
 		m_rotations[i] = q;
@@ -130,10 +147,12 @@ void PoseSpline::SetupTurns(void) {
 		bool isTurning = (length > cPointTolerance) and (m_segments[k].view != ViewMode::Swing);
 		secants[k] = isTurning ? LogRotation(glm::conjugate(m_rotations[k]) * m_rotations[k + 1]) / length : glm::vec3(0.0f);
 	}
-	rates[0] = m_isLoop ? TurnRate(secants[segmentCount - 1], secants[0], m_segments[segmentCount - 1].length, m_segments[0].length) : secants[0];
-	rates[segmentCount] = m_isLoop ? rates[0] : secants[segmentCount - 1];
+	rates[0] = secants[0];
 	for (int32_t k = 1; k < segmentCount; ++k)
 		rates[k] = TurnRate(secants[k - 1], secants[k], m_segments[k - 1].length, m_segments[k].length);
+	if (m_isLoop)
+		rates[m_loopKey] = TurnRate(secants[segmentCount - 1], secants[m_loopKey], m_segments[segmentCount - 1].length, m_segments[m_loopKey].length);
+	rates[segmentCount] = m_isLoop ? rates[m_loopKey] : secants[segmentCount - 1];
 	for (int32_t k = 0; k < segmentCount; ++k) {
 		Segment& segment = m_segments[k];
 		float third = segment.length / 3.0f;
@@ -237,11 +256,15 @@ glm::quat PoseSpline::Turn(int32_t segment, float t) const {
 
 void PoseSpline::SetupSegment(const AutoArray<Key>& keys, int32_t i) {
 	int32_t keyCount = keys.Length();
-	int32_t loopCount = keyCount - 1;
+	int32_t loopCount = keyCount - 1 - m_loopKey;
+	bool isCycle = m_isLoop and (i >= m_loopKey);
+	auto loopPosition = [&](int32_t k) -> const Vector3f& {
+		return keys[m_loopKey + (k - m_loopKey + loopCount) % loopCount].position;
+	};
 	const Vector3f& p1 = keys[i].position;
-	const Vector3f& p2 = keys[m_isLoop ? (i + 1) % loopCount : i + 1].position;
-	Vector3f p0 = m_isLoop ? keys[(i + loopCount - 1) % loopCount].position : (i > 0) ? keys[i - 1].position : p1 * 2.0f - p2;
-	Vector3f p3 = m_isLoop ? keys[(i + 2) % loopCount].position : (i + 2 < keyCount) ? keys[i + 2].position : p2 * 2.0f - p1;
+	const Vector3f& p2 = isCycle ? loopPosition(i + 1) : keys[i + 1].position;
+	Vector3f p0 = isCycle ? loopPosition(i - 1) : (i > 0) ? keys[i - 1].position : p1 * 2.0f - p2;
+	Vector3f p3 = isCycle ? loopPosition(i + 2) : (i + 2 < keyCount) ? keys[i + 2].position : p2 * 2.0f - p1;
 	Segment& segment = m_segments[i];
 	segment.p0 = p1;
 	segment.p1 = p2;
@@ -252,11 +275,9 @@ void PoseSpline::SetupSegment(const AutoArray<Key>& keys, int32_t i) {
 	}
 	else {
 		float d1 = KnotDistance(p1, p2);
-		float d0 = ((p1 - p0).Length() < cPointTolerance) ? d1 : KnotDistance(p0, p1);
-		float d2 = ((p3 - p2).Length() < cPointTolerance) ? d1 : KnotDistance(p2, p3);
-		segment.t0 = ((p1 - p0) / d0 - (p2 - p0) / (d0 + d1) + (p2 - p1) / d1) * d1;
-		segment.t1 = ((p2 - p1) / d1 - (p3 - p1) / (d1 + d2) + (p3 - p2) / d2) * d1;
-		if (not m_isLoop and (i == 0) and (i + 2 < keyCount))
+		segment.t0 = KnotVelocity(p0, p1, p2, d1) * d1;
+		segment.t1 = KnotVelocity((m_isLoop and (i + 1 == m_loopKey)) ? loopPosition(i) : p1, p2, p3, d1) * d1;
+		if (not isCycle and (i == 0) and (i + 2 < keyCount))
 			ArcTangents(p2 - p1, segment.t1, segment.t0);
 		else if (not m_isLoop and (i > 0) and (i + 2 == keyCount))
 			ArcTangents(p2 - p1, segment.t0, segment.t1);
@@ -293,12 +314,16 @@ float PoseSpline::ArcParameter(int32_t segment, float distance) const {
 
 
 int32_t PoseSpline::SegmentIndex(int32_t k) const {
-	return (m_firstKey + k) % m_segments.Length();
+	int32_t segmentCount = m_segments.Length();
+	int32_t i = m_firstKey + k;
+	if (not m_isLoop or (i < segmentCount))
+		return i;
+	return m_loopKey + (i - segmentCount) % (segmentCount - m_loopKey);
 }
 
 
 float PoseSpline::KeyTime(int32_t i) const {
-	return (i < m_keyTimes.Length()) ? m_keyTimes[i] : KeyTime(i - m_segments.Length()) + m_duration - m_loopStart;
+	return (i < m_keyTimes.Length()) ? m_keyTimes[i] : KeyTime(i - (m_segments.Length() - m_loopKey)) + m_duration - m_loopStart;
 }
 
 
@@ -307,7 +332,7 @@ float PoseSpline::StartTiming(int32_t firstKey, float speedScale, float rampTime
 	m_firstKey = std::clamp(firstKey, 0, segmentCount);
 	m_swingTime = swingTime;
 	int32_t leadIn = segmentCount - m_firstKey;
-	int32_t count = m_isLoop ? leadIn + segmentCount : leadIn;
+	int32_t count = m_isLoop ? leadIn + segmentCount - m_loopKey : leadIn;
 	m_starts.Resize(count + 1);
 	m_keyTimes.Resize(count + 1);
 	m_starts[0] = 0.0f;
