@@ -34,6 +34,8 @@ public:
 		GfxWrapMode	wrapU{ GfxWrapMode::Repeat };
 		GfxWrapMode	wrapV{ GfxWrapMode::Repeat };
 		float		alphaCutoff{ 0.0f };
+		float		metallic{ 1.0f };
+		float		roughness{ 1.0f };
 		bool		doubleSided{ false };
 		bool		isBlend{ false };
 	};
