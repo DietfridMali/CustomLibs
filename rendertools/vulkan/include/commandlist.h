@@ -330,6 +330,7 @@ public:
 	uint64_t					m_cmdListId{ 1 };
 	uint64_t					m_cmdListCount{ 0 };
 	TracyVkCtx					m_gpuProfilerCtx{ nullptr };
+	TracyVkCtx					m_listProfilerCtx{ nullptr };
 
 #ifdef _DEBUG
 	static bool s_logCalls;

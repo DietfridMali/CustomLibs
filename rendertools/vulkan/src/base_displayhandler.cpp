@@ -303,6 +303,7 @@ noexcept
 	if (HasBackBuffer())
 		m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
 	TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
+	TracyVkCollect(commandListHandler.m_listProfilerCtx, cb);
 }
 
 

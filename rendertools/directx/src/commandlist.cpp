@@ -285,7 +285,7 @@ noexcept
 #if USE_TRACY
 	// GPU timestamp zone for this command list, named after m_name. Begin timestamp is written
 	// here onto the freshly reset list; the end timestamp + ResolveQueryData follow in Close().
-	m_gpuZone = new tracy::D3D12ZoneScope(commandListHandler.m_gpuProfilerCtx,
+	m_gpuZone = new tracy::D3D12ZoneScope(commandListHandler.m_listProfilerCtx,
 										  uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
 										  (const char*)m_name, size_t(m_name.Length()), m_gfxListPtr.Get(), true);
 	++commandListHandler.m_gpuZonesOpened;
@@ -612,10 +612,18 @@ noexcept
 		return false;
 	gfxResourceHandler.Init(m_frameCount);
 	m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
+	m_listProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
 #if USE_TRACY
 	logHandler.Print("CommandListHandler::Create: Tracy GPU context %s, id %u (255 = constructor bailed out)\n",
 					 m_gpuProfilerCtx ? "created" : "NOT created - no GPU zones",
 					 m_gpuProfilerCtx ? unsigned(m_gpuProfilerCtx->GetId()) : 255u);
+	logHandler.Print("CommandListHandler::Create: Tracy list GPU context %s, id %u (255 = constructor bailed out)\n",
+					 m_listProfilerCtx ? "created" : "NOT created - no command list zones",
+					 m_listProfilerCtx ? unsigned(m_listProfilerCtx->GetId()) : 255u);
+	if (m_gpuProfilerCtx)
+		TracyD3D12ContextName(m_gpuProfilerCtx, "passes", 6);
+	if (m_listProfilerCtx)
+		TracyD3D12ContextName(m_listProfilerCtx, "command lists", 13);
 #endif
 	D3D12_INDIRECT_ARGUMENT_DESC argument{};
 	argument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
@@ -940,6 +948,7 @@ noexcept
 		ReleaseFrameResources();
 	}
 	TracyD3D12Collect(m_gpuProfilerCtx);
+	TracyD3D12Collect(m_listProfilerCtx);
 #if DBG_DIRECTX
 	dx12Context.QueryVRAM();
 #endif
@@ -960,8 +969,8 @@ uint64_t CommandListHandler::ProfilerQueryCount(void) const
 noexcept
 {
 #if USE_TRACY
-	if (m_gpuProfilerCtx)
-		return m_closedQueryCount + m_gpuProfilerCtx->QueryCounter();
+	if (m_listProfilerCtx)
+		return m_closedQueryCount + m_listProfilerCtx->QueryCounter();
 #endif
 	return 0;
 }
@@ -971,10 +980,12 @@ void CommandListHandler::CloseProfilerQueries(bool keepRecording)
 noexcept
 {
 #if USE_TRACY
-	if (not m_gpuProfilerCtx)
+	if (m_gpuProfilerCtx and not keepRecording)
+		m_gpuProfilerCtx->NewFrame(0);
+	if (not m_listProfilerCtx)
 		return;
 
-	uint32_t queryCounter = m_gpuProfilerCtx->QueryCounter();
+	uint32_t queryCounter = m_listProfilerCtx->QueryCounter();
 	uint64_t queryCount = m_closedQueryCount + queryCounter;
 	uint64_t oldestOpenQueryCount = queryCount;
 
@@ -993,7 +1004,7 @@ noexcept
 	if (keepCount > queryCounter)
 		keepCount = queryCounter;
 	m_closedQueryCount += queryCounter - keepCount;
-	m_gpuProfilerCtx->NewFrame(keepCount);
+	m_listProfilerCtx->NewFrame(keepCount);
 	{
 		static uint64_t reportFrame = 0;
 
@@ -1002,11 +1013,18 @@ noexcept
 			logHandler.Print(
 				"Tracy GPU: frame %llu, zones opened %llu, closed %llu, queries %u -> %u, kept %u, connected %d, ctx id %u, collects %llu, timestamps %llu, payloads pending %llu, active %llu, completed %llu\n",
 				(unsigned long long)m_frameNumber, (unsigned long long)m_gpuZonesOpened, (unsigned long long)m_gpuZonesClosed,
-				queryCounter, m_gpuProfilerCtx->QueryCounter(), keepCount, tracy::GetProfiler().IsConnected() ? 1 : 0,
-				unsigned(m_gpuProfilerCtx->GetId()), (unsigned long long)m_gpuProfilerCtx->CollectCalls(),
-				(unsigned long long)m_gpuProfilerCtx->CollectedTimestamps(),
-				(unsigned long long)m_gpuProfilerCtx->PendingPayloads(), (unsigned long long)m_gpuProfilerCtx->ActivePayload(),
-				(unsigned long long)m_gpuProfilerCtx->CompletedPayload());
+				queryCounter, m_listProfilerCtx->QueryCounter(), keepCount, tracy::GetProfiler().IsConnected() ? 1 : 0,
+				unsigned(m_listProfilerCtx->GetId()), (unsigned long long)m_listProfilerCtx->CollectCalls(),
+				(unsigned long long)m_listProfilerCtx->CollectedTimestamps(),
+				(unsigned long long)m_listProfilerCtx->PendingPayloads(), (unsigned long long)m_listProfilerCtx->ActivePayload(),
+				(unsigned long long)m_listProfilerCtx->CompletedPayload());
+			if (m_gpuProfilerCtx)
+				logHandler.Print(
+					"Tracy GPU passes: frame %llu, ctx id %u, collects %llu, timestamps %llu, payloads pending %llu, active %llu, completed %llu\n",
+					(unsigned long long)m_frameNumber, unsigned(m_gpuProfilerCtx->GetId()), (unsigned long long)m_gpuProfilerCtx->CollectCalls(),
+					(unsigned long long)m_gpuProfilerCtx->CollectedTimestamps(),
+					(unsigned long long)m_gpuProfilerCtx->PendingPayloads(), (unsigned long long)m_gpuProfilerCtx->ActivePayload(),
+					(unsigned long long)m_gpuProfilerCtx->CompletedPayload());
 		}
 	}
 #endif
@@ -1029,6 +1047,8 @@ noexcept
 {
 	TracyD3D12Destroy(m_gpuProfilerCtx);
 	m_gpuProfilerCtx = nullptr;
+	TracyD3D12Destroy(m_listProfilerCtx);
+	m_listProfilerCtx = nullptr;
 	for (auto cl : m_recycledLists) {
 		cl->Destroy();
 		delete cl;
@@ -1161,6 +1181,7 @@ noexcept
 	CloseProfilerQueries(true);
 	m_cmdQueue.WaitIdle();
 	TracyD3D12Collect(m_gpuProfilerCtx);
+	TracyD3D12Collect(m_listProfilerCtx);
 	for (auto l : m_pendingLists) {
 		if (l->m_isTemporary)
 			m_recycledLists.Push(l);

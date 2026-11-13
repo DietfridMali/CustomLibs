@@ -263,6 +263,7 @@ public:
 	int							m_frameCount{ CommandQueue::FRAME_COUNT };
 	uint64_t					m_frameNumber{ 0 }; // monotonic; ++ per BeginFrame — reliable frame-boundary signal
 	TracyD3D12Ctx				m_gpuProfilerCtx{ nullptr }; // Tracy D3D12 GPU-timestamp context; nullptr when USE_TRACY=0
+	TracyD3D12Ctx				m_listProfilerCtx{ nullptr };
 	uint64_t					m_closedQueryCount{ 0 };
 	uint64_t					m_gpuZonesOpened{ 0 };
 	uint64_t					m_gpuZonesClosed{ 0 };

@@ -1902,7 +1902,7 @@ noexcept
 	// still in m_openLists at frame end.
 	commandListHandler.m_openLists.Push(this);
 #if USE_TRACY
-	m_gpuZone = new tracy::VkCtxScope(commandListHandler.m_gpuProfilerCtx,
+	m_gpuZone = new tracy::VkCtxScope(commandListHandler.m_listProfilerCtx,
 									  uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
 									  (const char*)m_name, size_t(m_name.Length()), m_cmdBuffers[fi], true);
 #endif
@@ -2325,10 +2325,16 @@ noexcept
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		allocInfo.commandBufferCount = 1;
 		VkCommandBuffer tracyCb = VK_NULL_HANDLE;
-		if (vkAllocateCommandBuffers(device, &allocInfo, &tracyCb) == VK_SUCCESS)
+		if (vkAllocateCommandBuffers(device, &allocInfo, &tracyCb) == VK_SUCCESS) {
 			m_gpuProfilerCtx = TracyVkContext(vkContext.PhysicalDevice(), device, graphicsQueue, tracyCb);
+			m_listProfilerCtx = TracyVkContext(vkContext.PhysicalDevice(), device, graphicsQueue, tracyCb);
+		}
 		vkDestroyCommandPool(device, tracyPool, nullptr);
 	}
+	if (m_gpuProfilerCtx)
+		TracyVkContextName(m_gpuProfilerCtx, "passes", 6);
+	if (m_listProfilerCtx)
+		TracyVkContextName(m_listProfilerCtx, "command lists", 13);
 #endif
 	return true;
 }
@@ -2340,6 +2346,10 @@ noexcept
 	if (m_gpuProfilerCtx) {
 		TracyVkDestroy(m_gpuProfilerCtx);
 		m_gpuProfilerCtx = nullptr;
+	}
+	if (m_listProfilerCtx) {
+		TracyVkDestroy(m_listProfilerCtx);
+		m_listProfilerCtx = nullptr;
 	}
 	for (auto cl : m_recycledLists) {
 		cl->Destroy();
@@ -2536,6 +2546,8 @@ noexcept
 #if USE_TRACY
 	if (m_gpuProfilerCtx)
 		TracyVkCollectHost(m_gpuProfilerCtx);
+	if (m_listProfilerCtx)
+		TracyVkCollectHost(m_listProfilerCtx);
 #endif
 	for (auto l : m_pendingLists) {
 		if (l->IsTemporary())
