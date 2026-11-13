@@ -1,6 +1,7 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
+#include "linerenderer.h"
 
 // =================================================================================================
 // Line ribbon shader (DX). The general purpose line drawer of the library (LineRenderer,
@@ -330,6 +331,213 @@ const ShaderSource& LineDrawFacesShader()
 		LineDrawFS,
 		ShaderDataLayout(LineFacesQuadAttrs, 3),
 		{ ShaderMacro{ String("LINE_FACES"), String("1") } });
+	return source;
+}
+
+
+static const String LineCullCS = String(R"(
+struct LineInstance {
+    float3 p0;    float width;
+    float3 p1;    float style;
+    float4 color;
+    float  phase; float3 pad;
+};
+
+struct LineFaces {
+    float3 n0;    float contourWidth;
+    float3 n1;    float contourAlpha;
+};
+
+struct DrawCommand {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int  baseVertex;
+    uint firstInstance;
+};
+
+StructuredBuffer<LineInstance>  lines        : register(t0, space1);
+StructuredBuffer<LineFaces>     lineFaces    : register(t1, space1);
+RWStructuredBuffer<uint>        visibleLines : register(u0);
+RWStructuredBuffer<DrawCommand> drawCommands : register(u1);
+
+cbuffer FrameConstants : register(b0) {
+    column_major float4x4 mModelView;
+    column_major float4x4 mProjection;
+    column_major float4x4 mViewport;
+};
+
+cbuffer ShaderConstants : register(b1) {
+    float2 texelSize;
+    uint   lineCount;
+    uint   firstCommand;
+    float  minLength;
+    float  haloReach;
+    float  depthPull;
+    uint   depthLevelCount;
+    int    screenWidth;
+    int    screenHeight;
+};
+
+#ifdef LINE_DEPTH
+Texture2D<float> depthLevel0  : register(t0);
+Texture2D<float> depthLevel1  : register(t1);
+Texture2D<float> depthLevel2  : register(t2);
+Texture2D<float> depthLevel3  : register(t3);
+Texture2D<float> depthLevel4  : register(t4);
+Texture2D<float> depthLevel5  : register(t5);
+Texture2D<float> depthLevel6  : register(t6);
+Texture2D<float> depthLevel7  : register(t7);
+Texture2D<float> depthLevel8  : register(t8);
+Texture2D<float> depthLevel9  : register(t9);
+Texture2D<float> depthLevel10 : register(t10);
+Texture2D<float> depthLevel11 : register(t11);
+
+float LoadDepth(uint level, int2 texel) {
+    int3 at = int3(texel, 0);
+    if (level == 0u)
+        return depthLevel0.Load(at);
+    if (level == 1u)
+        return depthLevel1.Load(at);
+    if (level == 2u)
+        return depthLevel2.Load(at);
+    if (level == 3u)
+        return depthLevel3.Load(at);
+    if (level == 4u)
+        return depthLevel4.Load(at);
+    if (level == 5u)
+        return depthLevel5.Load(at);
+    if (level == 6u)
+        return depthLevel6.Load(at);
+    if (level == 7u)
+        return depthLevel7.Load(at);
+    if (level == 8u)
+        return depthLevel8.Load(at);
+    if (level == 9u)
+        return depthLevel9.Load(at);
+    if (level == 10u)
+        return depthLevel10.Load(at);
+    return depthLevel11.Load(at);
+}
+
+float PulledDepth(float3 p, float pull, float4x4 mClip) {
+    float4 v = mul(mModelView, float4(p, 1.0));
+    v.xyz *= 1.0 - pull;
+    float4 c = mul(mClip, v);
+    return c.z / c.w;
+}
+
+bool IsHidden(float3 p0, float3 p1, float4 c0, float4 c1, float lineWidth, float reach, float4x4 mClip) {
+    float2 screen = float2(float(screenWidth), float(screenHeight));
+    float2 s0 = float2(c0.x / c0.w * 0.5 + 0.5, 0.5 - c0.y / c0.w * 0.5) * screen;
+    float2 s1 = float2(c1.x / c1.w * 0.5 + 0.5, 0.5 - c1.y / c1.w * 0.5) * screen;
+    int2 low = int2(clamp(min(s0, s1) - reach, float2(0.0, 0.0), screen - 1.0));
+    int2 high = int2(clamp(max(s0, s1) + reach, float2(0.0, 0.0), screen - 1.0));
+    uint level = depthLevelCount;
+    for (uint k = 0u; k < depthLevelCount; ++k) {
+        int2 t0 = low >> int(k + 1u);
+        int2 t1 = high >> int(k + 1u);
+        if (max(t1.x - t0.x, t1.y - t0.y) <= 1) {
+            level = k;
+            break;
+        }
+    }
+    if (level >= depthLevelCount)
+        return false;
+    int shift = int(level + 1u);
+    int2 size = (int2(screenWidth, screenHeight) + (1 << shift) - 1) >> shift;
+    int2 t0 = min(low >> shift, size - 1);
+    int2 t1 = min(high >> shift, size - 1);
+    float farthest = max(max(LoadDepth(level, t0), LoadDepth(level, int2(t1.x, t0.y))), max(LoadDepth(level, int2(t0.x, t1.y)), LoadDepth(level, t1)));
+    float pull = min(depthPull * (0.5 * lineWidth + 1.0) / (0.5 * abs(mProjection[1][1]) * float(screenHeight)), 0.5);
+    float nearest = min(PulledDepth(p0, pull, mClip), PulledDepth(p1, pull, mClip));
+    return nearest > farthest;
+}
+#endif
+
+[numthreads(256, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+    uint index = id.x;
+    if (index >= lineCount)
+        return;
+    LineInstance l = lines[index];
+    LineFaces f = lineFaces[index];
+    float3 vMid = mul(mModelView, float4(0.5 * (l.p0 + l.p1), 1.0)).xyz;
+    float front0 = (dot(mul(mModelView, float4(f.n0, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
+    float front1 = (dot(mul(mModelView, float4(f.n1, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
+    if (front0 + front1 < 0.5)
+        return;
+    float lineWidth = (front0 + front1 > 1.5) ? l.width : f.contourWidth;
+    if (lineWidth <= 0.0)
+        return;
+    float4x4 mClip = mul(mViewport, mProjection);
+    float4 c0 = mul(mClip, mul(mModelView, float4(l.p0, 1.0)));
+    float4 c1 = mul(mClip, mul(mModelView, float4(l.p1, 1.0)));
+    float reach = 0.5 * lineWidth * (1.0 + haloReach) + 1.0;
+    float2 scale = 1.0 + 2.0 * reach * texelSize;
+    if (min(c0.x - c0.w * scale.x, c1.x - c1.w * scale.x) > 0.0)
+        return;
+    if (min(-c0.x - c0.w * scale.x, -c1.x - c1.w * scale.x) > 0.0)
+        return;
+    if (min(c0.y - c0.w * scale.y, c1.y - c1.w * scale.y) > 0.0)
+        return;
+    if (min(-c0.y - c0.w * scale.y, -c1.y - c1.w * scale.y) > 0.0)
+        return;
+    if (min(-c0.z, -c1.z) > 0.0)
+        return;
+    if (min(c0.z - c0.w, c1.z - c1.w) > 0.0)
+        return;
+    if (min(c0.w, c1.w) > 0.0) {
+        float2 span = (c1.xy / c1.w - c0.xy / c0.w) / (2.0 * texelSize);
+        if (length(span) < minLength)
+            return;
+#ifdef LINE_DEPTH
+        if (IsHidden(l.p0, l.p1, c0, c1, lineWidth, reach, mClip))
+            return;
+#endif
+    }
+    uint slot;
+    InterlockedAdd(drawCommands[firstCommand].instanceCount, 1u, slot);
+    visibleLines[slot] = index;
+}
+)");
+
+
+static AutoArray<ComputeBindingDesc> MakeLineCullBindings(int depthLevels)
+{
+	AutoArray<ComputeBindingDesc> b;
+	b.SetAutoFit(true);
+	using Kind = ComputeBindingDesc::Kind;
+	*b.Append() = { .binding = 0, .kind = Kind::UniformBuffer, .count = 1 };
+	*b.Append() = { .binding = 1, .kind = Kind::UniformBuffer, .count = 1 };
+	for (int i = 0; i < depthLevels; ++i)
+		*b.Append() = { .binding = uint32_t(4 + i), .kind = Kind::SampledImage, .count = 1 };
+	*b.Append() = { .binding = 36, .kind = Kind::StorageBuffer, .count = 1 };
+	*b.Append() = { .binding = 37, .kind = Kind::StorageBuffer, .count = 1 };
+	*b.Append() = { .binding = 42, .kind = Kind::ReadOnlyBuffer, .count = 1 };
+	*b.Append() = { .binding = 43, .kind = Kind::ReadOnlyBuffer, .count = 1 };
+	return b;
+}
+
+
+const ShaderSource& LineCullShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeLineCullBindings(0);
+	static const ShaderSource				source(
+		   "lineCull",
+		   { .cs = LineCullCS,
+					 .computeBindings = bindings });
+	return source;
+}
+
+
+const ShaderSource& LineCullDepthShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeLineCullBindings(LineRenderer::cMaxDepthLevels);
+	static const ShaderSource				source(
+		   "lineCullDepth",
+		   { .cs = String("#define LINE_DEPTH 1\n") + LineCullCS,
+					 .computeBindings = bindings });
 	return source;
 }
 

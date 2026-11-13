@@ -5,6 +5,10 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "shader.h"
+#ifndef OPENGL
+#include "compute_shader.h"
+#include "gpuzone.h"
+#endif
 
 // =================================================================================================
 
@@ -31,8 +35,10 @@ void LineRenderer::Destroy(void)
 	m_faceBuffer.Destroy();
 #ifndef OPENGL
 	m_slotBuffer.Destroy();
+	m_visibleBuffer.Destroy();
 	m_commandBuffer.Destroy();
 	m_slotCapacity = 0;
+	m_visibleCapacity = 0;
 	m_commandCapacity = 0;
 #endif
 	m_lines.Reset();
@@ -117,6 +123,18 @@ bool LineRenderer::ReserveSlotBuffer(void)
 		return false;
 	}
 	m_slotCapacity = m_capacity;
+	return true;
+}
+
+
+bool LineRenderer::ReserveVisibleBuffer(void)
+{
+	if (m_visibleCapacity >= m_capacity)
+		return true;
+	m_visibleCapacity = 0;
+	if (not m_visibleBuffer.Create(m_capacity))
+		return false;
+	m_visibleCapacity = m_capacity;
 	return true;
 }
 
@@ -373,10 +391,97 @@ bool LineRenderer::RenderRanges(const Range* ranges, int count)
 	EndDraw(states, shader != nullptr);
 	return shader != nullptr;
 }
+
+
+bool LineRenderer::RenderCulled(int count, RenderTarget* const* depthLevels, int depthLevelCount)
+{
+	static constexpr int cCullGroupSize = 256;
+
+	if (count > m_count)
+		count = m_count;
+	if (not (m_isAvailable and m_isResident and m_hasFaces) or (count <= 0))
+		return false;
+	if ((depthLevels == nullptr) or (depthLevelCount <= 0))
+		depthLevelCount = 0;
+	if (depthLevelCount > cMaxDepthLevels)
+		depthLevelCount = cMaxDepthLevels;
+	ComputeShader* cull = baseShaderHandler.SetupComputeShader((depthLevelCount > 0) ? "lineCullDepth" : "lineCull");
+	if ((cull == nullptr) or not cull->IsValid())
+		return false;
+	if (not (ReserveVisibleBuffer() and ReserveCommands(m_commandBuffer.AppendBase() + 1)))
+		return false;
+	SetupQuad();
+	if (not m_quad.UpdateData())
+		return false;
+
+	int				firstCommand = m_commandBuffer.AppendBase();
+	GfxDrawCommand&	command = m_commandBuffer.m_data[firstCommand];
+
+	command.indexCount = m_quad.Indices().GfxDataLength();
+	command.instanceCount = 0;
+	command.firstIndex = 0;
+	command.baseVertex = 0;
+	command.firstInstance = 0;
+	if (not m_commandBuffer.UploadRange(firstCommand, 1, true))
+		return false;
+	m_commandBuffer.SetAppendBase(firstCommand + 1);
+
+	Vector2f texelSize = TargetTexelSize();
+
+	cull->SetVector2f("texelSize", texelSize);
+	cull->SetInt("lineCount", count);
+	cull->SetInt("firstCommand", firstCommand);
+	cull->SetFloat("minLength", m_minLength);
+	cull->SetFloat("haloReach", m_haloReach);
+	if (depthLevelCount > 0) {
+		cull->SetFloat("depthPull", m_depthPull);
+		cull->SetInt("depthLevelCount", depthLevelCount);
+		cull->SetInt("screenWidth", int(std::lround(1.0f / texelSize.X())));
+		cull->SetInt("screenHeight", int(std::lround(1.0f / texelSize.Y())));
+		for (int i = 0; i < cMaxDepthLevels; ++i)
+			cull->BindSampledImage(uint32_t(4 + i), depthLevels[(i < depthLevelCount) ? i : depthLevelCount - 1], 0);
+	}
+	m_buffer.BindReadOnly(0);
+	m_faceBuffer.BindReadOnly(1);
+	m_visibleBuffer.Bind(0);
+	m_commandBuffer.Bind(1);
+	m_visibleBuffer.ComputeAccessBarrier();
+
+	bool isCulled = false;
+	{
+		GfxGpuZone("line culling");
+		isCulled = cull->Dispatch(uint32_t((count + cCullGroupSize - 1) / cCullGroupSize), 1, 1);
+	}
+	m_commandBuffer.Release(1);
+	m_visibleBuffer.Release(0);
+	m_faceBuffer.ReleaseReadOnly(1);
+	m_buffer.ReleaseReadOnly(0);
+	m_visibleBuffer.ComputeAccessBarrier();
+	m_commandBuffer.ComputeAccessBarrier();
+	if (not isCulled)
+		return false;
+
+	DrawStates	states;
+	Shader*		shader = BeginDraw(0, states, true);
+
+	if (shader != nullptr)
+		m_quad.GetGfxDataLayout().RenderIndirect({}, m_commandBuffer, uint32_t(firstCommand), 1);
+	EndDraw(states, shader != nullptr);
+	return shader != nullptr;
+}
 #endif
 
 
-Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states)
+Vector2f LineRenderer::TargetTexelSize(void)
+{
+	RenderTarget* renderTarget = baseRenderer.GetActiveBuffer();
+	if (renderTarget != nullptr)
+		return renderTarget->TexelSize();
+	return Vector2f(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
+}
+
+
+Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states, bool isCulled)
 {
 	// states feed the PSO, so they are set before the shader is activated. Alpha blending for the
 	// antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
@@ -386,7 +491,7 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states)
 	baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha, m_darken ? GfxOperations::BlendOp::Min : GfxOperations::BlendOp::Add);
 	states.culling = gfxStates.SetFaceCulling(0);
 #ifndef OPENGL
-	if (m_hasFaces and not ReserveSlotBuffer())
+	if (m_hasFaces and not isCulled and not ReserveSlotBuffer())
 		return nullptr;
 #endif
 
@@ -407,12 +512,7 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states)
 	// pixel scale is the buffer's - baseRenderer.TexelSize () describes the viewport and inflated a
 	// line drawn into a 370 px wide menu canvas on a 1920 px screen five times. Without an active
 	// buffer the window is the target.
-	RenderTarget*	renderTarget = baseRenderer.GetActiveBuffer();
-	TexCoord		texelSize = renderTarget
-			 ? renderTarget->TexelSize()
-			 : TexCoord(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
-
-	shader->SetVector2f("texelSize", texelSize);
+	shader->SetVector2f("texelSize", TargetTexelSize());
 	shader->SetFloat("dashScale", m_dashScale);
 	shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
 	shader->SetInt("firstLine", firstLine);
@@ -430,7 +530,10 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states)
 		shader->SetFloat("haloStrength", m_haloStrength);
 		m_faceBuffer.BindReadOnly(1);
 #ifndef OPENGL
-		m_slotBuffer.BindInstanceStream("Uint", 0);
+		if (isCulled)
+			m_visibleBuffer.BindInstanceStream("Uint", 0);
+		else
+			m_slotBuffer.BindInstanceStream("Uint", 0);
 #endif
 	}
 	return shader;

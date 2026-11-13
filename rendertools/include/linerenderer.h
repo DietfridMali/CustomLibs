@@ -31,8 +31,12 @@
 // joints; a single Add () can do the same with the phase argument (the pattern length already used up
 // before p0, in view units).
 
+class RenderTarget;
+
 class LineRenderer {
 public:
+	static constexpr int cMaxDepthLevels = 12;
+
 	enum class Style : uint8_t {
 		Solid = 0,
 		Dashed = 1,
@@ -82,6 +86,7 @@ public:
 	float		m_minWidthScale{ 0.0f };
 	float		m_haloReach{ 0.0f };
 	float		m_haloStrength{ 0.0f };
+	float		m_minLength{ 1.0f };
 
 	LineRenderer() = default;
 	~LineRenderer() {
@@ -130,6 +135,8 @@ public:
 
 #ifndef OPENGL
 	bool RenderRanges(const Range* ranges, int count);
+
+	bool RenderCulled(int count, RenderTarget* const* depthLevels = nullptr, int depthLevelCount = 0);
 #endif
 
 	bool Upload(void);
@@ -147,8 +154,10 @@ private:
 	GfxArray<Faces, GfxTypes::StructuredBuffer>		m_faceBuffer;
 #ifndef OPENGL
 	GfxArray<uint32_t, GfxTypes::InstanceBuffer>	m_slotBuffer;
+	GfxArray<uint32_t, GfxTypes::InstanceBuffer>	m_visibleBuffer;
 	GfxDrawCommandBuffer							m_commandBuffer;
 	int												m_slotCapacity{ 0 };
+	int												m_visibleCapacity{ 0 };
 	int												m_commandCapacity{ 0 };
 #endif
 	AutoArray<Line>									m_lines;
@@ -168,11 +177,13 @@ private:
 	bool ReserveFaceBuffer(void);
 #ifndef OPENGL
 	bool ReserveSlotBuffer(void);
+	bool ReserveVisibleBuffer(void);
 	bool ReserveCommands(int count);
 #endif
 	bool UploadBatch(int firstLine);
 	void SetupQuad(void);
-	Shader* BeginDraw(int firstLine, DrawStates& states);
+	Vector2f TargetTexelSize(void);
+	Shader* BeginDraw(int firstLine, DrawStates& states, bool isCulled = false);
 	void EndDraw(const DrawStates& states, bool isBound);
 };
 

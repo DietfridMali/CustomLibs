@@ -291,6 +291,37 @@ public:
 			commandListHandler.BindInstanceStream(uint32_t(slot), VK_NULL_HANDLE);
 	}
 
+	void ComputeAccessBarrier(void)
+	{
+		if (m_buffer == VK_NULL_HANDLE)
+			return;
+		VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+		if (cb == VK_NULL_HANDLE)
+			return;
+		CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
+		VkPipelineStageFlags2 stages = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+			VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+		VkAccessFlags2 access = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT |
+			VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+		VkBufferMemoryBarrier2 b{};
+		b.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+		b.srcStageMask = stages;
+		b.srcAccessMask = access;
+		b.dstStageMask = stages;
+		b.dstAccessMask = access;
+		b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		b.buffer = m_buffer;
+		b.offset = 0;
+		b.size = m_bufferSize;
+		VkDependencyInfo dep{};
+		dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		dep.bufferMemoryBarrierCount = 1;
+		dep.pBufferMemoryBarriers = &b;
+		Vk13Api::CmdPipelineBarrier2(cb, &dep);
+		commandListHandler.ResumeRendering(scope);
+	}
+
 	// Writes vkCmdFillBuffer onto the currently active CommandList's CB. Contract: caller ensures
 	// no vkCmdBeginRendering scope is open at call time — render-pass scopes forbid both buffer
 	// fills and image clears. DecalHandler::Render handles that by calling EndRendering before

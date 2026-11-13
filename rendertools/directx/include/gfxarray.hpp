@@ -281,6 +281,17 @@ public:
 			commandListHandler.BindInstanceStream(uint32_t(slot));
 	}
 
+	void ComputeAccessBarrier(void)
+	{
+		auto* list = commandListHandler.CurrentGfxList();
+		if (not (list and m_resource) or (m_state != D3D12_RESOURCE_STATE_UNORDERED_ACCESS))
+			return;
+		D3D12_RESOURCE_BARRIER b{};
+		b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		b.UAV.pResource = m_resource.Get();
+		list->ResourceBarrier(1, &b);
+	}
+
 	ID3D12Resource* IndirectArguments(ID3D12GraphicsCommandList* list)
 	{
 		if (not (isBuffer and m_resource))
