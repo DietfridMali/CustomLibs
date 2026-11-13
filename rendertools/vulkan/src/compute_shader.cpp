@@ -749,17 +749,26 @@ bool ComputeShader::Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t gr
 	uint32_t				dynamicOffsetCount = 0;
 
 	if (HasBinding(0, ComputeBindingDesc::Kind::UniformBuffer)) {
-		CbAlloc b0a = cbvAllocator.Allocate(kMonoFrameConstantsSize);
+		const uint32_t b0Size = FrameConstantsSize(baseRenderer.ViewCount());
+		CbAlloc b0a = cbvAllocator.Allocate(b0Size);
 		if (not b0a.IsValid())
 			return false;
 		FrameConstants fc{};
 		std::memcpy(fc.mModelView, baseRenderer.ModelView().AsArray(), 64);
 		std::memcpy(fc.mProjection, baseRenderer.Projection().AsArray(), 64);
 		std::memcpy(fc.mViewport, baseRenderer.ViewportTransformation().AsArray(), 64);
-		std::memcpy(b0a.cpu, &fc, kMonoFrameConstantsSize);
+		if (baseRenderer.ViewCount() > 1) {
+			const BaseRenderer::ViewProjections* views = baseRenderer.FindViewProjections(baseRenderer.Projection());
+			for (int i = 0; i < kMaxRenderViews; ++i) {
+				std::memcpy(fc.mEyeProjection[i], views ? views->eyeProjection[i].AsArray() : baseRenderer.Projection().AsArray(), 64);
+				std::memcpy(fc.mEyeView[i], views ? views->eyeView[i].AsArray() : Matrix4f::IDENTITY.AsArray(), 64);
+				std::memcpy(fc.mHeadFromEye[i], views ? views->headFromEye[i].AsArray() : Matrix4f::IDENTITY.AsArray(), 64);
+			}
+		}
+		std::memcpy(b0a.cpu, &fc, b0Size);
 		bufferInfos[bufferCount].buffer = b0a.buffer;
 		bufferInfos[bufferCount].offset = 0;
-		bufferInfos[bufferCount].range = kMonoFrameConstantsSize;
+		bufferInfos[bufferCount].range = b0Size;
 		writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[writeCount].dstSet = set;
 		writes[writeCount].dstBinding = 0;

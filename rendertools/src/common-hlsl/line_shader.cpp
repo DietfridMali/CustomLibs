@@ -365,6 +365,7 @@ cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
     column_major float4x4 mProjection;
     column_major float4x4 mViewport;
+    FRAME_EYE_MATRICES
 };
 
 cbuffer ShaderConstants : register(b1) {
@@ -379,22 +380,34 @@ cbuffer ShaderConstants : register(b1) {
     int    screenHeight;
 };
 
-#ifdef LINE_DEPTH
-Texture2D<float> depthLevel0  : register(t0);
-Texture2D<float> depthLevel1  : register(t1);
-Texture2D<float> depthLevel2  : register(t2);
-Texture2D<float> depthLevel3  : register(t3);
-Texture2D<float> depthLevel4  : register(t4);
-Texture2D<float> depthLevel5  : register(t5);
-Texture2D<float> depthLevel6  : register(t6);
-Texture2D<float> depthLevel7  : register(t7);
-Texture2D<float> depthLevel8  : register(t8);
-Texture2D<float> depthLevel9  : register(t9);
-Texture2D<float> depthLevel10 : register(t10);
-Texture2D<float> depthLevel11 : register(t11);
+float4x4 EyeProjection(uint eye) {
+#if VIEW_COUNT > 1
+    return mEyeProjection[eye];
+#else
+    return mProjection;
+#endif
+}
 
-float LoadDepth(uint level, int2 texel) {
+#ifdef LINE_DEPTH
+ScreenTexture<float> depthLevel0  : register(t0);
+ScreenTexture<float> depthLevel1  : register(t1);
+ScreenTexture<float> depthLevel2  : register(t2);
+ScreenTexture<float> depthLevel3  : register(t3);
+ScreenTexture<float> depthLevel4  : register(t4);
+ScreenTexture<float> depthLevel5  : register(t5);
+ScreenTexture<float> depthLevel6  : register(t6);
+ScreenTexture<float> depthLevel7  : register(t7);
+ScreenTexture<float> depthLevel8  : register(t8);
+ScreenTexture<float> depthLevel9  : register(t9);
+ScreenTexture<float> depthLevel10 : register(t10);
+ScreenTexture<float> depthLevel11 : register(t11);
+
+float LoadDepth(uint level, int2 texel, uint eye) {
+#if VIEW_COUNT > 1
+    int4 at = int4(texel, int(eye), 0);
+#else
     int3 at = int3(texel, 0);
+#endif
     if (level == 0u)
         return depthLevel0.Load(at);
     if (level == 1u)
@@ -427,7 +440,7 @@ float PulledDepth(float3 p, float pull, float4x4 mClip) {
     return c.z / c.w;
 }
 
-bool IsHidden(float3 p0, float3 p1, float4 c0, float4 c1, float lineWidth, float reach, float4x4 mClip) {
+bool IsHidden(float3 p0, float3 p1, float4 c0, float4 c1, float lineWidth, float reach, float4x4 mClip, float4x4 mEye, uint eye) {
     float2 screen = float2(float(screenWidth), float(screenHeight));
     float2 s0 = float2(c0.x / c0.w * 0.5 + 0.5, 0.5 - c0.y / c0.w * 0.5) * screen;
     float2 s1 = float2(c1.x / c1.w * 0.5 + 0.5, 0.5 - c1.y / c1.w * 0.5) * screen;
@@ -448,12 +461,41 @@ bool IsHidden(float3 p0, float3 p1, float4 c0, float4 c1, float lineWidth, float
     int2 size = (int2(screenWidth, screenHeight) + (1 << shift) - 1) >> shift;
     int2 t0 = min(low >> shift, size - 1);
     int2 t1 = min(high >> shift, size - 1);
-    float farthest = max(max(LoadDepth(level, t0), LoadDepth(level, int2(t1.x, t0.y))), max(LoadDepth(level, int2(t0.x, t1.y)), LoadDepth(level, t1)));
-    float pull = min(depthPull * (0.5 * lineWidth + 1.0) / (0.5 * abs(mProjection[1][1]) * float(screenHeight)), 0.5);
+    float farthest = max(max(LoadDepth(level, t0, eye), LoadDepth(level, int2(t1.x, t0.y), eye)), max(LoadDepth(level, int2(t0.x, t1.y), eye), LoadDepth(level, t1, eye)));
+    float pull = min(depthPull * (0.5 * lineWidth + 1.0) / (0.5 * abs(mEye[1][1]) * float(screenHeight)), 0.5);
     float nearest = min(PulledDepth(p0, pull, mClip), PulledDepth(p1, pull, mClip));
     return nearest > farthest;
 }
 #endif
+
+bool IsVisible(LineInstance l, float lineWidth, float reach, float2 scale, uint eye) {
+    float4x4 mEye = EyeProjection(eye);
+    float4x4 mClip = mul(mViewport, mEye);
+    float4 c0 = mul(mClip, mul(mModelView, float4(l.p0, 1.0)));
+    float4 c1 = mul(mClip, mul(mModelView, float4(l.p1, 1.0)));
+    if (min(c0.x - c0.w * scale.x, c1.x - c1.w * scale.x) > 0.0)
+        return false;
+    if (min(-c0.x - c0.w * scale.x, -c1.x - c1.w * scale.x) > 0.0)
+        return false;
+    if (min(c0.y - c0.w * scale.y, c1.y - c1.w * scale.y) > 0.0)
+        return false;
+    if (min(-c0.y - c0.w * scale.y, -c1.y - c1.w * scale.y) > 0.0)
+        return false;
+    if (min(-c0.z, -c1.z) > 0.0)
+        return false;
+    if (min(c0.z - c0.w, c1.z - c1.w) > 0.0)
+        return false;
+    if (min(c0.w, c1.w) > 0.0) {
+        float2 span = (c1.xy / c1.w - c0.xy / c0.w) / (2.0 * texelSize);
+        if (length(span) < minLength)
+            return false;
+#ifdef LINE_DEPTH
+        if (IsHidden(l.p0, l.p1, c0, c1, lineWidth, reach, mClip, mEye, eye))
+            return false;
+#endif
+    }
+    return true;
+}
 
 [numthreads(256, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID) {
@@ -470,35 +512,16 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
     float lineWidth = (front0 + front1 > 1.5) ? l.width : f.contourWidth;
     if (lineWidth <= 0.0)
         return;
-    float4x4 mClip = mul(mViewport, mProjection);
-    float4 c0 = mul(mClip, mul(mModelView, float4(l.p0, 1.0)));
-    float4 c1 = mul(mClip, mul(mModelView, float4(l.p1, 1.0)));
     float reach = 0.5 * lineWidth * (1.0 + haloReach) + 1.0;
     float2 scale = 1.0 + 2.0 * reach * texelSize;
-    if (min(c0.x - c0.w * scale.x, c1.x - c1.w * scale.x) > 0.0)
-        return;
-    if (min(-c0.x - c0.w * scale.x, -c1.x - c1.w * scale.x) > 0.0)
-        return;
-    if (min(c0.y - c0.w * scale.y, c1.y - c1.w * scale.y) > 0.0)
-        return;
-    if (min(-c0.y - c0.w * scale.y, -c1.y - c1.w * scale.y) > 0.0)
-        return;
-    if (min(-c0.z, -c1.z) > 0.0)
-        return;
-    if (min(c0.z - c0.w, c1.z - c1.w) > 0.0)
-        return;
-    if (min(c0.w, c1.w) > 0.0) {
-        float2 span = (c1.xy / c1.w - c0.xy / c0.w) / (2.0 * texelSize);
-        if (length(span) < minLength)
+    for (uint eye = 0u; eye < uint(VIEW_COUNT); ++eye) {
+        if (IsVisible(l, lineWidth, reach, scale, eye)) {
+            uint slot;
+            InterlockedAdd(drawCommands[firstCommand].instanceCount, 1u, slot);
+            visibleLines[slot] = index;
             return;
-#ifdef LINE_DEPTH
-        if (IsHidden(l.p0, l.p1, c0, c1, lineWidth, reach, mClip))
-            return;
-#endif
+        }
     }
-    uint slot;
-    InterlockedAdd(drawCommands[firstCommand].instanceCount, 1u, slot);
-    visibleLines[slot] = index;
 }
 )");
 
