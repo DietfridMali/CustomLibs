@@ -197,7 +197,7 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     node += perp * across;
 #ifdef LINE_FACES
     if (perspective > 0.5)
-        node *= 1.0 - min(depthPull * halfDraw / (pxAcross * max(length(0.5 * (vp0 + vp1)), 1e-4)), 0.5);
+        node *= 1.0 - min(depthPull * (halfWidth + 1.0) / (pxAcross * max(length(0.5 * (vp0 + vp1)), 1e-4)), 0.5);
 #endif
 
     PSInput o;
