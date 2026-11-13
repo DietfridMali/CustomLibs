@@ -10,6 +10,7 @@
 #include "gfxarray.hpp"
 #include "oceanfft.h"
 #include "loghandler.h"
+#include "gpuzone.h"
 
 // =================================================================================================
 
@@ -211,6 +212,7 @@ bool OceanFFT::Update(float time, float deltaTime)
 
 bool OceanFFT::Compute(float time, float deltaTime)
 {
+	GfxGpuZone("ocean fft");
 	if (not m_hasSpectrum) {
 		if (not UploadSpectrum())
 			return false;
