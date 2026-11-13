@@ -1,5 +1,6 @@
 ﻿#include <new>
 #include "shadowmap.h"
+#include "loghandler.h"
 
 #define APPLY_POLYGON_OFFSET 1
 
@@ -21,8 +22,13 @@
 
 // =================================================================================================
 
-bool ShadowMap::Setup(void)
+bool ShadowMap::Setup(bool staticTiles)
 {
+	m_hasStaticTiles = staticTiles;
+	if (m_staticParams.Create(cStaticParamHeaderSize + cMaxStaticCells / 4)) {
+		m_staticParams.m_data.Fill(Vector4f::ZERO);
+		m_staticParams.UploadImmediate();
+	}
 	if (CreateMap(Vector2f::ZERO)) {
 		m_status = 1;
 		return true;
@@ -36,7 +42,9 @@ bool ShadowMap::CreateMap(Vector2f frustumSize)
 {
 	m_status = -1;
 #if !DEMO
-	if (not (m_map = new RenderTarget()))
+	if (m_hasStaticTiles and not CreateStaticAtlas())
+		m_hasStaticTiles = false;
+	if (not (m_hasStaticTiles or (m_map = new RenderTarget())))
 		return false;
 	if (not (m_dynamicMap = new RenderTarget()))
 		return false;
@@ -48,7 +56,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize)
 	const int		maxSize = gfxStates.MaxTextureSize(ShadowDepthBytesPerPixel);
 	int				startSize = std::min<int>(maxSize, 8192);
 	for (int size = startSize; size >= 1024; size /= 2) {
-		if (m_map->Create(size, size, 1,
+		if (m_hasStaticTiles or m_map->Create(size, size, 1,
 						  { .name = "shadowmap",
 							.colorBufferCount = 0,
 							.depthBufferCount = 1,
@@ -63,7 +71,8 @@ bool ShadowMap::CreateMap(Vector2f frustumSize)
 				m_status = 1;
 				return true;
 			}
-			m_map->Destroy();
+			if (m_map)
+				m_map->Destroy();
 		}
 		//m_maxLightRadius *= 0.9f;
 	}
@@ -83,6 +92,12 @@ noexcept
 	if (m_dynamicMap) {
 		delete m_dynamicMap;
 		m_dynamicMap = nullptr;
+		m_status = 0;
+	}
+	if (m_staticAtlas) {
+		delete m_staticAtlas;
+		m_staticAtlas = nullptr;
+		m_staticMap = nullptr;
 	}
 	m_activeMap = nullptr;
 	m_hasStaticCasters = false;
@@ -146,7 +161,7 @@ void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matri
 {
 	m_lightTransform = lightProj;
 	m_lightTransform *= lightView;
-	Stabilize(float(m_map->GetWidth(true)));
+	Stabilize(float(m_dynamicMap->GetWidth(true)));
 	UpdateTransformation();
 }
 
@@ -451,7 +466,265 @@ bool ShadowMap::Update(Vector3f center, Vector3f viewDirection, Vector3f lightDi
 	else
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #endif
+	if (m_hasStaticTiles)
+		UpdateStaticParams();
 	return true;
+}
+
+
+static float ProjectDepth(Matrix4f transform, Vector3f point)
+{
+	Vector4f v = transform * Vector4f({ point.X(), point.Y(), point.Z(), 1.0f });
+	return v.z / v.w;
+}
+
+
+static int ConvexHull(Vector2f* points, int count, Vector2f* hull)
+{
+	std::sort(points, points + count, [](const Vector2f& a, const Vector2f& b) { return (a.x < b.x) or ((a.x == b.x) and (a.y < b.y)); });
+	auto Turn = [](const Vector2f& o, const Vector2f& a, const Vector2f& b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); };
+	int n = 0;
+	for (int i = 0; i < count; ++i) {
+		while ((n >= 2) and (Turn(hull[n - 2], hull[n - 1], points[i]) <= 0.0f))
+			--n;
+		hull[n++] = points[i];
+	}
+	int lower = n + 1;
+	for (int i = count - 2; i >= 0; --i) {
+		while ((n >= lower) and (Turn(hull[n - 2], hull[n - 1], points[i]) <= 0.0f))
+			--n;
+		hull[n++] = points[i];
+	}
+	return n - 1;
+}
+
+
+static bool CellOverlapsHull(const Vector2f* hull, int count, float left, float bottom, float right, float top)
+{
+	constexpr float cTolerance = 1.0e-3f;
+	const Vector2f corners[4] = { Vector2f(left, bottom), Vector2f(right, bottom), Vector2f(right, top), Vector2f(left, top) };
+	for (int i = 0; i < count; ++i) {
+		const Vector2f& a = hull[i];
+		const Vector2f& b = hull[(i + 1) % count];
+		float nx = a.y - b.y;
+		float ny = b.x - a.x;
+		float hullMin = FLT_MAX;
+		float hullMax = -FLT_MAX;
+		for (int j = 0; j < count; ++j) {
+			float d = nx * hull[j].x + ny * hull[j].y;
+			hullMin = std::min(hullMin, d);
+			hullMax = std::max(hullMax, d);
+		}
+		float cellMin = FLT_MAX;
+		float cellMax = -FLT_MAX;
+		for (const Vector2f& c : corners) {
+			float d = nx * c.x + ny * c.y;
+			cellMin = std::min(cellMin, d);
+			cellMax = std::max(cellMax, d);
+		}
+		float tolerance = cTolerance * std::sqrt(nx * nx + ny * ny);
+		if ((cellMax < hullMin - tolerance) or (cellMin > hullMax + tolerance))
+			return false;
+	}
+	return true;
+}
+
+
+bool ShadowMap::CreateStaticAtlas(void)
+{
+	constexpr int cShadowDepthBytesPerPixel = 4;
+	if (gfxStates.MaxTextureSize(cShadowDepthBytesPerPixel) < cStaticAtlasSize)
+		return false;
+	m_staticAtlas = new (std::nothrow) ShadowAtlas();
+	if (not m_staticAtlas)
+		return false;
+	if (not m_staticAtlas->Create(cStaticAtlasSize, cStaticTileSize, cStaticTileSize)) {
+		delete m_staticAtlas;
+		m_staticAtlas = nullptr;
+		return false;
+	}
+	m_staticMap = m_staticAtlas->GetMap();
+	return true;
+}
+
+
+bool ShadowMap::LayoutStaticTiles(const Vector3f& lightDirection, const Vector3f& casterMin, const Vector3f& casterMax)
+{
+	constexpr int	cRotationSteps = 180;
+	constexpr float	cDepthMargin = 1.0f;
+
+	m_staticTileCells.Clear();
+	m_hasStaticCasters = false;
+	m_staticParams.m_data.Fill(Vector4f::ZERO);
+	if (not (m_hasStaticTiles and m_staticAtlas and m_dynamicMap)) {
+		m_staticParams.Upload();
+		return false;
+	}
+	m_staticLightDirection = lightDirection;
+	m_staticLightDirection.Normalize();
+	float texelsPerUnit = float(m_dynamicMap->GetWidth(true)) / (2.0f * m_maxLightRadius);
+	m_staticCellSize = float(cStaticTileSize - 2 * cStaticTileBorder) / texelsPerUnit;
+
+	Vector3f center = (casterMin + casterMax) * 0.5f;
+	Vector3f eye = center + m_staticLightDirection * (casterMax - casterMin).Length();
+	Vector3f side = Vector3f(0.0f, 1.0f, 0.0f).Cross(m_staticLightDirection);
+	if (side.Length() < Conversions::NumericTolerance)
+		side = Vector3f(1.0f, 0.0f, 0.0f);
+	side.Normalize();
+	Vector3f up = m_staticLightDirection.Cross(side);
+	Vector4f corners[8];
+	for (int i = 0; i < 8; ++i)
+		corners[i] = Vector4f({ (i & 1) ? casterMax.X() : casterMin.X(), (i & 2) ? casterMax.Y() : casterMin.Y(), (i & 4) ? casterMax.Z() : casterMin.Z(), 1.0f });
+
+	auto Evaluate = [&](int step, AutoArray<int32_t>& cells, Matrix4f& view, Vector2f& origin, int& gridWidth, int& gridHeight, float& zNear, float& zFar) -> bool {
+		float angle = Conversions::DegToRad(float(step) * 180.0f / float(cRotationSteps));
+		view.LookAt(eye, center, up * std::cos(angle) + side * std::sin(angle));
+		Vector2f points[8];
+		Vector2f hull[16];
+		float uMin = FLT_MAX;
+		float uMax = -FLT_MAX;
+		float vMin = FLT_MAX;
+		float vMax = -FLT_MAX;
+		float zMin = FLT_MAX;
+		float zMax = -FLT_MAX;
+		for (int i = 0; i < 8; ++i) {
+			Vector4f v = view * corners[i];
+			points[i] = Vector2f(v.x, v.y);
+			uMin = std::min(uMin, v.x);
+			uMax = std::max(uMax, v.x);
+			vMin = std::min(vMin, v.y);
+			vMax = std::max(vMax, v.y);
+			zMin = std::min(zMin, v.z);
+			zMax = std::max(zMax, v.z);
+		}
+		gridWidth = std::max(1, int(std::ceil((uMax - uMin) / m_staticCellSize)));
+		gridHeight = std::max(1, int(std::ceil((vMax - vMin) / m_staticCellSize)));
+		if (gridWidth * gridHeight > cMaxStaticCells)
+			return false;
+		int hullCount = ConvexHull(points, 8, hull);
+		cells.Clear();
+		for (int y = 0; y < gridHeight; ++y) {
+			for (int x = 0; x < gridWidth; ++x) {
+				float left = uMin + float(x) * m_staticCellSize;
+				float top = vMax - float(y) * m_staticCellSize;
+				if (CellOverlapsHull(hull, hullCount, left, top - m_staticCellSize, left + m_staticCellSize, top))
+					cells.Append(y * gridWidth + x);
+			}
+		}
+		origin = Vector2f(uMin, vMax);
+		zNear = -zMax - cDepthMargin;
+		zFar = -zMin + cDepthMargin;
+		return true;
+	};
+
+	int					capacity = std::min(m_staticAtlas->TileCount(), cMaxStaticCells);
+	int					bestStep = -1;
+	int					bestCount = capacity + 1;
+	int					bestArea = 0;
+	int					gridHeight = 0;
+	AutoArray<int32_t>	cells;
+	for (int step = 0; step < cRotationSteps; ++step) {
+		if (not Evaluate(step, cells, m_staticLightView, m_staticGridOrigin, m_staticGridWidth, gridHeight, m_staticNear, m_staticFar))
+			continue;
+		int area = m_staticGridWidth * gridHeight;
+		if ((cells.Length() < bestCount) or ((cells.Length() == bestCount) and (area < bestArea))) {
+			bestStep = step;
+			bestCount = cells.Length();
+			bestArea = area;
+		}
+	}
+	if (bestStep < 0) {
+		logHandler.Print("shadow map: the static shadow casters need more than %d tiles\n", capacity);
+		m_staticParams.Upload();
+		return false;
+	}
+	Evaluate(bestStep, m_staticTileCells, m_staticLightView, m_staticGridOrigin, m_staticGridWidth, gridHeight, m_staticNear, m_staticFar);
+
+	Projector projector;
+	m_staticLightTransform = projector.ComputeOrthoProjection(m_staticGridOrigin.x, m_staticGridOrigin.x + float(m_staticGridWidth) * m_staticCellSize,
+															  m_staticGridOrigin.y - float(gridHeight) * m_staticCellSize, m_staticGridOrigin.y, m_staticNear, m_staticFar);
+	m_staticLightTransform *= m_staticLightView;
+
+	int		tilesPerRow = m_staticAtlas->Size() / m_staticAtlas->TileSize();
+	float	slots[cMaxStaticCells];
+	std::fill(slots, slots + cMaxStaticCells, -1.0f);
+	for (int i = 0; i < m_staticTileCells.Length(); ++i)
+		slots[m_staticTileCells[i]] = float(i);
+	m_staticParams.m_data[4] = Vector4f({ float(m_staticGridWidth), float(gridHeight), float(tilesPerRow), 1.0f });
+	m_staticParams.m_data[5] = Vector4f({ float(cStaticTileSize - 2 * cStaticTileBorder) / float(cStaticTileSize), float(cStaticTileBorder) / float(cStaticTileSize),
+										  1.0f / float(tilesPerRow), 1.0f });
+	for (int i = 0; i < cMaxStaticCells / 4; ++i)
+		m_staticParams.m_data[cStaticParamHeaderSize + i] = Vector4f({ slots[4 * i], slots[4 * i + 1], slots[4 * i + 2], slots[4 * i + 3] });
+	UpdateStaticParams();
+	m_staticParams.Upload();
+	return true;
+}
+
+
+void ShadowMap::UpdateStaticParams(void)
+{
+	Matrix4f		inverseLight = m_lightTransform.Inverse();
+	Matrix4f		dynamicToStatic = m_staticLightTransform * inverseLight;
+	const float*	m = dynamicToStatic.AsArray();
+	for (int row = 0; row < 4; ++row)
+		m_staticParams.m_data[row] = Vector4f({ m[row], m[4 + row], m[8 + row], m[12 + row] });
+	Vector4f	center = inverseLight * Vector4f({ 0.0f, 0.0f, 0.5f, 1.0f });
+	Vector3f	p0(center.x / center.w, center.y / center.w, center.z / center.w);
+	Vector3f	p1 = p0 + m_staticLightDirection;
+	float		dynamicScale = std::fabs(ProjectDepth(m_lightTransform, p1) - ProjectDepth(m_lightTransform, p0));
+	float		staticScale = std::fabs(ProjectDepth(m_staticLightTransform, p1) - ProjectDepth(m_staticLightTransform, p0));
+	m_staticParams.m_data[5].w = (dynamicScale > 0.0f) ? staticScale / dynamicScale : 1.0f;
+	m_staticParams.UploadRange(0, cStaticParamHeaderSize);
+}
+
+
+bool ShadowMap::StartStaticTiles(void)
+noexcept
+{
+	if (not (IsReady() and m_staticMap))
+		return false;
+	baseRenderer.StartShadowPass();
+	m_activeMap = m_staticMap;
+	m_activeMap->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth });
+	baseRenderer.PushViewport();
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.SetFaceCulling(1);
+	gfxStates.CullFace(GfxOperations::CullFace::Front);
+#if APPLY_POLYGON_OFFSET
+	gfxStates.SetPolygonOffset(1.0f, 1.0f);
+#endif
+	return true;
+}
+
+
+void ShadowMap::SetStaticTile(int tile)
+{
+	int			cell = m_staticTileCells[tile];
+	float		guard = m_staticCellSize * float(cStaticTileBorder) / float(cStaticTileSize - 2 * cStaticTileBorder);
+	float		left = m_staticGridOrigin.x + float(cell % m_staticGridWidth) * m_staticCellSize - guard;
+	float		top = m_staticGridOrigin.y - float(cell / m_staticGridWidth) * m_staticCellSize + guard;
+	float		size = m_staticCellSize + 2.0f * guard;
+	Projector	projector;
+	m_lightTransform = projector.ComputeOrthoProjection(left, left + size, top - size, top, m_staticNear, m_staticFar);
+	m_lightTransform *= m_staticLightView;
+	UpdateTransformation();
+	Viewport viewport = m_staticAtlas->TileViewport(tile);
+	gfxStates.SetViewport(viewport.Left(), viewport.Top(), viewport.Width(), viewport.Height());
+}
+
+
+void ShadowMap::StopStaticTiles(void)
+noexcept
+{
+	baseRenderer.PopViewport();
+	gfxStates.CullFace(GfxOperations::CullFace::Back);
+#if APPLY_POLYGON_OFFSET
+	gfxStates.SetPolygonOffset(0.0f, 0.0f);
+#endif
+	m_activeMap->Deactivate();
+	m_activeMap = nullptr;
+	m_hasStaticCasters = true;
 }
 
 // =================================================================================================

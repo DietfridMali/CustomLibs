@@ -4,8 +4,11 @@
 #include "matrix.hpp"
 #include "basesingleton.hpp"
 #include "gfxrenderer.h"
+#include "gfxarray.hpp"
 
 // =================================================================================================
+
+class ShadowAtlas;
 
 class ShadowMap
 	: public BaseSingleton<ShadowMap> {
@@ -32,8 +35,28 @@ private:
 	bool			m_hasStaticCasters{ false };
 	Vector3f		m_lightPosition{ Vector3f::ZERO };
 
+	static constexpr int	cStaticParamHeaderSize = 6;
+	static constexpr int	cMaxStaticCells = 128;
+	static constexpr int	cStaticAtlasSize = 16384;
+	static constexpr int	cStaticTileSize = 2048;
+	static constexpr int	cStaticTileBorder = 2;
+
+	GfxArray<Vector4f, GfxTypes::StructuredBuffer>	m_staticParams;
+	ShadowAtlas*		m_staticAtlas{ nullptr };
+	RenderTarget*		m_staticMap{ nullptr };
+	Matrix4f			m_staticLightView;
+	Matrix4f			m_staticLightTransform;
+	Vector3f			m_staticLightDirection{ Vector3f::ZERO };
+	Vector2f			m_staticGridOrigin{ Vector2f::ZERO };
+	AutoArray<int32_t>	m_staticTileCells;
+	float				m_staticCellSize{ 0.0f };
+	float				m_staticNear{ 0.0f };
+	float				m_staticFar{ 0.0f };
+	int					m_staticGridWidth{ 0 };
+	bool				m_hasStaticTiles{ false };
+
 public:
-	bool Setup(void);
+	bool Setup(bool staticTiles = false);
 
 	bool Update(Vector3f center, Vector3f viewDirection, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
@@ -72,11 +95,14 @@ public:
 	inline void MakeReadable(void)
 	noexcept
 	{
-		if (m_map and m_map->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth }))
+		if (m_map and m_map->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth, .clear = false }))
 			m_map->Deactivate();
-		if (m_dynamicMap and m_dynamicMap->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth }))
+		if (m_dynamicMap and m_dynamicMap->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth, .clear = false }))
 			m_dynamicMap->Deactivate();
-		m_hasStaticCasters = false;
+		if (m_staticMap and m_staticMap->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth, .clear = false }))
+			m_staticMap->Deactivate();
+		if (not m_hasStaticTiles)
+			m_hasStaticCasters = false;
 	}
 
 	inline bool IsDynamicPass(void)
@@ -112,6 +138,8 @@ public:
 	inline Texture* ShadowTexture(void)
 	noexcept
 	{
+		if (m_staticMap)
+			return m_staticMap->GetDepthAsShadowTexture();
 		return m_map ? m_map->GetDepthAsShadowTexture() : nullptr;
 	}
 
@@ -121,11 +149,38 @@ public:
 		return m_dynamicMap ? m_dynamicMap->GetDepthAsShadowTexture() : nullptr;
 	}
 
+	inline bool BindStaticParams(uint32_t slot)
+	{
+		return m_staticParams.BindReadOnly(slot);
+	}
+
+	inline bool HasStaticTiles(void)
+	noexcept
+	{
+		return m_hasStaticTiles;
+	}
+
+	inline int StaticTileCount(void)
+	noexcept
+	{
+		return m_staticTileCells.Length();
+	}
+
+	bool LayoutStaticTiles(const Vector3f& lightDirection, const Vector3f& casterMin, const Vector3f& casterMax);
+
+	bool StartStaticTiles(void)
+	noexcept;
+
+	void SetStaticTile(int tile);
+
+	void StopStaticTiles(void)
+	noexcept;
+
 	inline void ActivateCamera(void)
 	noexcept
 	{
 		baseRenderer.PushViewport();
-		m_map->SetViewport();
+		m_activeMap->SetViewport();
 	}
 
 	inline void DeactivateCamera(void)
@@ -190,6 +245,10 @@ public:
 
 private:
 	bool CreateMap(Vector2f frustumSize);
+
+	bool CreateStaticAtlas(void);
+
+	void UpdateStaticParams(void);
 
 	void Stabilize(float shadowMapSize);
 
