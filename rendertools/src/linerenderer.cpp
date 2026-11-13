@@ -5,6 +5,7 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "shader.h"
+#include "texture.h"
 
 // =================================================================================================
 
@@ -28,12 +29,16 @@ bool LineRenderer::Create(int capacity)
 void LineRenderer::Destroy(void)
 {
 	m_buffer.Destroy();
+	m_faceBuffer.Destroy();
 	m_lines.Reset();
+	m_faces.Reset();
 	m_lineCapacity = 0;
 	m_capacity = 0;
+	m_faceCapacity = 0;
 	m_count = 0;
 	m_isResident = false;
 	m_isAvailable = false;
+	m_hasFaces = false;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -73,6 +78,19 @@ bool LineRenderer::ReserveBuffer(int count)
 	return true;
 }
 
+
+bool LineRenderer::ReserveFaceBuffer(void)
+{
+	if (m_faceCapacity >= m_capacity)
+		return true;
+	if (not m_faceBuffer.Create(m_capacity)) {
+		m_isAvailable = false;
+		return false;
+	}
+	m_faceCapacity = m_capacity;
+	return true;
+}
+
 // -------------------------------------------------------------------------------------------------
 
 static int CapFlags(LineRenderer::Cap cap, int flatFlag, int miterFlag)
@@ -101,6 +119,25 @@ bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, cons
 	line.pad[0] = float(CapFlags(startCap, 1, 4) + CapFlags(endCap, 2, 8));
 	line.pad[1] = startValue;
 	line.pad[2] = endValue;
+	return true;
+}
+
+
+bool LineRenderer::AddFaced(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, const Vector3f& n0,
+							const Vector3f& n1, float contourWidth, float contourAlpha)
+{
+	if (not Add(p0, p1, width, color))
+		return false;
+	if (m_faces.Length() < m_lineCapacity)
+		m_faces.Resize(m_lineCapacity);
+
+	Faces& faces = m_faces[m_count - 1];
+
+	faces.n0 = n0;
+	faces.contourWidth = contourWidth;
+	faces.n1 = n1;
+	faces.contourAlpha = contourAlpha;
+	m_hasFaces = true;
 	return true;
 }
 
@@ -191,6 +228,20 @@ void LineRenderer::SetupQuad(void)
 }
 
 
+bool LineRenderer::UploadBatch(int firstLine)
+{
+	std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
+	if (not m_buffer.UploadRange(firstLine, m_count, false))
+		return false;
+	if (not m_hasFaces)
+		return true;
+	if (not ReserveFaceBuffer())
+		return false;
+	std::memcpy(m_faceBuffer.m_data.Data() + firstLine, m_faces.Data(), size_t(m_count) * sizeof(Faces));
+	return m_faceBuffer.UploadRange(firstLine, m_count, false);
+}
+
+
 bool LineRenderer::Upload(void)
 {
 	m_isResident = false;
@@ -198,8 +249,7 @@ bool LineRenderer::Upload(void)
 		return false;
 	if (not ReserveBuffer(m_count))
 		return false;
-	std::memcpy(m_buffer.m_data.Data(), m_lines.Data(), size_t(m_count) * sizeof(Line));
-	if (not m_buffer.UploadRange(0, m_count, false))
+	if (not UploadBatch(0))
 		return false;
 	m_isResident = true;
 	return true;
@@ -217,8 +267,7 @@ bool LineRenderer::Render(void)
 		if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
 			return false;
 		firstLine = m_buffer.AppendBase();
-		std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
-		if (not m_buffer.UploadRange(firstLine, m_count, false))
+		if (not UploadBatch(firstLine))
 			return false;
 		m_buffer.SetAppendBase(firstLine + m_count);
 	}
@@ -228,13 +277,14 @@ bool LineRenderer::Render(void)
 	int							prevBlend = gfxStates.SetBlending(1);
 	GfxOperations::BlendFactor	prevSrc;
 	GfxOperations::BlendFactor	prevDst;
+	GfxOperations::BlendOp		prevOp = gfxStates.GetBlendEquation();
 
 	gfxStates.GetBlendFunc(prevSrc, prevDst);
-	baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha);
+	baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha, m_darken ? GfxOperations::BlendOp::Min : GfxOperations::BlendOp::Add);
 
 	int prevCull = gfxStates.SetFaceCulling(0);
 
-	Shader*	shader = baseShaderHandler.SetupRenderShader("lineDraw");
+	Shader*	shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? "lineDrawFaces" : "lineDraw");
 	bool	ok = false;
 
 	if (shader != nullptr) {
@@ -262,14 +312,29 @@ bool LineRenderer::Render(void)
 		shader->SetInt("firstLine", firstLine);
 		shader->SetFloat("viewerPull", m_viewerPull);
 		shader->SetFloat("worldWidth", m_worldWidth);
+		shader->SetFloat("darken", m_darken ? 1.0f : 0.0f);
 		m_buffer.BindReadOnly(0);
+		if (m_hasFaces) {
+			shader->SetFloat("widthFadeDistance", m_widthFadeDistance);
+			shader->SetFloat("alphaFadeScale", m_alphaFadeScale);
+			shader->SetFloat("depthPull", m_depthPull);
+			shader->SetFloat("widthRefDistance", m_widthRefDistance);
+			shader->SetFloat("minWidthScale", m_minWidthScale);
+			m_faceBuffer.BindReadOnly(1);
+			m_depthTexture->Activate(2);
+		}
 		m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
 		ok = m_quad.Render(shader);
 		m_quad.GetGfxDataLayout().SetInstanceCount(1);
+		if (m_hasFaces) {
+			m_depthTexture->Deactivate();
+			m_faceBuffer.ReleaseReadOnly(1);
+		}
 		m_buffer.ReleaseReadOnly(0);
 	}
 
 	gfxStates.SetFaceCulling(prevCull);
+	gfxStates.BlendEquation(prevOp);
 	gfxStates.BlendFunc(prevSrc, prevDst);
 	gfxStates.SetBlending(prevBlend);
 	return ok;

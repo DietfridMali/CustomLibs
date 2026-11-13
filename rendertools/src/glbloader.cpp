@@ -2,6 +2,7 @@
 #include "glbloader.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstring>
 #include <fstream>
@@ -119,6 +120,24 @@ static bool ReadImageFile(const std::filesystem::path& path, AutoArray<uint8_t>&
 	return false;
 }
 
+static uint32_t Crc32(uint32_t crc, const uint8_t* data, size_t size)
+{
+	static const std::array<uint32_t, 256> table = [] {
+		std::array<uint32_t, 256> entries{};
+		for (uint32_t i = 0; i < 256; ++i) {
+			uint32_t c = i;
+			for (int32_t k = 0; k < 8; ++k)
+				c = (c & 1u) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+			entries[i] = c;
+		}
+		return entries;
+	}();
+	crc = ~crc;
+	for (size_t i = 0; i < size; ++i)
+		crc = table[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
+	return ~crc;
+}
+
 static bool IsBinaryFile(const String& filename)
 {
 	std::ifstream	f((const char*)filename, std::ios::binary);
@@ -162,6 +181,7 @@ void GLBLoader::Reset(void)
 	m_data.imageNames.Clear();
 	m_data.jointIndices.Clear();
 	m_data.jointNames.Clear();
+	m_data.sourceHash = 0;
 	m_isHullVertex.Clear();
 	m_hullVertexMap.Clear();
 }
@@ -194,6 +214,7 @@ bool GLBLoader::LoadModel(const String& filename)
 		return false;
 	LoadMaterials();
 	LoadImages(std::filesystem::path(static_cast<const char*>(filename)).parent_path());
+	ComputeSourceHash(filename);
 	ReleaseModel();
 	return true;
 }
@@ -310,6 +331,26 @@ void GLBLoader::LoadImages(const std::filesystem::path& folder)
 			missingFiles.Report(path.generic_string().c_str());
 		}
 	}
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GLBLoader::ComputeSourceHash(const String& filename)
+{
+	std::vector<unsigned char>	bytes;
+	std::string					errorMsg;
+	std::string					fn = filename;
+	if (not tinygltf::ReadWholeFile(&bytes, &errorMsg, fn, nullptr)) {
+		logHandler.Print("GLBLoader: cannot read '%s' for its checksum: %s\n", static_cast<const char*>(filename), errorMsg.c_str());
+		return;
+	}
+	uint32_t crc = Crc32(0, bytes.data(), bytes.size());
+	uint64_t length = uint64_t(bytes.size());
+	for (const tinygltf::Buffer& buffer : m_model.buffers) {
+		crc = Crc32(crc, buffer.data.data(), buffer.data.size());
+		length += uint64_t(buffer.data.size());
+	}
+	m_data.sourceHash = ((length & 0xFFFFFFFFull) << 32) | uint64_t(crc);
 }
 
 // -------------------------------------------------------------------------------------------------

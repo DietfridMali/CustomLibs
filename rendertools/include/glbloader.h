@@ -61,6 +61,7 @@ public:
 		AutoArray<String>				imageNames;
 		AutoArray<int32_t>				jointIndices;
 		List<String>					jointNames;
+		uint64_t						sourceHash{ 0 };
 	};
 
 public:
@@ -186,6 +187,8 @@ private:
 	void LoadMaterials(void);
 
 	void LoadImages(const std::filesystem::path& folder);
+
+	void ComputeSourceHash(const String& filename);
 
 	bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int skinIndex);
 

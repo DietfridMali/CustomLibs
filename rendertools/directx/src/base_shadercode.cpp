@@ -41,6 +41,7 @@ const ShaderSource& BilateralBlurDepthShader();
 const ShaderSource& LightningDrawShader();
 const ShaderSource& LightningFlareShader();
 const ShaderSource& LineDrawShader();
+const ShaderSource& LineDrawFacesShader();
 const ShaderSource& SkyboxShader();
 const ShaderSource& BlackholeShader();
 const ShaderSource& KuwaharaTensorShader();
@@ -103,6 +104,7 @@ BaseShaderCode::BaseShaderCode()
 		&LightningDrawShader(),
 		&LightningFlareShader(),
 		&LineDrawShader(),
+		&LineDrawFacesShader(),
 		&SkyboxShader(),
 		&BlackholeShader(),
 		&KuwaharaTensorShader(),

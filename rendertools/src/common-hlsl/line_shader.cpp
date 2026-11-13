@@ -33,6 +33,15 @@ struct LineInstance {
 
 StructuredBuffer<LineInstance> lines : register(t0, space1);
 
+#ifdef LINE_FACES
+struct LineFaces {
+    float3 n0;    float contourWidth;
+    float3 n1;    float contourAlpha;
+};
+
+StructuredBuffer<LineFaces> lineFaces : register(t1, space1);
+#endif
+
 cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
     column_major float4x4 mProjection;
@@ -48,6 +57,14 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
     int    firstLine;      // index of this draw's first record in the buffer
     float  viewerPull;
     float  worldWidth;
+    float  darken;
+#ifdef LINE_FACES
+    float  widthFadeDistance;
+    float  alphaFadeScale;
+    float  depthPull;
+    float  widthRefDistance;
+    float  minWidthScale;
+#endif
 };
 
 static const float minWorldHalfWidth = 0.375;
@@ -78,6 +95,22 @@ float3 PullToViewer(float3 vp) {
 PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     SET_VIEW_ID
     LineInstance l = lines[v.iid + uint(firstLine)];
+    float lineWidth = l.width;
+    float4 lineColor = l.color;
+#ifdef LINE_FACES
+    LineFaces f = lineFaces[v.iid + uint(firstLine)];
+    float3 vMid = mul(mModelView, float4(0.5 * (l.p0 + l.p1), 1.0)).xyz;
+    float front0 = (dot(mul(mModelView, float4(f.n0, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
+    float front1 = (dot(mul(mModelView, float4(f.n1, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
+    if (front0 + front1 < 1.5) {
+        lineWidth = f.contourWidth;
+        lineColor.a = f.contourAlpha;
+    }
+    float drawn = ((front0 + front1 > 0.5) ? 1.0 : 0.0) * ((lineWidth > 0.0) ? 1.0 : 0.0);
+    float viewDist = max(length(vMid), 1e-4);
+    if (alphaFadeScale > 0.0)
+        lineColor.a *= saturate(alphaFadeScale / viewDist);
+#endif
 
     float3 vp0 = PullToViewer(mul(mModelView, float4(l.p0, 1.0)).xyz);
     float3 vp1 = PullToViewer(mul(mModelView, float4(l.p1, 1.0)).xyz);
@@ -115,9 +148,15 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float pxAcross = max(length(dPerpNdc * pxScale), 1e-6);
     float pxAlong = length(dAxisNdc * pxScale);
     float pxSide = max(length(dSideNdc * pxScale), 1e-6);
-    float halfWidth = max(0.5 * l.width, 1e-3);   // pixels
+    float halfWidth = max(0.5 * lineWidth, 1e-3);   // pixels
     if (worldWidth > 0.0)
         halfWidth = max(min(halfWidth, 0.5 * worldWidth * pxAcross), minWorldHalfWidth);
+#ifdef LINE_FACES
+    if (widthFadeDistance > 0.0)
+        halfWidth = max(halfWidth * saturate(1.0 - viewDist / widthFadeDistance), 0.5);
+    if (widthRefDistance > 0.0)
+        halfWidth = max(halfWidth * clamp(widthRefDistance / viewDist, minWidthScale, 1.0), 0.5);
+#endif
     // one pixel of margin around the capsule, so the antialiased edge has the pixels it fades over
     float halfDraw = halfWidth + 1.0;
 
@@ -135,11 +174,19 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float across = v.pos.y * 2.0 * halfDraw / pxAcross;
     float3 node = (column == 0) ? vp0 - side * (startReach / pxSide) : (column == 1) ? vp0 : (column == 2) ? vp1 : vp1 + side * (endReach / pxSide);
     node += perp * across;
+#ifdef LINE_FACES
+    if (perspective > 0.5)
+        node *= 1.0 - min(depthPull * halfDraw / (pxAcross * max(length(0.5 * (vp0 + vp1)), 1e-4)), 0.5);
+#endif
 
     PSInput o;
     o.pos = mul(mViewport, mul(VIEW_PROJECTION, float4(node, 1.0)));
+#ifdef LINE_FACES
+    if (drawn < 0.5)
+        o.pos = float4(0.0, 0.0, -2.0, 1.0);
+#endif
     o.cap = float4(along, across * pxAcross, segPx, halfWidth);
-    o.color = l.color;
+    o.color = lineColor;
     o.pattern = float4(l.style, l.phase * pxAlong, l.pad.x, 0.0);
     o.ends = float2(startValue, endValue);
     return o;
@@ -163,14 +210,31 @@ cbuffer ShaderConstants : register(b1) {
     int    firstLine;
     float  viewerPull;
     float  worldWidth;
+    float  darken;
+#ifdef LINE_FACES
+    float  widthFadeDistance;
+    float  alphaFadeScale;
+    float  depthPull;
+    float  widthRefDistance;
+    float  minWidthScale;
+#endif
 };
+
+#ifdef LINE_FACES
+ScreenTexture sceneDepth : register(t2);
+#endif
 
 // distance of t to the interval [s, e] along the line, 0 inside
 float IntervalDist(float t, float s, float e) {
     return max(max(s - t, t - e), 0.0);
 }
 
+#ifdef LINE_FACES
+float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+    SET_VIEW_ID
+#else
 float4 PSMain(PSInput i) : SV_Target {
+#endif
     float along  = i.cap.x;
     float across = i.cap.y;
     float segLen = i.cap.z;
@@ -219,7 +283,14 @@ float4 PSMain(PSInput i) : SV_Target {
         discard;
     if (alpha <= 0.0)
         discard;
-    return float4(i.color.rgb, i.color.a * alpha);
+#ifdef LINE_FACES
+    if (i.pos.z > sceneDepth.Load(SCREEN_TEXEL(int2(i.pos.xy))).r)
+        discard;
+#endif
+    float a = i.color.a * alpha;
+    if (darken > 0.5)
+        return float4(lerp(float3(1.0, 1.0, 1.0), i.color.rgb, a), 1.0);
+    return float4(i.color.rgb, a);
 }
 )");
 
@@ -230,6 +301,18 @@ const ShaderSource& LineDrawShader()
 		LineDrawVS,
 		LineDrawFS,
 		ShaderDataLayout(LineQuadAttrs, 2));
+	return source;
+}
+
+
+const ShaderSource& LineDrawFacesShader()
+{
+	static const ShaderSource source(
+		"lineDrawFaces",
+		LineDrawVS,
+		LineDrawFS,
+		ShaderDataLayout(LineQuadAttrs, 2),
+		{ ShaderMacro{ String("LINE_FACES"), String("1") } });
 	return source;
 }
 

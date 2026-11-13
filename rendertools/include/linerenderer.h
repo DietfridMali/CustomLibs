@@ -7,6 +7,8 @@
 #include "gfxarray.hpp"
 #include "base_quadmesh.h"
 
+class Texture;
+
 // =================================================================================================
 // LineRenderer - the library's line drawer, one shader for all three APIs ("lineDraw", see
 // <backend>/src/line_shader.cpp).
@@ -57,10 +59,24 @@ public:
 		float		pad[3];
 	};
 
-	float	m_dashScale{ 1.0f };
-	bool	m_antialias{ true };
-	float	m_viewerPull{ 0.0f };
-	float	m_worldWidth{ 0.0f };
+	struct Faces {
+		Vector3f	n0;
+		float		contourWidth;
+		Vector3f	n1;
+		float		contourAlpha;
+	};
+
+	float		m_dashScale{ 1.0f };
+	bool		m_antialias{ true };
+	float		m_viewerPull{ 0.0f };
+	float		m_worldWidth{ 0.0f };
+	bool		m_darken{ false };
+	float		m_widthFadeDistance{ 0.0f };
+	float		m_alphaFadeScale{ 0.0f };
+	float		m_depthPull{ 0.0f };
+	float		m_widthRefDistance{ 0.0f };
+	float		m_minWidthScale{ 0.0f };
+	Texture*	m_depthTexture{ nullptr };
 
 	LineRenderer() = default;
 	~LineRenderer() {
@@ -87,11 +103,15 @@ public:
 	{
 		m_count = 0;
 		m_isResident = false;
+		m_hasFaces = false;
 	}
 
 	bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid,
 			 float phase = 0.0f, Cap startCap = Cap::Round, float startValue = 0.0f, Cap endCap = Cap::Round,
 			 float endValue = 0.0f);
+
+	bool AddFaced(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, const Vector3f& n0, const Vector3f& n1,
+				  float contourWidth, float contourAlpha);
 
 	static float MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other);
 
@@ -107,20 +127,27 @@ public:
 
 private:
 	GfxArray<Line, GfxTypes::StructuredBuffer>	m_buffer;
+	GfxArray<Faces, GfxTypes::StructuredBuffer>	m_faceBuffer;
 	AutoArray<Line>								m_lines;
+	AutoArray<Faces>							m_faces;
 	int											m_lineCapacity{ 0 };
 	int											m_capacity{ 0 };
+	int											m_faceCapacity{ 0 };
 	int											m_count{ 0 };
 	BaseQuadMesh								m_quad;
 	bool										m_quadReady{ false };
 	bool										m_isAvailable{ false };
 	bool										m_isResident{ false };
+	bool										m_hasFaces{ false };
 
 	bool Reserve(int count);
 	bool ReserveBuffer(int count);
+	bool ReserveFaceBuffer(void);
+	bool UploadBatch(int firstLine);
 	void SetupQuad(void);
 };
 
 static_assert(sizeof(LineRenderer::Line) == 64, "LineRenderer::Line must stay 64 bytes (GPU StructuredBuffer layout)");
+static_assert(sizeof(LineRenderer::Faces) == 32, "LineRenderer::Faces must stay 32 bytes (GPU StructuredBuffer layout)");
 
 // =================================================================================================
