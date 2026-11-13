@@ -23,6 +23,12 @@ static const ShaderDataAttributes LineQuadAttrs[] = {
 	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
+static const ShaderDataAttributes LineFacesQuadAttrs[] = {
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Uint", 0, ShaderDataAttributes::Uint1, true },
+};
+
 static const String LineDrawVS = String(R"(
 struct LineInstance {
     float3 p0;    float width;   // width in target pixels
@@ -74,6 +80,9 @@ static const float minWorldHalfWidth = 0.375;
 struct VSInput {
     [[vk::location(0)]] float3 pos : POSITION;
     [[vk::location(1)]] float2 tc  : TEXCOORD;
+#ifdef LINE_FACES
+    [[vk::location(13)]] uint slot : UINT0;
+#endif
     uint   iid : SV_InstanceID;
 };
 
@@ -96,11 +105,16 @@ float3 PullToViewer(float3 vp) {
 
 PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     SET_VIEW_ID
-    LineInstance l = lines[v.iid + uint(firstLine)];
+#ifdef LINE_FACES
+    uint lineIndex = v.slot + uint(firstLine);
+#else
+    uint lineIndex = v.iid + uint(firstLine);
+#endif
+    LineInstance l = lines[lineIndex];
     float lineWidth = l.width;
     float4 lineColor = l.color;
 #ifdef LINE_FACES
-    LineFaces f = lineFaces[v.iid + uint(firstLine)];
+    LineFaces f = lineFaces[lineIndex];
     float3 vMid = mul(mModelView, float4(0.5 * (l.p0 + l.p1), 1.0)).xyz;
     float front0 = (dot(mul(mModelView, float4(f.n0, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
     float front1 = (dot(mul(mModelView, float4(f.n1, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
@@ -229,21 +243,12 @@ cbuffer ShaderConstants : register(b1) {
 #endif
 };
 
-#ifdef LINE_FACES
-ScreenTexture sceneDepth : register(t2);
-#endif
-
 // distance of t to the interval [s, e] along the line, 0 inside
 float IntervalDist(float t, float s, float e) {
     return max(max(s - t, t - e), 0.0);
 }
 
-#ifdef LINE_FACES
-float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
-    SET_VIEW_ID
-#else
 float4 PSMain(PSInput i) : SV_Target {
-#endif
     float along  = i.cap.x;
     float across = i.cap.y;
     float segLen = i.cap.z;
@@ -299,10 +304,6 @@ float4 PSMain(PSInput i) : SV_Target {
         discard;
     if (alpha <= 0.0)
         discard;
-#ifdef LINE_FACES
-    if (i.pos.z > sceneDepth.Load(SCREEN_TEXEL(int2(i.pos.xy))).r)
-        discard;
-#endif
     float a = i.color.a * alpha;
     if (darken > 0.5)
         return float4(lerp(float3(1.0, 1.0, 1.0), i.color.rgb, a), 1.0);
@@ -327,7 +328,7 @@ const ShaderSource& LineDrawFacesShader()
 		"lineDrawFaces",
 		LineDrawVS,
 		LineDrawFS,
-		ShaderDataLayout(LineQuadAttrs, 2),
+		ShaderDataLayout(LineFacesQuadAttrs, 3),
 		{ ShaderMacro{ String("LINE_FACES"), String("1") } });
 	return source;
 }

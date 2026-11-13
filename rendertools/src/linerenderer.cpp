@@ -5,7 +5,6 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "shader.h"
-#include "texture.h"
 
 // =================================================================================================
 
@@ -30,6 +29,12 @@ void LineRenderer::Destroy(void)
 {
 	m_buffer.Destroy();
 	m_faceBuffer.Destroy();
+#ifndef OPENGL
+	m_slotBuffer.Destroy();
+	m_commandBuffer.Destroy();
+	m_slotCapacity = 0;
+	m_commandCapacity = 0;
+#endif
 	m_lines.Reset();
 	m_faces.Reset();
 	m_lineCapacity = 0;
@@ -90,6 +95,48 @@ bool LineRenderer::ReserveFaceBuffer(void)
 	m_faceCapacity = m_capacity;
 	return true;
 }
+
+
+#ifndef OPENGL
+bool LineRenderer::ReserveSlotBuffer(void)
+{
+	if (m_slotCapacity >= m_capacity)
+		return true;
+	m_slotCapacity = 0;
+	if (not m_slotBuffer.Create(m_capacity)) {
+		m_isAvailable = false;
+		return false;
+	}
+
+	uint32_t* slots = m_slotBuffer.m_data.DataPtr(0);
+
+	for (int i = 0; i < m_capacity; ++i)
+		slots[i] = uint32_t(i);
+	if (not m_slotBuffer.UploadRange(0, m_capacity, false)) {
+		m_isAvailable = false;
+		return false;
+	}
+	m_slotCapacity = m_capacity;
+	return true;
+}
+
+
+bool LineRenderer::ReserveCommands(int count)
+{
+	if (count <= m_commandCapacity)
+		return true;
+
+	int capacity = (m_commandCapacity > 0) ? m_commandCapacity : 1;
+
+	while (capacity < count)
+		capacity *= 2;
+	m_commandCapacity = 0;
+	if (not m_commandBuffer.Create(capacity))
+		return false;
+	m_commandCapacity = capacity;
+	return true;
+}
+#endif
 
 // -------------------------------------------------------------------------------------------------
 
@@ -272,74 +319,139 @@ bool LineRenderer::Render(void)
 		m_buffer.SetAppendBase(firstLine + m_count);
 	}
 
-	// states feed the PSO, so they are set before the shader is activated. Alpha blending for the
-	// antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
-	int							prevBlend = gfxStates.SetBlending(1);
-	GfxOperations::BlendFactor	prevSrc;
-	GfxOperations::BlendFactor	prevDst;
-	GfxOperations::BlendOp		prevOp = gfxStates.GetBlendEquation();
-
-	gfxStates.GetBlendFunc(prevSrc, prevDst);
-	baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha, m_darken ? GfxOperations::BlendOp::Min : GfxOperations::BlendOp::Add);
-
-	int prevCull = gfxStates.SetFaceCulling(0);
-
-	Shader*	shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? "lineDrawFaces" : "lineDraw");
-	bool	ok = false;
+	DrawStates	states;
+	Shader*		shader = BeginDraw(firstLine, states);
+	bool		ok = false;
 
 	if (shader != nullptr) {
-		SetupQuad();
-		// Perspective or orthographic: a perspective matrix has the w row's z coefficient (-1 or 1) where
-		// an orthographic one has 0. Column major, so that is element 11. The shader divides the pixel
-		// scale by the depth only for a perspective projection.
-		const float* projection = baseRenderer.Projection().AsArray();
-
-		shader->SetFloat("perspective", (projection[11] != 0.0f) ? 1.0f : 0.0f);
-		// What the VS converts pixels into view units with: the texel size of the ACTIVE RENDER TARGET.
-		// The VS measures the projection through mViewport, i.e. in the NDC of the whole target buffer
-		// (the gfx viewport always spans the buffer; mViewport scales into the sub rectangle), so the
-		// pixel scale is the buffer's - baseRenderer.TexelSize () describes the viewport and inflated a
-		// line drawn into a 370 px wide menu canvas on a 1920 px screen five times. Without an active
-		// buffer the window is the target.
-		RenderTarget*	renderTarget = baseRenderer.GetActiveBuffer();
-		TexCoord		texelSize = renderTarget
-				 ? renderTarget->TexelSize()
-				 : TexCoord(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
-
-		shader->SetVector2f("texelSize", texelSize);
-		shader->SetFloat("dashScale", m_dashScale);
-		shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
-		shader->SetInt("firstLine", firstLine);
-		shader->SetFloat("viewerPull", m_viewerPull);
-		shader->SetFloat("worldWidth", m_worldWidth);
-		shader->SetFloat("darken", m_darken ? 1.0f : 0.0f);
-		m_buffer.BindReadOnly(0);
-		if (m_hasFaces) {
-			shader->SetFloat("widthFadeDistance", m_widthFadeDistance);
-			shader->SetFloat("alphaFadeScale", m_alphaFadeScale);
-			shader->SetFloat("depthPull", m_depthPull);
-			shader->SetFloat("widthRefDistance", m_widthRefDistance);
-			shader->SetFloat("minWidthScale", m_minWidthScale);
-			shader->SetFloat("haloReach", m_haloReach);
-			shader->SetFloat("haloStrength", m_haloStrength);
-			m_faceBuffer.BindReadOnly(1);
-			m_depthTexture->Activate(2);
-		}
 		m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
 		ok = m_quad.Render(shader);
 		m_quad.GetGfxDataLayout().SetInstanceCount(1);
+	}
+	EndDraw(states, shader != nullptr);
+	return ok;
+}
+
+
+#ifndef OPENGL
+bool LineRenderer::RenderRanges(const Range* ranges, int count)
+{
+	if (not (m_isAvailable and m_isResident and m_hasFaces) or (count <= 0))
+		return false;
+	if (not ReserveCommands(m_commandBuffer.AppendBase() + count))
+		return false;
+	SetupQuad();
+	if (not m_quad.UpdateData())
+		return false;
+
+	int				firstCommand = m_commandBuffer.AppendBase();
+	GfxDrawCommand*	commands = m_commandBuffer.m_data.DataPtr(firstCommand);
+	uint32_t		indexCount = m_quad.Indices().GfxDataLength();
+	int				commandCount = 0;
+
+	for (int i = 0; i < count; ++i) {
+		if (ranges[i].count <= 0)
+			continue;
+
+		GfxDrawCommand& command = commands[commandCount++];
+
+		command.indexCount = indexCount;
+		command.instanceCount = uint32_t(ranges[i].count);
+		command.firstIndex = 0;
+		command.baseVertex = 0;
+		command.firstInstance = uint32_t(ranges[i].first);
+	}
+	if ((commandCount == 0) or (indexCount == 0) or not m_commandBuffer.UploadRange(firstCommand, commandCount, false))
+		return false;
+	m_commandBuffer.SetAppendBase(firstCommand + commandCount);
+
+	DrawStates	states;
+	Shader*		shader = BeginDraw(0, states);
+
+	if (shader != nullptr)
+		m_quad.GetGfxDataLayout().RenderIndirect({}, m_commandBuffer, uint32_t(firstCommand), uint32_t(commandCount));
+	EndDraw(states, shader != nullptr);
+	return shader != nullptr;
+}
+#endif
+
+
+Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states)
+{
+	// states feed the PSO, so they are set before the shader is activated. Alpha blending for the
+	// antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
+	states.blending = gfxStates.SetBlending(1);
+	states.operation = gfxStates.GetBlendEquation();
+	gfxStates.GetBlendFunc(states.source, states.destination);
+	baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha, m_darken ? GfxOperations::BlendOp::Min : GfxOperations::BlendOp::Add);
+	states.culling = gfxStates.SetFaceCulling(0);
+#ifndef OPENGL
+	if (m_hasFaces and not ReserveSlotBuffer())
+		return nullptr;
+#endif
+
+	Shader* shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? "lineDrawFaces" : "lineDraw");
+
+	if (shader == nullptr)
+		return nullptr;
+	SetupQuad();
+	// Perspective or orthographic: a perspective matrix has the w row's z coefficient (-1 or 1) where
+	// an orthographic one has 0. Column major, so that is element 11. The shader divides the pixel
+	// scale by the depth only for a perspective projection.
+	const float* projection = baseRenderer.Projection().AsArray();
+
+	shader->SetFloat("perspective", (projection[11] != 0.0f) ? 1.0f : 0.0f);
+	// What the VS converts pixels into view units with: the texel size of the ACTIVE RENDER TARGET.
+	// The VS measures the projection through mViewport, i.e. in the NDC of the whole target buffer
+	// (the gfx viewport always spans the buffer; mViewport scales into the sub rectangle), so the
+	// pixel scale is the buffer's - baseRenderer.TexelSize () describes the viewport and inflated a
+	// line drawn into a 370 px wide menu canvas on a 1920 px screen five times. Without an active
+	// buffer the window is the target.
+	RenderTarget*	renderTarget = baseRenderer.GetActiveBuffer();
+	TexCoord		texelSize = renderTarget
+			 ? renderTarget->TexelSize()
+			 : TexCoord(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
+
+	shader->SetVector2f("texelSize", texelSize);
+	shader->SetFloat("dashScale", m_dashScale);
+	shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
+	shader->SetInt("firstLine", firstLine);
+	shader->SetFloat("viewerPull", m_viewerPull);
+	shader->SetFloat("worldWidth", m_worldWidth);
+	shader->SetFloat("darken", m_darken ? 1.0f : 0.0f);
+	m_buffer.BindReadOnly(0);
+	if (m_hasFaces) {
+		shader->SetFloat("widthFadeDistance", m_widthFadeDistance);
+		shader->SetFloat("alphaFadeScale", m_alphaFadeScale);
+		shader->SetFloat("depthPull", m_depthPull);
+		shader->SetFloat("widthRefDistance", m_widthRefDistance);
+		shader->SetFloat("minWidthScale", m_minWidthScale);
+		shader->SetFloat("haloReach", m_haloReach);
+		shader->SetFloat("haloStrength", m_haloStrength);
+		m_faceBuffer.BindReadOnly(1);
+#ifndef OPENGL
+		m_slotBuffer.BindInstanceStream("Uint", 0);
+#endif
+	}
+	return shader;
+}
+
+
+void LineRenderer::EndDraw(const DrawStates& states, bool isBound)
+{
+	if (isBound) {
 		if (m_hasFaces) {
-			m_depthTexture->Deactivate();
+#ifndef OPENGL
+			m_slotBuffer.ReleaseInstanceStream("Uint", 0);
+#endif
 			m_faceBuffer.ReleaseReadOnly(1);
 		}
 		m_buffer.ReleaseReadOnly(0);
 	}
-
-	gfxStates.SetFaceCulling(prevCull);
-	gfxStates.BlendEquation(prevOp);
-	gfxStates.BlendFunc(prevSrc, prevDst);
-	gfxStates.SetBlending(prevBlend);
-	return ok;
+	gfxStates.SetFaceCulling(states.culling);
+	gfxStates.BlendEquation(states.operation);
+	gfxStates.BlendFunc(states.source, states.destination);
+	gfxStates.SetBlending(states.blending);
 }
 
 // =================================================================================================

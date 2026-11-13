@@ -5,9 +5,8 @@
 #include "colordata.h"
 #include "gfxtypes.h"
 #include "gfxarray.hpp"
+#include "rendertypes.h"
 #include "base_quadmesh.h"
-
-class Texture;
 
 // =================================================================================================
 // LineRenderer - the library's line drawer, one shader for all three APIs ("lineDraw", see
@@ -66,6 +65,11 @@ public:
 		float		contourAlpha;
 	};
 
+	struct Range {
+		int32_t		first;
+		int32_t		count;
+	};
+
 	float		m_dashScale{ 1.0f };
 	bool		m_antialias{ true };
 	float		m_viewerPull{ 0.0f };
@@ -78,7 +82,6 @@ public:
 	float		m_minWidthScale{ 0.0f };
 	float		m_haloReach{ 0.0f };
 	float		m_haloStrength{ 0.0f };
-	Texture*	m_depthTexture{ nullptr };
 
 	LineRenderer() = default;
 	~LineRenderer() {
@@ -125,28 +128,52 @@ public:
 	// Draws what was added since Clear () with the current matrices and viewport.
 	bool Render(void);
 
+#ifndef OPENGL
+	bool RenderRanges(const Range* ranges, int count);
+#endif
+
 	bool Upload(void);
 
 private:
-	GfxArray<Line, GfxTypes::StructuredBuffer>	m_buffer;
-	GfxArray<Faces, GfxTypes::StructuredBuffer>	m_faceBuffer;
-	AutoArray<Line>								m_lines;
-	AutoArray<Faces>							m_faces;
-	int											m_lineCapacity{ 0 };
-	int											m_capacity{ 0 };
-	int											m_faceCapacity{ 0 };
-	int											m_count{ 0 };
-	BaseQuadMesh								m_quad;
-	bool										m_quadReady{ false };
-	bool										m_isAvailable{ false };
-	bool										m_isResident{ false };
-	bool										m_hasFaces{ false };
+	struct DrawStates {
+		int							blending{ 0 };
+		GfxOperations::BlendFactor	source{};
+		GfxOperations::BlendFactor	destination{};
+		GfxOperations::BlendOp		operation{};
+		int							culling{ 0 };
+	};
+
+	GfxArray<Line, GfxTypes::StructuredBuffer>		m_buffer;
+	GfxArray<Faces, GfxTypes::StructuredBuffer>		m_faceBuffer;
+#ifndef OPENGL
+	GfxArray<uint32_t, GfxTypes::InstanceBuffer>	m_slotBuffer;
+	GfxDrawCommandBuffer							m_commandBuffer;
+	int												m_slotCapacity{ 0 };
+	int												m_commandCapacity{ 0 };
+#endif
+	AutoArray<Line>									m_lines;
+	AutoArray<Faces>								m_faces;
+	int												m_lineCapacity{ 0 };
+	int												m_capacity{ 0 };
+	int												m_faceCapacity{ 0 };
+	int												m_count{ 0 };
+	BaseQuadMesh									m_quad;
+	bool											m_quadReady{ false };
+	bool											m_isAvailable{ false };
+	bool											m_isResident{ false };
+	bool											m_hasFaces{ false };
 
 	bool Reserve(int count);
 	bool ReserveBuffer(int count);
 	bool ReserveFaceBuffer(void);
+#ifndef OPENGL
+	bool ReserveSlotBuffer(void);
+	bool ReserveCommands(int count);
+#endif
 	bool UploadBatch(int firstLine);
 	void SetupQuad(void);
+	Shader* BeginDraw(int firstLine, DrawStates& states);
+	void EndDraw(const DrawStates& states, bool isBound);
 };
 
 static_assert(sizeof(LineRenderer::Line) == 64, "LineRenderer::Line must stay 64 bytes (GPU StructuredBuffer layout)");
