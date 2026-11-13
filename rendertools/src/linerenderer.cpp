@@ -320,6 +320,8 @@ bool LineRenderer::Render(void)
 			shader->SetFloat("depthPull", m_depthPull);
 			shader->SetFloat("widthRefDistance", m_widthRefDistance);
 			shader->SetFloat("minWidthScale", m_minWidthScale);
+			shader->SetFloat("haloReach", m_haloReach);
+			shader->SetFloat("haloStrength", m_haloStrength);
 			m_faceBuffer.BindReadOnly(1);
 			m_depthTexture->Activate(2);
 		}

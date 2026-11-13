@@ -76,6 +76,8 @@ public:
 	float		m_depthPull{ 0.0f };
 	float		m_widthRefDistance{ 0.0f };
 	float		m_minWidthScale{ 0.0f };
+	float		m_haloReach{ 0.0f };
+	float		m_haloStrength{ 0.0f };
 	Texture*	m_depthTexture{ nullptr };
 
 	LineRenderer() = default;

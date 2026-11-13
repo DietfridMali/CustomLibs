@@ -64,6 +64,8 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
     float  depthPull;
     float  widthRefDistance;
     float  minWidthScale;
+    float  haloReach;
+    float  haloStrength;
 #endif
 };
 
@@ -159,6 +161,11 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
 #endif
     // one pixel of margin around the capsule, so the antialiased edge has the pixels it fades over
     float halfDraw = halfWidth + 1.0;
+    float haloWidth = 0.0;
+#ifdef LINE_FACES
+    haloWidth = haloReach * halfWidth;
+    halfDraw += haloWidth;
+#endif
 
     // capsule bounding box: x along the line (round cap before p0 .. round cap after p1), y across -
     // spanned in view units, so the pixel margins go back through the scale of their direction
@@ -187,7 +194,7 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
 #endif
     o.cap = float4(along, across * pxAcross, segPx, halfWidth);
     o.color = lineColor;
-    o.pattern = float4(l.style, l.phase * pxAlong, l.pad.x, 0.0);
+    o.pattern = float4(l.style, l.phase * pxAlong, l.pad.x, haloWidth);
     o.ends = float2(startValue, endValue);
     return o;
 }
@@ -217,6 +224,8 @@ cbuffer ShaderConstants : register(b1) {
     float  depthPull;
     float  widthRefDistance;
     float  minWidthScale;
+    float  haloReach;
+    float  haloStrength;
 #endif
 };
 
@@ -272,6 +281,13 @@ float4 PSMain(PSInput i) : SV_Target {
     // the distance alone gave a line on a pixel boundary 37 % per row where it covers 87 %.
     float fw = max(fwidth(dist), 1e-6);
     float alpha = (antialias > 0.5) ? saturate((hw - dist) / fw + 0.5) : ((dist <= hw) ? 1.0 : 0.0);
+#ifdef LINE_FACES
+    float haloWidth = i.pattern.w;
+    if (haloWidth > 0.0) {
+        float fade = 1.0 - saturate((dist - hw) / haloWidth);
+        alpha = max(alpha, haloStrength * fade * fade);
+    }
+#endif
     float fa = max(fwidth(along), 1e-6);
     if (flatStart || flatEnd) {
         float dEnd = max(flatStart ? -i.ends.x - along : -1e20, flatEnd ? along - segLen - i.ends.y : -1e20);
