@@ -544,6 +544,38 @@ noexcept
 	return resource;
 }
 
+
+bool UploadBufferData(ID3D12Resource* dstResource, const void* data, size_t dataSize)
+noexcept
+{
+	ComPtr<ID3D12Resource> staging = gfxResourceHandler.AcquireUpload(dataSize);
+	if (not staging)
+		return false;
+
+	void*		mapped = nullptr;
+	D3D12_RANGE	mapRange{ 0, 0 };
+	HRESULT		hr = staging->Map(0, &mapRange, &mapped);
+	if (FAILED(hr)) {
+		logHandler.Print("UploadBufferData: Map failed (size=%zu, hr=0x%08X)\n", dataSize, unsigned(hr));
+		gfxResourceHandler.TrackUpload(staging);
+		return false;
+	}
+	std::memcpy(mapped, data, dataSize);
+	staging->Unmap(0, nullptr);
+
+	UploadCommands upload;
+	if (not BeginUpload(upload, "UploadBufferData")) {
+		gfxResourceHandler.TrackUpload(staging);
+		return false;
+	}
+	ID3D12GraphicsCommandList* list = upload.cl->GfxList();
+	SubresourceBarrier(list, dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+	list->CopyBufferRegion(dstResource, 0, staging.Get(), 0, UINT64(dataSize));
+	SubresourceBarrier(list, dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+	gfxResourceHandler.TrackUpload(staging);
+	return EndUpload(upload, true);
+}
+
 // =================================================================================================
 // Platform-neutral upload helpers
 

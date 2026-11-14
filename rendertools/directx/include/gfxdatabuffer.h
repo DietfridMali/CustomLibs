@@ -6,11 +6,11 @@
 #include <cstring>
 
 // =================================================================================================
-// DX12 GfxDataBuffer — wraps a committed GPU resource (upload heap) and exposes vertex / index buffer views.
+// DX12 GfxDataBuffer — wraps a committed GPU resource (upload heap, static data: default heap) and exposes vertex / index buffer views.
 //
 // In the OGL version the GfxDataBuffer held a GLuint (via SharedGfxHandle) and was described with
 // glVertexAttribPointer / glBindBuffer.  In DX12 we use:
-//   • A committed resource on the upload heap (CPU-writable, GPU-readable).
+//   • A committed resource on the upload heap (CPU-writable, GPU-readable); static data is copied from there into one on the default heap.
 //   • D3D12_VERTEX_BUFFER_VIEW for vertex attribute streams (GL_ARRAY_BUFFER).
 //   • D3D12_INDEX_BUFFER_VIEW  for the index stream (GL_ELEMENT_ARRAY_BUFFER).
 //
@@ -29,7 +29,7 @@ public:
 
 	static constexpr int FRAME_COUNT = 2; // upload-resource slots, rotated per frame-in-flight
 
-	ComPtr<ID3D12Resource>		m_resource[FRAME_COUNT]; // upload-heap buffers; dynamic buffers rotate slots per frame
+	ComPtr<ID3D12Resource>		m_resource[FRAME_COUNT]; // upload-heap buffers; dynamic buffers rotate slots per frame; static data sits in a default-heap buffer in slot 0
 	D3D12_VERTEX_BUFFER_VIEW	m_vbv{}; // valid when m_bufferType == GfxBufferTarget::Vertex
 	D3D12_INDEX_BUFFER_VIEW		m_ibv{}; // valid when m_bufferType == GfxBufferTarget::Index
 
@@ -39,6 +39,7 @@ public:
 	int				m_componentCount;
 	ComponentType	m_componentType; // Float / UInt32 / UInt16
 	bool			m_isDynamic;
+	bool			m_inDefaultHeap{ false };
 	// Which slot the views point at, and when a slot stopped being that one. A buffer is drawn from
 	// its live slot in EVERY frame until the next Update, not only in the frame it was written in -
 	// so slot rotation alone says nothing about whether a slot is free (see Update ()).
@@ -94,6 +95,10 @@ public:
 
 	bool Create(int slot, size_t dataSize);
 
+	bool CreateStatic(size_t dataSize);
+
+	void ReleaseSlot(int slot)
+	noexcept;
 
 	// Upload new data and (re-)create the GPU resource if needed.
 	// componentCount: components per vertex element (e.g. 3 for float3)

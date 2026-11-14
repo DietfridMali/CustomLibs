@@ -82,6 +82,9 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
 										   const void* data)
 noexcept;
 
+bool UploadBufferData(ID3D12Resource* dstResource, const void* data, size_t dataSize)
+noexcept;
+
 // =================================================================================================
 // Platform-neutral upload entry points used by base_noisetexture. Each function does the full
 // per-Deploy pipeline for an existing Texture: releases any previously-owned ID3D12Resource,

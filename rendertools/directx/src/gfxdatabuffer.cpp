@@ -3,6 +3,7 @@
 #include "gfxdatabuffer.h"
 #include "commandlist.h"
 #include "dx12context.h"
+#include "dx12upload.h"
 #include "resource_handler.h"
 #include "shader_loading.h"
 #include "loghandler.h"
@@ -12,9 +13,9 @@
 // =================================================================================================
 // DX12 GfxDataBuffer implementation
 //
-// Data is kept on an upload-heap committed resource (CPU-writable, GPU-readable).
-// For the DX12 port this is fine for both dynamic and static meshes; a future optimisation
-// would copy static buffers into a default-heap resource.
+// Dynamic data is kept on an upload-heap committed resource (CPU-writable, GPU-readable).
+// Static data is copied from an upload buffer into a default-heap resource, so the GPU reads it
+// from video memory instead of across the bus.
 
 static_assert(GfxDataBuffer::FRAME_COUNT == CommandList::FRAME_COUNT,
 			  "GfxDataBuffer upload-slot count must match the command-list frame count");
@@ -76,6 +77,7 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
 		m_componentCount = other.m_componentCount;
 		m_componentType = other.m_componentType;
 		m_isDynamic = other.m_isDynamic;
+		m_inDefaultHeap = other.m_inDefaultHeap;
 		m_liveSlot = other.m_liveSlot;
 		m_activeSlot = other.m_activeSlot;
 		for (int i = 0; i < FRAME_COUNT; ++i) {
@@ -110,6 +112,7 @@ noexcept
 		m_componentCount = other.m_componentCount;
 		m_componentType = other.m_componentType;
 		m_isDynamic = other.m_isDynamic;
+		m_inDefaultHeap = other.m_inDefaultHeap;
 		m_liveSlot = other.m_liveSlot;
 		m_activeSlot = other.m_activeSlot;
 		for (int i = 0; i < FRAME_COUNT; ++i) {
@@ -136,6 +139,48 @@ bool GfxDataBuffer::Create(int slot, size_t dataSize)
 	m_resource[slot]->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
 #endif
 	return true;
+}
+
+
+bool GfxDataBuffer::CreateStatic(size_t dataSize)
+{
+	D3D12_HEAP_PROPERTIES	hp{ D3D12_HEAP_TYPE_DEFAULT };
+	D3D12_RESOURCE_DESC		rd{};
+	rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	rd.Width = dataSize;
+	rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
+	rd.SampleDesc.Count = 1;
+	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	HRESULT hr = dx12Context.Device()->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr,
+															   IID_PPV_ARGS(&m_resource[0]));
+	if (FAILED(hr)) {
+		logHandler.Print("GfxDataBuffer::CreateStatic: CreateCommittedResource failed (size=%zu, type=%s/%d, hr=0x%08X)\n", dataSize,
+						 m_type ? m_type : "?", m_id, unsigned(hr));
+		return false;
+	}
+#if DBG_DIRECTX
+	char name[128];
+	snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] static", m_type, m_id);
+	m_resource[0]->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+#endif
+	m_inDefaultHeap = true;
+	return true;
+}
+
+
+void GfxDataBuffer::ReleaseSlot(int slot)
+noexcept
+{
+	if (m_resource[slot]) {
+		if ((slot == 0) and m_inDefaultHeap)
+			gfxResourceHandler.Track(m_resource[slot]);
+		else
+			gfxResourceHandler.TrackUpload(m_resource[slot]);
+		m_resource[slot].Reset();
+	}
+	if (slot == 0)
+		m_inDefaultHeap = false;
 }
 
 
@@ -189,20 +234,22 @@ noexcept
 	const int		slot = m_isDynamic ? commandListHandler.FrameIndex() : 0;
 #if OPTIMIZE_BUFFER_REUSE
 	const bool slotIsBusy = m_resource[slot] and m_slotWasBound[slot] and (m_slotBoundFrame[slot] + framesInFlight > frameNumber);
-	if (slotIsBusy or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
-		if (m_resource[slot])
-			gfxResourceHandler.TrackUpload(m_resource[slot]);
-		if (not Create(slot, dataSize))
+	const bool toDefaultHeap = not m_isDynamic and not slotIsBusy;
+	const bool heapMatches = (slot != 0) or (m_inDefaultHeap == toDefaultHeap);
+	if (slotIsBusy or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize) or not heapMatches) {
+		ReleaseSlot(slot);
+		if (not (toDefaultHeap ? CreateStatic(dataSize) : Create(slot, dataSize)))
 			return false;
 		m_slotWasBound[slot] = false;
 	}
 #else
 	const bool slotIsBusy = m_resource[slot] and ((slot == m_liveSlot) or (m_slotRetiredFrame[slot] + framesInFlight > frameNumber));
 	const bool needsFreshBuffer = slotIsBusy or not m_isDynamic;
-	if (needsFreshBuffer or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
-		if (m_resource[slot])
-			gfxResourceHandler.TrackUpload(m_resource[slot]);
-		if (not Create(slot, dataSize))
+	const bool toDefaultHeap = not m_isDynamic and not slotIsBusy;
+	const bool heapMatches = (slot != 0) or (m_inDefaultHeap == toDefaultHeap);
+	if (needsFreshBuffer or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize) or not heapMatches) {
+		ReleaseSlot(slot);
+		if (not (toDefaultHeap ? CreateStatic(dataSize) : Create(slot, dataSize)))
 			return false;
 	}
 	if ((m_liveSlot >= 0) and (m_liveSlot != slot))
@@ -213,16 +260,22 @@ noexcept
 	ID3D12Resource* resource = m_resource[slot].Get();
 
 	// Upload data
-	void*		mapped = nullptr;
-	D3D12_RANGE	range{ 0, 0 };
-	HRESULT hr = resource->Map(0, &range, &mapped);
-	if (FAILED(hr)) {
-		logHandler.Print("GfxDataBuffer::Update: Map failed (size=%zu, type=%s/%d slot %d, hr=0x%08X)\n", dataSize,
-						 m_type ? m_type : "?", m_id, slot, unsigned(hr));
-		return false;
+	if (toDefaultHeap) {
+		if (not UploadBufferData(resource, data, dataSize))
+			return false;
 	}
-	std::memcpy(mapped, data, dataSize);
-	resource->Unmap(0, nullptr);
+	else {
+		void*		mapped = nullptr;
+		D3D12_RANGE	range{ 0, 0 };
+		HRESULT hr = resource->Map(0, &range, &mapped);
+		if (FAILED(hr)) {
+			logHandler.Print("GfxDataBuffer::Update: Map failed (size=%zu, type=%s/%d slot %d, hr=0x%08X)\n", dataSize,
+							 m_type ? m_type : "?", m_id, slot, unsigned(hr));
+			return false;
+		}
+		std::memcpy(mapped, data, dataSize);
+		resource->Unmap(0, nullptr);
+	}
 
 	D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = resource->GetGPUVirtualAddress();
 
@@ -244,11 +297,8 @@ noexcept
 void GfxDataBuffer::Clear(void)
 noexcept
 {
-	for (auto& r : m_resource) {
-		if (r)
-			gfxResourceHandler.TrackUpload(r);
-		r.Reset();
-	}
+	for (int i = 0; i < FRAME_COUNT; ++i)
+		ReleaseSlot(i);
 	m_vbv = {};
 	m_ibv = {};
 	m_id = 0;
@@ -259,11 +309,8 @@ noexcept
 void GfxDataBuffer::Destroy(void)
 noexcept
 {
-	for (auto& r : m_resource) {
-		if (r)
-			gfxResourceHandler.TrackUpload(r);
-		r.Reset();
-	}
+	for (int i = 0; i < FRAME_COUNT; ++i)
+		ReleaseSlot(i);
 	m_vbv = {};
 	m_ibv = {};
 	m_size = 0;
