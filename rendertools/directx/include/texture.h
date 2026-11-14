@@ -432,6 +432,19 @@ public:
 
 // =================================================================================================
 
+class SingleChannelTexture
+	: public Texture {
+public:
+	SingleChannelTexture() = default;
+	~SingleChannelTexture() = default;
+
+	virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
+
+	virtual bool Deploy(int bufferIndex = 0) override;
+};
+
+// =================================================================================================
+
 class RenderTargetTexture
 	: public Texture {
 public:

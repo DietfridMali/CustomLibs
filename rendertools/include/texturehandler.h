@@ -83,6 +83,10 @@ public:
 		return GetTexture<TiledTexture>(name);
 	}
 
+	inline SingleChannelTexture* GetSingleChannelTexture(String& name) {
+		return GetTexture<SingleChannelTexture>(name);
+	}
+
 	inline Cubemap* GetCubemap(String& name) {
 		return GetTexture<Cubemap>(name);
 	}

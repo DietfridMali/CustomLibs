@@ -113,6 +113,31 @@ void TextureBuffer::Premultiply(void)
 }
 
 
+bool TextureBuffer::ExtractChannel(int channel)
+{
+	const int32_t		componentCount = m_info.m_componentCount;
+	const int32_t		texelCount = m_info.m_width * m_info.m_height;
+	AutoArray<uint8_t>	channelData;
+	try {
+		channelData.Resize(texelCount);
+	}
+	catch (...) {
+		return false;
+	}
+	if (channelData.Length() < texelCount)
+		return false;
+	const uint8_t*	source = m_data.Data() + channel;
+	uint8_t*		dest = channelData.Data();
+	for (int32_t i = 0; i < texelCount; ++i, source += componentCount)
+		dest[i] = *source;
+	ReleaseData();
+	if (not Allocate(m_info.m_width, m_info.m_height, 1, channelData.Data()))
+		return false;
+	m_info.m_gfxFormat = GfxPixelFormat::R8_UNorm;
+	return true;
+}
+
+
 bool TextureBuffer::Allocate(int width, int height, int componentCount, void* data)
 noexcept
 {

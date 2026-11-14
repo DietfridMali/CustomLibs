@@ -134,6 +134,8 @@ public:
 
 	void Premultiply(void);
 
+	bool ExtractChannel(int channel);
+
 	TextureBuffer& operator=(const TextureBuffer& other)
 	noexcept;
 

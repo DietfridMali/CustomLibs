@@ -688,6 +688,51 @@ void TiledTexture::SetParams(bool forceUpdate)
 	m_sampling.maxAnisotropy = 16.0f;
 }
 
+// =================================================================================================
+
+bool SingleChannelTexture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
+{
+	if (not Texture::Load(folder, fileNames, params))
+		return false;
+	for (TextureBuffer* buffer : m_buffers) {
+		if ((buffer->m_info.m_componentCount > 1) and not buffer->ExtractChannel(0))
+			return false;
+	}
+	return true;
+}
+
+
+bool SingleChannelTexture::Deploy(int bufferIndex)
+{
+	if (m_isDeployed)
+		return true;
+	if (bufferIndex >= m_buffers.Length())
+		return false;
+	TextureBuffer* tb = m_buffers[bufferIndex];
+	if (tb->m_info.m_componentCount != 1)
+		return Texture::Deploy(bufferIndex);
+	int w = tb->m_info.m_width;
+	int h = tb->m_info.m_height;
+	if ((w <= 0) or (h <= 0))
+		return false;
+	const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+	if (not CreateTextureResource(w, h, 1, int(mipLevels), ToVkFormat(GfxPixelFormat::R8_UNorm)))
+		return false;
+	const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
+	if (mipLevels > 1) {
+		if (not UploadTextureDataWithMips(m_image, m_layoutTracker, pixels, w, h, 1, mipLevels, ecLinear))
+			return false;
+	}
+	else if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, 1))
+		return false;
+	if (not CreateSRV())
+		return false;
+	m_isDeployed = true;
+	DropCpuCopy();
+	return true;
+}
+
+// =================================================================================================
 
 void RenderTargetTexture::SetParams(bool forceUpdate)
 {
