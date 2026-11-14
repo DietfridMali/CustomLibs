@@ -414,7 +414,8 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 	// because Vulkan forbids sampling a view that spans depth AND stencil.
 	VkImageAspectFlags attachmentAspect = m_hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
 													   : VK_IMAGE_ASPECT_DEPTH_BIT;
-	int layerCount = (m_viewCount > 1) ? LayerGroupCount() * m_viewCount : 1;
+	bool isArray = (m_viewCount > 1) or (m_arrayLayerCount > 0);
+	int layerCount = isArray ? LayerGroupCount() * m_viewCount : 1;
 
 	if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
 						  info.m_image, info.m_allocation, layerCount))
@@ -422,7 +423,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 	info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, attachmentAspect);
 
 	// Attachment view: depth (plus stencil, if the target asked for a stencil plane).
-	if (m_viewCount > 1) {
+	if (isArray) {
 		info.m_imageView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, attachmentAspect, 0, uint32_t(layerCount));
 		if (info.m_imageView == VK_NULL_HANDLE)
 			return;
@@ -439,7 +440,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 
 	// Sampling view: depth aspect only - for use as a sampled texture (sampler2DShadow / shadow map).
 	info.m_depthSampleView = CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D, fmt, VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1);
-	if (baseRenderer.ViewCount() > 1)
+	if ((baseRenderer.ViewCount() > 1) or (m_arrayLayerCount > 0))
 		info.m_depthArrayView =
 			CreateImageView(info.m_image, VK_IMAGE_VIEW_TYPE_2D_ARRAY, fmt, VK_IMAGE_ASPECT_DEPTH_BIT, 0, uint32_t(layerCount));
 }

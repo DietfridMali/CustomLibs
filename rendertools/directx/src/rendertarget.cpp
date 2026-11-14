@@ -304,7 +304,8 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 	cv.Format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
 	cv.DepthStencil.Depth = 1.0f;
 	cv.DepthStencil.Stencil = 0;
-	int layerCount = (m_viewCount > 1) ? LayerGroupCount() * m_viewCount : 1;
+	bool isArray = (m_viewCount > 1) or (m_arrayLayerCount > 0);
+	int layerCount = isArray ? LayerGroupCount() * m_viewCount : 1;
 
 	info.m_resource = CreateRTResource(device, static_cast<const char*>(m_name), w, h,
 									   m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
@@ -313,7 +314,7 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 		return false;
 	info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-	if (m_viewCount > 1) {
+	if (isArray) {
 		if (not info.AllocArrayDSVs(LayerGroupCount(), m_viewCount)) {
 			logHandler.Print("RenderTarget '%s': depth view creation failed\n", static_cast<const char*>(m_name));
 			return false;

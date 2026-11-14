@@ -137,7 +137,7 @@ class DescriptorHeapHandler
 	: public BaseSingleton<DescriptorHeapHandler> {
 public:
 	static constexpr uint32_t RTV_CAPACITY = 1024;
-	static constexpr uint32_t DSV_CAPACITY = 128;
+	static constexpr uint32_t DSV_CAPACITY = 4096;
 	static constexpr uint32_t BINDLESS_CAPACITY = 1024;
 	static constexpr uint32_t BINDLESS_SRV_TYPES = 3;
 	static constexpr uint32_t SRV_CAPACITY = 16384 + BINDLESS_SRV_TYPES * BINDLESS_CAPACITY; // CBV/SRV/UAV, GPU-visible

@@ -8,8 +8,6 @@
 
 // =================================================================================================
 
-class ShadowAtlas;
-
 class ShadowMap
 	: public BaseSingleton<ShadowMap> {
 private:
@@ -36,13 +34,11 @@ private:
 	Vector3f		m_lightPosition{ Vector3f::ZERO };
 
 	static constexpr int	cStaticParamHeaderSize = 6;
-	static constexpr int	cMaxStaticCells = 128;
-	static constexpr int	cStaticAtlasSize = 16384;
+	static constexpr int	cMaxStaticCells = 1024;
 	static constexpr int	cStaticTileSize = 2048;
 	static constexpr int	cStaticTileBorder = 2;
 
 	GfxArray<Vector4f, GfxTypes::StructuredBuffer>	m_staticParams;
-	ShadowAtlas*		m_staticAtlas{ nullptr };
 	RenderTarget*		m_staticMap{ nullptr };
 	Matrix4f			m_staticLightView;
 	Matrix4f			m_staticLightTransform;
@@ -138,15 +134,21 @@ public:
 	inline Texture* ShadowTexture(void)
 	noexcept
 	{
-		if (m_staticMap)
-			return m_staticMap->GetDepthAsShadowTexture();
-		return m_map ? m_map->GetDepthAsShadowTexture() : nullptr;
+		if (m_map)
+			return m_map->GetDepthAsShadowTexture();
+		return DynamicShadowTexture();
 	}
 
 	inline Texture* DynamicShadowTexture(void)
 	noexcept
 	{
 		return m_dynamicMap ? m_dynamicMap->GetDepthAsShadowTexture() : nullptr;
+	}
+
+	inline Texture* StaticShadowTexture(void)
+	noexcept
+	{
+		return m_staticMap ? m_staticMap->GetDepthAsShadowTexture() : nullptr;
 	}
 
 	inline bool BindStaticParams(uint32_t slot)
@@ -246,7 +248,7 @@ public:
 private:
 	bool CreateMap(Vector2f frustumSize);
 
-	bool CreateStaticAtlas(void);
+	bool CreateStaticMap(int tileCount);
 
 	void UpdateStaticParams(void);
 

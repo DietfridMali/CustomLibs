@@ -42,18 +42,18 @@ bool ShadowMap::CreateMap(Vector2f frustumSize)
 {
 	m_status = -1;
 #if !DEMO
-	if (m_hasStaticTiles and not CreateStaticAtlas())
-		m_hasStaticTiles = false;
-	if (not (m_hasStaticTiles or (m_map = new RenderTarget())))
-		return false;
-	if (not (m_dynamicMap = new RenderTarget()))
-		return false;
 	// ShadowMap-Format ist D32_FLOAT (4 Byte/Pixel, single-channel, kein Stencil) — siehe
 	// rendertarget.cpp/resource_view.h. Start bei 8K (industry-typische ShadowMap-Aufloesung),
 	// halbieren bei Fehlschlag bis 1024. Cap zusaetzlich gegen die Hardware-Allocation-Grenze
 	// fuer 4-Byte-Pixel-Formate, falls die GPU weniger als 8K verkraftet.
 	constexpr int	ShadowDepthBytesPerPixel = 4;
 	const int		maxSize = gfxStates.MaxTextureSize(ShadowDepthBytesPerPixel);
+	if (m_hasStaticTiles and (maxSize < cStaticTileSize))
+		m_hasStaticTiles = false;
+	if (not (m_hasStaticTiles or (m_map = new RenderTarget())))
+		return false;
+	if (not (m_dynamicMap = new RenderTarget()))
+		return false;
 	int				startSize = std::min<int>(maxSize, 8192);
 	for (int size = startSize; size >= 1024; size /= 2) {
 		if (m_hasStaticTiles or m_map->Create(size, size, 1,
@@ -94,9 +94,8 @@ noexcept
 		m_dynamicMap = nullptr;
 		m_status = 0;
 	}
-	if (m_staticAtlas) {
-		delete m_staticAtlas;
-		m_staticAtlas = nullptr;
+	if (m_staticMap) {
+		delete m_staticMap;
 		m_staticMap = nullptr;
 	}
 	m_activeMap = nullptr;
@@ -530,21 +529,28 @@ static bool CellOverlapsHull(const Vector2f* hull, int count, float left, float 
 }
 
 
-bool ShadowMap::CreateStaticAtlas(void)
+bool ShadowMap::CreateStaticMap(int tileCount)
 {
-	constexpr int cShadowDepthBytesPerPixel = 4;
-	if (gfxStates.MaxTextureSize(cShadowDepthBytesPerPixel) < cStaticAtlasSize)
-		return false;
-	m_staticAtlas = new (std::nothrow) ShadowAtlas();
-	if (not m_staticAtlas)
-		return false;
-	if (not m_staticAtlas->Create(cStaticAtlasSize, cStaticTileSize, cStaticTileSize)) {
-		delete m_staticAtlas;
-		m_staticAtlas = nullptr;
-		return false;
+	if (m_staticMap and (m_staticMap->ArrayLayerCount() == tileCount))
+		return true;
+	if (not m_staticMap) {
+		m_staticMap = new (std::nothrow) RenderTarget();
+		if (not m_staticMap)
+			return false;
 	}
-	m_staticMap = m_staticAtlas->GetMap();
-	return true;
+	RenderTarget::RTCreationParams params;
+	params.name = "static shadow tiles";
+	params.colorBufferCount = 0;
+	params.depthBufferCount = 1;
+	params.stencilBufferCount = 0;
+	params.vertexBufferCount = 0;
+	params.arrayLayerCount = tileCount;
+	params.hasMRTs = false;
+	if (m_staticMap->Create(cStaticTileSize, cStaticTileSize, 1, params))
+		return true;
+	delete m_staticMap;
+	m_staticMap = nullptr;
+	return false;
 }
 
 
@@ -556,7 +562,7 @@ bool ShadowMap::LayoutStaticTiles(const Vector3f& lightDirection, const Vector3f
 	m_staticTileCells.Clear();
 	m_hasStaticCasters = false;
 	m_staticParams.m_data.Fill(Vector4f::ZERO);
-	if (not (m_hasStaticTiles and m_staticAtlas and m_dynamicMap)) {
+	if (not (m_hasStaticTiles and m_dynamicMap)) {
 		m_staticParams.Upload();
 		return false;
 	}
@@ -617,7 +623,7 @@ bool ShadowMap::LayoutStaticTiles(const Vector3f& lightDirection, const Vector3f
 		return true;
 	};
 
-	int					capacity = std::min(m_staticAtlas->TileCount(), cMaxStaticCells);
+	int					capacity = cMaxStaticCells;
 	int					bestStep = -1;
 	int					bestCount = capacity + 1;
 	int					bestArea = 0;
@@ -639,24 +645,33 @@ bool ShadowMap::LayoutStaticTiles(const Vector3f& lightDirection, const Vector3f
 		return false;
 	}
 	Evaluate(bestStep, m_staticTileCells, m_staticLightView, m_staticGridOrigin, m_staticGridWidth, gridHeight, m_staticNear, m_staticFar);
+	if ((m_staticTileCells.Length() > 0) and not CreateStaticMap(m_staticTileCells.Length())) {
+		logHandler.Print("shadow map: cannot create %d static shadow tiles\n", m_staticTileCells.Length());
+		m_staticTileCells.Clear();
+		m_staticParams.Upload();
+		return false;
+	}
 
 	Projector projector;
 	m_staticLightTransform = projector.ComputeOrthoProjection(m_staticGridOrigin.x, m_staticGridOrigin.x + float(m_staticGridWidth) * m_staticCellSize,
 															  m_staticGridOrigin.y - float(gridHeight) * m_staticCellSize, m_staticGridOrigin.y, m_staticNear, m_staticFar);
 	m_staticLightTransform *= m_staticLightView;
 
-	int		tilesPerRow = m_staticAtlas->Size() / m_staticAtlas->TileSize();
 	float	slots[cMaxStaticCells];
 	std::fill(slots, slots + cMaxStaticCells, -1.0f);
 	for (int i = 0; i < m_staticTileCells.Length(); ++i)
 		slots[m_staticTileCells[i]] = float(i);
-	m_staticParams.m_data[4] = Vector4f({ float(m_staticGridWidth), float(gridHeight), float(tilesPerRow), 1.0f });
+	m_staticParams.m_data[4] = Vector4f({ float(m_staticGridWidth), float(gridHeight), 0.0f, 1.0f });
 	m_staticParams.m_data[5] = Vector4f({ float(cStaticTileSize - 2 * cStaticTileBorder) / float(cStaticTileSize), float(cStaticTileBorder) / float(cStaticTileSize),
-										  1.0f / float(tilesPerRow), 1.0f });
+										  0.0f, 1.0f });
 	for (int i = 0; i < cMaxStaticCells / 4; ++i)
 		m_staticParams.m_data[cStaticParamHeaderSize + i] = Vector4f({ slots[4 * i], slots[4 * i + 1], slots[4 * i + 2], slots[4 * i + 3] });
 	UpdateStaticParams();
 	m_staticParams.Upload();
+	constexpr int	cShadowDepthBytesPerPixel = 4;
+	constexpr int	cTileMegabytes = (cStaticTileSize * cStaticTileSize * cShadowDepthBytesPerPixel) >> 20;
+	logHandler.Print("shadow map: %d static shadow tiles, grid %d x %d, cell %.2f wu, %d MB\n", m_staticTileCells.Length(), m_staticGridWidth, gridHeight,
+					 m_staticCellSize, m_staticTileCells.Length() * cTileMegabytes);
 	return true;
 }
 
@@ -709,8 +724,8 @@ void ShadowMap::SetStaticTile(int tile)
 	m_lightTransform = projector.ComputeOrthoProjection(left, left + size, top - size, top, m_staticNear, m_staticFar);
 	m_lightTransform *= m_staticLightView;
 	UpdateTransformation();
-	Viewport viewport = m_staticAtlas->TileViewport(tile);
-	gfxStates.SetViewport(viewport.Left(), viewport.Top(), viewport.Width(), viewport.Height());
+	m_staticMap->SelectArrayLayer(tile);
+	m_staticMap->ClearDepthBuffer(1.0f);
 }
 
 
