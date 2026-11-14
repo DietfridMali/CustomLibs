@@ -344,6 +344,10 @@ void GLBLoader::ComputeSourceHash(const String& filename)
 		logHandler.Print("GLBLoader: cannot read '%s' for its checksum: %s\n", static_cast<const char*>(filename), errorMsg.c_str());
 		return;
 	}
+	std::string extension = std::filesystem::path(fn).extension().string();
+	std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+	if (extension == ".gltf")
+		bytes.erase(std::remove(bytes.begin(), bytes.end(), static_cast<unsigned char>('\r')), bytes.end());
 	uint32_t crc = Crc32(0, bytes.data(), bytes.size());
 	uint64_t length = uint64_t(bytes.size());
 	for (const tinygltf::Buffer& buffer : m_model.buffers) {
