@@ -43,6 +43,20 @@ public:
 		}
 		return true;
 	}
+
+	inline bool Contains(const Vector3f& vMin, const Vector3f& vMax) const
+	noexcept
+	{
+		for (int32_t i = 0; i < cPlaneCount; ++i) {
+			const Vector4f& plane = m_planes[i];
+			float x = (plane.x >= 0.0f) ? vMax.x : vMin.x;
+			float y = (plane.y >= 0.0f) ? vMax.y : vMin.y;
+			float z = (plane.z >= 0.0f) ? vMax.z : vMin.z;
+			if (plane.x * x + plane.y * y + plane.z * z + plane.w < 0.0f)
+				return false;
+		}
+		return true;
+	}
 };
 
 // =================================================================================================
