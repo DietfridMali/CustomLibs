@@ -104,6 +104,8 @@ public:
 	String					m_name;
 	List<TextureBuffer*>	m_buffers;
 	List<String>			m_filenames;
+	String					m_sourceFolder;
+	TextureCreationParams	m_sourceParams;
 	TextureType				m_type{ TextureType::Texture2D };
 	int						m_tmuIndex{ -1 };
 	GfxWrapMode				m_wrapMode{ GfxWrapMode::Repeat }; // U axis - set through SetWrapping ()
@@ -118,6 +120,8 @@ public:
 	bool					m_isDisposable{ false };
 	bool					m_restoreGpu{ false };
 	bool					m_restoreBindless{ false };
+	bool					m_hasFileSource{ false };
+	bool					m_keepInRAM{ false };
 	TextureSampling			m_sampling;
 
 	static inline AVLTree<String, Texture*> textureLUT;
@@ -145,6 +149,14 @@ public:
 		if (update != -1)
 			updateLUT = (update == 1);
 		return updateLUT;
+	}
+
+	static inline bool KeepInRAM(int keep = -1)
+	{
+		static bool keepInRAM = true;
+		if (keep != -1)
+			keepInRAM = (keep == 1);
+		return keepInRAM;
 	}
 
 	explicit Texture(uint32_t handle = UINT32_MAX, TextureType type = TextureType::Texture2D, GfxWrapMode wrap = GfxWrapMode::Repeat);
@@ -262,6 +274,11 @@ public:
 	noexcept;
 
 	bool Redeploy(void);
+
+	void DropCpuCopy(void)
+	noexcept;
+
+	bool RestoreCpuCopy(void);
 
 	bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
 

@@ -78,6 +78,7 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
 		return false;
 
 	m_isDeployed = true;
+	DropCpuCopy();
 	return true;
 }
 

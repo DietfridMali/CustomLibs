@@ -82,6 +82,10 @@ Texture& Texture::Copy(const Texture& other)
 		m_name = other.m_name;
 		m_buffers = other.m_buffers;
 		m_filenames = other.m_filenames;
+		m_sourceFolder = other.m_sourceFolder;
+		m_sourceParams = other.m_sourceParams;
+		m_hasFileSource = other.m_hasFileSource;
+		m_keepInRAM = other.m_keepInRAM;
 		m_type = other.m_type;
 		m_wrapMode = other.m_wrapMode;
 		m_wrapModeV = other.m_wrapModeV;
@@ -108,6 +112,10 @@ noexcept
 		m_name = std::move(other.m_name);
 		m_buffers = std::move(other.m_buffers);
 		m_filenames = std::move(other.m_filenames);
+		m_sourceFolder = std::move(other.m_sourceFolder);
+		m_sourceParams = other.m_sourceParams;
+		m_hasFileSource = std::exchange(other.m_hasFileSource, false);
+		m_keepInRAM = other.m_keepInRAM;
 		m_type = other.m_type;
 		m_wrapMode = other.m_wrapMode;
 		m_wrapModeV = other.m_wrapModeV;
@@ -124,6 +132,7 @@ noexcept
 bool Texture::Create(void)
 {
 	Destroy();
+	m_hasFileSource = false;
 	return CreateHandle();
 }
 
@@ -226,7 +235,7 @@ bool Texture::RestoreGpu(void)
 	if (not m_restoreGpu)
 		return true;
 	m_restoreGpu = false;
-	if (not Deploy(0)) {
+	if (not (RestoreCpuCopy() and Deploy(0))) {
 		Destroy();
 		return false;
 	}
@@ -471,6 +480,7 @@ bool Texture::Deploy(int bufferIndex)
 		return false;
 	SetParams();
 	m_isDeployed = true;
+	DropCpuCopy();
 	return true;
 }
 
@@ -478,7 +488,45 @@ bool Texture::Deploy(int bufferIndex)
 bool Texture::Redeploy(void)
 {
 	m_isDeployed = false;
-	return Deploy(0);
+	return RestoreCpuCopy() and Deploy(0);
+}
+
+
+void Texture::DropCpuCopy(void)
+noexcept
+{
+	if (KeepInRAM() or m_keepInRAM or not m_hasFileSource)
+		return;
+	for (TextureBuffer* buffer : m_buffers)
+		buffer->ReleaseData();
+}
+
+
+bool Texture::RestoreCpuCopy(void)
+{
+	if (not m_hasFileSource)
+		return true;
+	bool hasData = not m_buffers.IsEmpty();
+	for (TextureBuffer* buffer : m_buffers) {
+		if (not buffer->HasData())
+			hasData = false;
+	}
+	if (hasData)
+		return true;
+	for (auto* p : m_buffers) {
+		if (p->m_refCount)
+			--p->m_refCount;
+		else
+			delete p;
+	}
+	m_buffers.Clear();
+	String folder = m_sourceFolder;
+	List<String> fileNames = m_filenames;
+	if (not Load(folder, fileNames, m_sourceParams))
+		return false;
+	if (m_sourceParams.cartoonize)
+		Cartoonize(m_sourceParams.blur, m_sourceParams.gradients, m_sourceParams.outline);
+	return true;
 }
 
 
@@ -518,6 +566,9 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
 		return true;
 	if (not Load(folder, fileNames, params))
 		return false;
+	m_sourceFolder = folder;
+	m_sourceParams = params;
+	m_hasFileSource = true;
 	if (not m_buffers.IsEmpty())
 		m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
 	if (params.cartoonize)

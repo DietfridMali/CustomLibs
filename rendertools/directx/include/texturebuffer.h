@@ -159,6 +159,23 @@ public:
 		return m_data.DataSize();
 	}
 
+	inline bool HasData(void)
+	noexcept
+	{
+		return DataSize() > 0;
+	}
+
+	inline void ReleaseData(void)
+	noexcept
+	{
+#if USE_SHARED_POINTERS
+		if (m_data.IsValid())
+			m_data.Release();
+#else
+		m_data.Reset();
+#endif
+	}
+
 	inline int Width(void)
 	noexcept
 	{
