@@ -62,6 +62,7 @@
     <ClInclude Include="..\include\string.hpp" />
     <ClInclude Include="..\include\stringutils.hpp" />
     <ClInclude Include="..\include\tablesize.h" />
+    <ClInclude Include="..\include\threadpool.h" />
     <ClInclude Include="..\include\timer.hpp" />
     <ClInclude Include="..\include\tracy_wrapper.h" />
     <ClInclude Include="..\include\triangulararray.hpp" />
@@ -83,6 +84,7 @@
     <ClCompile Include="..\src\matrix.cpp" />
     <ClCompile Include="..\src\std_string.cpp" />
     <ClCompile Include="..\src\string.cpp" />
+    <ClCompile Include="..\src\threadpool.cpp" />
     <ClCompile Include="..\src\vector.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
