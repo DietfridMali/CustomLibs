@@ -808,11 +808,8 @@ noexcept
 	static constexpr D3D12_RESOURCE_STATES kReadOnlyState =
 		D3D12_RESOURCE_STATES(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-	for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
-		const BoundBuffer& buffer = m_storageBufferStates[i];
-		if (buffer.pState and (*buffer.pState == kReadOnlyState))
-			TransitionBoundBuffer(list, buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	}
+	for (uint32_t i = 0; i < CommandList::kUavSlots; ++i)
+		TransitionBoundBuffer(list, m_storageBufferStates[i], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
 		const BoundBuffer& buffer = m_readOnlyBufferStates[i];
 		if (buffer.pState and (*buffer.pState != D3D12_RESOURCE_STATE_COMMON))
