@@ -81,6 +81,7 @@ protected:
 	RGBAColor			m_backgroundColor;
 	RenderPassType		m_renderPass;
 	MovingFrameCounter	m_frameCounter;
+	float				m_fpsScale{ 1.0f };
 
 	eRenderPerspective m_perspective{ rpForward };
 
@@ -618,6 +619,15 @@ public:
 	noexcept
 	{
 		m_frameCounter.ShowFps(showFps);
+	}
+
+	void SetupFpsViewport(void) noexcept;
+
+	inline void SetFpsScale(float scale)
+	noexcept
+	{
+		m_fpsScale = scale;
+		SetupFpsViewport();
 	}
 
 	inline void ToggleFps(void)

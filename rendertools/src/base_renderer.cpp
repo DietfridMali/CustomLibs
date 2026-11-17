@@ -49,7 +49,13 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
 	ResetTransformation();
 	DrawBufferHandler::Setup(WindowWidth(), WindowHeight());
 	m_drawBufferStack.Clear();
-	int w = m_windowWidth / 15;
+	SetupFpsViewport();
+}
+
+
+void BaseRenderer::SetupFpsViewport(void) noexcept
+{
+	int w = int(float(m_windowWidth / 15) * m_fpsScale);
 	int h = int(w * 0.5f / m_aspectRatio);
 	m_frameCounter.Setup(::Viewport(m_windowWidth - w, m_windowHeight - h, w, h), ColorData::White);
 }
