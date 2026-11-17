@@ -668,10 +668,6 @@ bool ShadowMap::LayoutStaticTiles(const Vector3f& lightDirection, const Vector3f
 		m_staticParams.m_data[cStaticParamHeaderSize + i] = Vector4f({ slots[4 * i], slots[4 * i + 1], slots[4 * i + 2], slots[4 * i + 3] });
 	UpdateStaticParams();
 	m_staticParams.Upload();
-	constexpr int	cShadowDepthBytesPerPixel = 4;
-	constexpr int	cTileMegabytes = (cStaticTileSize * cStaticTileSize * cShadowDepthBytesPerPixel) >> 20;
-	logHandler.Print("shadow map: %d static shadow tiles, grid %d x %d, cell %.2f wu, %d MB\n", m_staticTileCells.Length(), m_staticGridWidth, gridHeight,
-					 m_staticCellSize, m_staticTileCells.Length() * cTileMegabytes);
 	return true;
 }
 
