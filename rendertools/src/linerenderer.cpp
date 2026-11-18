@@ -5,6 +5,7 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "shader.h"
+#include "texture.h"
 #ifndef OPENGL
 #include "compute_shader.h"
 #include "gpuzone.h"
@@ -495,7 +496,7 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states, bool isCulled
 		return nullptr;
 #endif
 
-	Shader* shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? "lineDrawFaces" : "lineDraw");
+	Shader* shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? "lineDrawFaces" : (m_occluderDepth != nullptr) ? "lineDrawHidden" : "lineDraw");
 
 	if (shader == nullptr)
 		return nullptr;
@@ -520,6 +521,17 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states, bool isCulled
 	shader->SetFloat("worldWidth", m_worldWidth);
 	shader->SetFloat("darken", m_darken ? 1.0f : 0.0f);
 	m_buffer.BindReadOnly(0);
+	if (UsesOccluderDepth()) {
+		m_occluderDepth->Activate(2);
+		if (m_occluderMask != nullptr) {
+			m_occluderMask->Activate(3);
+			shader->SetFloat("occluderMaskLimit", m_occluderMaskLimit);
+		}
+		else {
+			m_occluderDepth->Activate(3);
+			shader->SetFloat("occluderMaskLimit", 1e30f);
+		}
+	}
 	if (m_hasFaces) {
 		shader->SetFloat("widthFadeDistance", m_widthFadeDistance);
 		shader->SetFloat("alphaFadeScale", m_alphaFadeScale);
@@ -548,6 +560,11 @@ void LineRenderer::EndDraw(const DrawStates& states, bool isBound)
 			m_slotBuffer.ReleaseInstanceStream("Uint", 0);
 #endif
 			m_faceBuffer.ReleaseReadOnly(1);
+		}
+		if (UsesOccluderDepth()) {
+			if (m_occluderMask != nullptr)
+				m_occluderMask->Deactivate();
+			m_occluderDepth->Deactivate();
 		}
 		m_buffer.ReleaseReadOnly(0);
 	}

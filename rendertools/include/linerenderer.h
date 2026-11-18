@@ -32,6 +32,7 @@
 // before p0, in view units).
 
 class RenderTarget;
+class Texture;
 
 class LineRenderer {
 public:
@@ -87,6 +88,9 @@ public:
 	float		m_haloReach{ 0.0f };
 	float		m_haloStrength{ 0.0f };
 	float		m_minLength{ 1.0f };
+	Texture*	m_occluderDepth{ nullptr };
+	Texture*	m_occluderMask{ nullptr };
+	float		m_occluderMaskLimit{ 1e30f };
 
 	LineRenderer() = default;
 	~LineRenderer() {
@@ -181,6 +185,11 @@ private:
 	bool ReserveCommands(int count);
 #endif
 	bool UploadBatch(int firstLine);
+	inline bool UsesOccluderDepth(void) const
+	noexcept
+	{
+		return (m_occluderDepth != nullptr) and not m_hasFaces;
+	}
 	void SetupQuad(void);
 	Vector2f TargetTexelSize(void);
 	Shader* BeginDraw(int firstLine, DrawStates& states, bool isCulled = false);

@@ -40,6 +40,7 @@ const ShaderSource& BilateralBlurDepthShader();
 const ShaderSource& LightningDrawShader();
 const ShaderSource& LightningFlareShader();
 const ShaderSource& LineDrawShader();
+const ShaderSource& LineDrawHiddenShader();
 const ShaderSource& LineDrawFacesShader();
 const ShaderSource& LineCullShader();
 const ShaderSource& LineCullDepthShader();
@@ -105,6 +106,7 @@ BaseShaderCode::BaseShaderCode()
 		&LightningDrawShader(),
 		&LightningFlareShader(),
 		&LineDrawShader(),
+		&LineDrawHiddenShader(),
 		&LineDrawFacesShader(),
 		&LineCullShader(),
 		&LineCullDepthShader(),

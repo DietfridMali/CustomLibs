@@ -74,6 +74,9 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
     float  haloReach;
     float  haloStrength;
 #endif
+#ifdef LINE_HIDDEN
+    float  occluderMaskLimit;
+#endif
 };
 
 static const float minWorldHalfWidth = 0.375;
@@ -242,6 +245,9 @@ cbuffer ShaderConstants : register(b1) {
     float  haloReach;
     float  haloStrength;
 #endif
+#ifdef LINE_HIDDEN
+    float  occluderMaskLimit;
+#endif
 };
 
 // distance of t to the interval [s, e] along the line, 0 inside
@@ -249,7 +255,20 @@ float IntervalDist(float t, float s, float e) {
     return max(max(s - t, t - e), 0.0);
 }
 
+#ifdef LINE_HIDDEN
+ScreenTexture occluderDepth : register(t2);
+ScreenTexture occluderMask  : register(t3);
+
+float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+    SET_VIEW_ID
+    int2 pixel = int2(i.pos.xy);
+    if (i.pos.z <= occluderDepth.Load(SCREEN_TEXEL(pixel)).r)
+        discard;
+    if (occluderMask.Load(SCREEN_TEXEL(pixel)).a > occluderMaskLimit)
+        discard;
+#else
 float4 PSMain(PSInput i) : SV_Target {
+#endif
     float along  = i.cap.x;
     float across = i.cap.y;
     float segLen = i.cap.z;
@@ -319,6 +338,18 @@ const ShaderSource& LineDrawShader()
 		LineDrawVS,
 		LineDrawFS,
 		ShaderDataLayout(LineQuadAttrs, 2));
+	return source;
+}
+
+
+const ShaderSource& LineDrawHiddenShader()
+{
+	static const ShaderSource source(
+		"lineDrawHidden",
+		LineDrawVS,
+		LineDrawFS,
+		ShaderDataLayout(LineQuadAttrs, 2),
+		{ ShaderMacro{ String("LINE_HIDDEN"), String("1") } });
 	return source;
 }
 
