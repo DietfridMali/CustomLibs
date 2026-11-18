@@ -192,8 +192,10 @@ static const String OceanAssembleMain = String(R"(
         float dzz = choppiness * b.w;
         float dxz = choppiness * a.w;
         float jacobian = (1.0 + dxx) * (1.0 + dzz) - dxz * dxz;
+        float minStretch = 1.0 + 0.5 * (dxx + dzz) - 0.5 * sqrt((dxx - dzz) * (dxx - dzz) + 4.0 * dxz * dxz);
+        float fold = min(jacobian, minStretch);
         float previous = source2.Load(int3(id.xy, 0)).a;
-        float compression = max(1.0 - jacobian, previous - foamDecay * deltaTime / max(jacobian, 0.5));
+        float compression = max(1.0 - fold, previous - foamDecay * deltaTime / max(fold, 0.5));
         target0[id.xy] = float4(choppiness * a.x, a.z, choppiness * a.y, compression);
         target1[id.xy] = float4(b.x, b.y, dxx, dzz);
     }
