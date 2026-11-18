@@ -33,7 +33,7 @@ public:
 		float		shortestWave{ 0.35f };
 		float		gravity{ 9.81f };
 		float		choppiness{ 1.4f };
-		float		foamDecay{ 0.15f };
+		float		foamDecay{ 0.08f };
 		uint32_t	seed{ 20261008u };
 	};
 
