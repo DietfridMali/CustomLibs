@@ -51,6 +51,8 @@ public:
 
 	Texture* DerivativeMap(int cascade);
 
+	Texture* FoamAgeMap(int cascade);
+
 	inline float TileSize(int cascade) const
 	noexcept
 	{
@@ -89,6 +91,7 @@ private:
 	RenderTarget*	m_work{ nullptr };
 	RenderTarget*	m_displacement[cCascadeCount][2]{};
 	RenderTarget*	m_derivatives[cCascadeCount]{};
+	RenderTarget*	m_foamAge[cCascadeCount]{};
 	int				m_current{ 0 };
 	bool			m_isAvailable{ false };
 	bool			m_hasSpectrum{ false };

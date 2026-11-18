@@ -179,6 +179,7 @@ static const String OceanAssembleMain = String(R"(
     Texture2D<float4> source2 : register(t2);
     [[vk::image_format("rgba16f")]] RWTexture2D<float4> target0 : register(u0);
     [[vk::image_format("rgba16f")]] RWTexture2D<float4> target1 : register(u1);
+    [[vk::image_format("rgba16f")]] RWTexture2D<float4> target2 : register(u2);
 
     [numthreads(8, 8, 1)]
     void CSMain(uint3 id : SV_DispatchThreadID) {
@@ -198,13 +199,15 @@ static const String OceanAssembleMain = String(R"(
         float compression = max(1.0 - fold, previous - foamDecay * deltaTime / max(fold, 0.5));
         target0[id.xy] = float4(choppiness * a.x, a.z, choppiness * a.y, compression);
         target1[id.xy] = float4(b.x, b.y, dxx, dzz);
+        float freshness = (compression > 1.0e-3) ? saturate((1.0 - fold) / compression) : 0.0;
+        target2[id.xy] = float4(freshness, 0.0, 0.0, 0.0);
     }
 )");
 
 
 const ShaderSource& OceanAssembleShader()
 {
-	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(3, 2, 0);
+	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(3, 3, 0);
 	static const ShaderSource				source(
 		   "oceanAssemble",
 		   { .cs = OceanConstants() + OceanAssembleMain,

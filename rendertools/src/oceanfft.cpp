@@ -59,7 +59,8 @@ bool OceanFFT::Create(const Params& params)
 		m_displacement[c][0] = CreateTarget("oceanDisplacement", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
 		m_displacement[c][1] = CreateTarget("oceanDisplacement", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
 		m_derivatives[c] = CreateTarget("oceanDerivatives", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
-		ok = (m_displacement[c][0] != nullptr) and (m_displacement[c][1] != nullptr) and (m_derivatives[c] != nullptr);
+		m_foamAge[c] = CreateTarget("oceanFoamAge", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
+		ok = (m_displacement[c][0] != nullptr) and (m_displacement[c][1] != nullptr) and (m_derivatives[c] != nullptr) and (m_foamAge[c] != nullptr);
 	}
 	if (not ok) {
 		logHandler.Print("OceanFFT: creating the wave targets failed\n");
@@ -79,9 +80,11 @@ void OceanFFT::Destroy(void)
 		delete m_displacement[c][0];
 		delete m_displacement[c][1];
 		delete m_derivatives[c];
+		delete m_foamAge[c];
 		m_displacement[c][0] = nullptr;
 		m_displacement[c][1] = nullptr;
 		m_derivatives[c] = nullptr;
+		m_foamAge[c] = nullptr;
 	}
 	m_current = 0;
 	m_isAvailable = false;
@@ -263,6 +266,7 @@ bool OceanFFT::Compute(float time, float deltaTime)
 		assemble->BindSampledImage(6, m_displacement[c][previous], m_displacement[c][previous]->m_computeBufferIndex);
 		assemble->BindStorageImage(36, m_displacement[c][current], m_displacement[c][current]->m_computeBufferIndex);
 		assemble->BindStorageImage(37, m_derivatives[c], m_derivatives[c]->m_computeBufferIndex);
+		assemble->BindStorageImage(38, m_foamAge[c], m_foamAge[c]->m_computeBufferIndex);
 		if (not assemble->Dispatch(gridGroups, gridGroups, 1))
 			return false;
 	}
@@ -292,6 +296,12 @@ Texture* OceanFFT::DisplacementMap(int cascade)
 Texture* OceanFFT::DerivativeMap(int cascade)
 {
 	return MapTexture(m_derivatives[cascade]);
+}
+
+
+Texture* OceanFFT::FoamAgeMap(int cascade)
+{
+	return MapTexture(m_foamAge[cascade]);
 }
 
 // =================================================================================================
