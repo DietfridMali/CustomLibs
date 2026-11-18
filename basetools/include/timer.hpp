@@ -19,6 +19,7 @@
 #include "conversions.hpp"
 
 #include <algorithm>
+#include <atomic>
 
 // ================================================================================================ =
 // High-Resolution Timer (intern/extern: micro seconds, int64_t)
@@ -58,15 +59,51 @@ public:
 	}
 
 
-	static inline int64_t GetHiresTime(int64_t scale = 1)
+	static inline std::atomic<int64_t>& ClockLead()
+	noexcept
+	{
+		static std::atomic<int64_t> lead{ 0 };
+		return lead;
+	}
+
+
+	static inline std::atomic<int64_t>& ClockMark()
+	noexcept
+	{
+		static std::atomic<int64_t> mark{ 0 };
+		return mark;
+	}
+
+
+	static inline int64_t GetRealTime(void)
 	noexcept
 	{ // micro seconds
 		const int64_t	t = int64_t(SDL_GetPerformanceCounter()) - BaseTime();
 		const int64_t	f = Frequency();
 		const int64_t	q = t / f; // Sekunden
 		const int64_t	r = t % f; // Rest-Ticks
-		int64_t			time = q * 1000000 + (r * 1000000 + f / 2) / f; // rundet
+		return q * 1000000 + (r * 1000000 + f / 2) / f; // rundet
+	}
+
+
+	static inline int64_t GetHiresTime(int64_t scale = 1)
+	noexcept
+	{ // micro seconds
+		int64_t time = GetRealTime() + ClockLead().load(std::memory_order_relaxed);
 		return (scale == 1) ? time : (time + scale / 2) / scale;
+	}
+
+
+	static inline void AdvanceClock(int64_t step)
+	noexcept
+	{
+		int64_t now = GetHiresTime();
+		int64_t target = ClockMark().load(std::memory_order_relaxed) + step;
+		if (now < target) {
+			ClockLead().fetch_add(target - now, std::memory_order_relaxed);
+			now = target;
+		}
+		ClockMark().store(now, std::memory_order_relaxed);
 	}
 
 
