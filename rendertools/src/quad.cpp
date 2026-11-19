@@ -439,4 +439,17 @@ noexcept
 	return minDist;
 }
 
+// -------------------------------------------------------------------------------------------------
+
+Vector3f Quad::NearestPoint(const Vector3f& p)
+noexcept
+{
+	Vector3f	m = p - m_coordinates[0];
+	float		l0 = m_refEdges[0].Dot(m_refEdges[0]);
+	float		l1 = m_refEdges[1].Dot(m_refEdges[1]);
+	float		s = (l0 > 0.0f) ? std::clamp(m.Dot(m_refEdges[0]) / l0, 0.0f, 1.0f) : 0.0f;
+	float		t = (l1 > 0.0f) ? std::clamp(m.Dot(m_refEdges[1]) / l1, 0.0f, 1.0f) : 0.0f;
+	return m_coordinates[0] + m_refEdges[0] * s + m_refEdges[1] * t;
+}
+
 // =================================================================================================

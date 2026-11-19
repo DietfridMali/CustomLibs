@@ -109,6 +109,9 @@ public:
 	float PointDistance(Vector3f p, bool intersectRectangle = false)
 	noexcept;
 
+	Vector3f NearestPoint(const Vector3f& p)
+	noexcept;
+
 	void Translate(Vector3f t)
 	noexcept;
 
