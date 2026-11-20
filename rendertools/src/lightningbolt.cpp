@@ -42,6 +42,10 @@ LightningLook& LightningLook::Instance(void)
 namespace {
 constexpr int32_t MinSegments = 6;
 constexpr int32_t MaxSegments = 2048; // nodes scale with length (100 wu trunk ~ 1000 nodes); GPU buffer grows on demand
+constexpr int32_t MinMidpointLevels = 3;
+constexpr int32_t MaxMidpointLevels = 11;
+constexpr float MidpointNoiseGain = 3.0f;
+constexpr float MidpointKeyRange = 4096.0f;
 
 constexpr float Pi = 3.14159265f;
 constexpr float DegToRad = 0.01745329252f;
@@ -128,7 +132,7 @@ bool SameParams(const LightningBoltParams& a, const LightningBoltParams& b)
 		(a.planeNormal == b.planeNormal) and (a.tailFraction == b.tailFraction) and
 		(a.fbm.kinkAmplitude == b.fbm.kinkAmplitude) and (a.fbm.octaves == b.fbm.octaves) and (a.fbm.gain == b.fbm.gain) and
 		(a.fbm.lacunarity == b.fbm.lacunarity) and (a.fbm.kinkOctaves == b.fbm.kinkOctaves) and
-		(a.fbm.planeDistTolerance == b.fbm.planeDistTolerance);
+		(a.fbm.planeDistTolerance == b.fbm.planeDistTolerance) and (a.fbm.midpointRoughness == b.fbm.midpointRoughness);
 }
 #endif
 
@@ -394,6 +398,45 @@ void LightningBolt::Build(const LightningBoltParams& params)
 		: 1.0f;
 	// keeps the peak swing at exactly `amplitude` however the two channels are weighted
 	const float swingScale = swingV.IsZero() ? 1.0f : 1.0f / std::sqrt(1.0f + planeDistTolerance * planeDistTolerance);
+
+	if (look.pathMode == lpMidpoint) {
+		float	step = (look.midpointStep > 1e-4f) ? look.midpointStep : 1e-4f;
+		int32_t	levels = int32_t(std::ceil(std::log2(fullLength / step)));
+		if (levels < MinMidpointLevels)
+			levels = MinMidpointLevels;
+		if (levels > MaxMidpointLevels)
+			levels = MaxMidpointLevels;
+		int32_t	nodeSegments = 1 << levels;
+		float	roughness = (params.fbm.midpointRoughness >= 0.0f) ? params.fbm.midpointRoughness : look.midpointRoughness;
+		float	offset = params.amplitude * (1.0f - roughness) * swingScale;
+		m_nodes.Resize(nodeSegments + 1);
+		m_nodes[0].position = params.start;
+		m_nodes[nodeSegments].position = params.start + fullDelta;
+		for (int32_t level = 0; level < levels; level++) {
+			int32_t	span = nodeSegments >> level;
+			int32_t	half = span >> 1;
+			float	phase = params.time * (1.0f + float(level));
+			for (int32_t j = half; j < nodeSegments; j += span) {
+				float		key = Hash01(params.seed ^ 0x51ed270bu, uint32_t(level) * 65536u + uint32_t(j)) * MidpointKeyRange;
+				float		nu = LightningNoise::Perlin2D(key, phase, params.seed) * MidpointNoiseGain;
+				float		nv = LightningNoise::Perlin2D(key, phase, params.seed ^ 0x68bc21ebu) * MidpointNoiseGain;
+				Vector3f	disp = swingU * nu + swingV * ((bOutward ? std::fabs(nv) : nv) * planeDistTolerance);
+				m_nodes[j].position = (m_nodes[j - half].position + m_nodes[j + half].position) * 0.5f + disp * offset;
+			}
+			offset *= roughness;
+		}
+		int32_t visibleSegments = int32_t(float(nodeSegments) / extent + 0.5f);
+		if (visibleSegments < 1)
+			visibleSegments = 1;
+		for (int32_t i = 0; i <= nodeSegments; i++) {
+			float tw = float(i) / float(visibleSegments);
+			if (tw > 1.0f)
+				tw = 1.0f;
+			m_nodes[i].width = params.startWidth + (params.endWidth - params.startWidth) * tw;
+		}
+		m_visibleNodes = visibleSegments + 1;
+		return;
+	}
 
 	m_nodes.Reserve(totalSegments + 1);
 	for (int32_t i = 0; i <= totalSegments; i++) {
@@ -727,6 +770,7 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
 	int32_t nodeCount = bolt.VisibleNodes();
 	if (nodeCount < 2)
 		return;
+	float chanceScale = (nodeCount > 1) ? float(segments) / float(nodeCount - 1) : 1.0f;
 	m_bolts.Append(bolt);
 
 	if (depth >= m_branchDepth)
@@ -814,9 +858,9 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
 #if CONTROLLED_FORKS
 		// Kink-weighted (mean weight 1): the chance piles up fastest at the strong bends, so that's where
 		// the test tends to fire -> forks sit at the kinks.
-		accumChance += m_branchChance * (kinks[i] / meanKink);
+		accumChance += m_branchChance * chanceScale * (kinks[i] / meanKink);
 #else
-		accumChance += m_branchChance;
+		accumChance += m_branchChance * chanceScale;
 #endif
 		if (--skipBranchTests > 0)
 			continue;
@@ -824,7 +868,7 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
 		if (Hash01(seed, uint32_t(i) * 3u) >= accumChance) // seeded (deterministic) -> branch structure identical every frame
 			continue;
 		accumChance -= 1.0f;
-		skipBranchTests = int32_t(Hash01(seed, uint32_t(i) * 3u + 1u) * float(m_maxBranchTestSkips)) + 1;
+		skipBranchTests = int32_t(float(int32_t(Hash01(seed, uint32_t(i) * 3u + 1u) * float(m_maxBranchTestSkips)) + 1) / chanceScale + 0.5f);
 		// branch deflection off the parent's LOCAL tangent at the fork node: normal draw (Box-Muller from
 		// two independent hash streams; the second one is seed-xored so it cannot collide with the i*3u
 		// streams of the next node), clamped.

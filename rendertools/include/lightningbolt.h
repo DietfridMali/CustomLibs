@@ -42,6 +42,11 @@ enum eSwingMode {
 	smSurface
 };
 
+enum eLightningPath {
+	lpNoise,
+	lpMidpoint
+};
+
 // -------------------------------------------------------------------------------------------------
 // The universal look, shared by every lightning of an application. Defaults are the values tuned for
 // Paintjob Rampage; an application with a different world scale (Descent's world units are not the
@@ -75,6 +80,10 @@ struct LightningLook {
 	// strictly flat bolt, 1 = the plane means nothing. A small share keeps a bolt from collapsing to
 	// a straight line when it is seen edge on, without letting the path circle its axis again.
 	float planeDistTolerance{ 0.5f };
+
+	eLightningPath	pathMode{ lpNoise };
+	float			midpointRoughness{ 0.55f };
+	float			midpointStep{ 0.05f };
 
 	// Branch deflection off the parent's local tangent: normal distribution (high-speed camera statistics:
 	// weak branches deflect ~40-45 deg, normally distributed, sigma 14-24 deg -- the values are 2D projections,
@@ -132,6 +141,7 @@ struct LightningFbmParams {
 	float	lacunarity{ -1.0f }; // fbm frequency growth per octave; BOTH layers use it
 	int32_t	kinkOctaves{ -1 }; // KINK layer octaves - detail of the fine jaggedness
 	float	planeDistTolerance{ -1.0f }; // share of the swing that may leave the plane; negative = the look default
+	float	midpointRoughness{ -1.0f };
 };
 
 // -------------------------------------------------------------------------------------------------
