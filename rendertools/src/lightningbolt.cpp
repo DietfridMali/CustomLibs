@@ -123,6 +123,46 @@ float Hash01(uint32_t a, uint32_t b)
 	return float(h >> 8) * (1.0f / 16777216.0f);
 }
 
+
+int32_t MidpointLevels(float length)
+{
+	const LightningLook&	look = lightningLook;
+	float					step = (look.midpointStep > 1e-4f) ? look.midpointStep : 1e-4f;
+	int32_t					levels = int32_t(std::ceil(std::log2(length / step)));
+	if (levels < MinMidpointLevels)
+		levels = MinMidpointLevels;
+	if (levels > MaxMidpointLevels)
+		levels = MaxMidpointLevels;
+	return levels;
+}
+
+
+float MidpointRoughness(const LightningFbmParams& fbm)
+{
+	return (fbm.midpointRoughness >= 0.0f) ? fbm.midpointRoughness : lightningLook.midpointRoughness;
+}
+
+
+void MidpointField(uint32_t keySeed, uint32_t noiseSeed, float time, int32_t levels, float roughness, bool isOneSided, AutoArray<float>& field)
+{
+	int32_t nodeSegments = 1 << levels;
+	field.Resize(nodeSegments + 1, 0.0f);
+	field[0] = 0.0f;
+	field[nodeSegments] = 0.0f;
+	float scale = 1.0f;
+	for (int32_t level = 0; level < levels; level++) {
+		int32_t	span = nodeSegments >> level;
+		int32_t	half = span >> 1;
+		float	phase = time * (1.0f + float(level));
+		for (int32_t j = half; j < nodeSegments; j += span) {
+			float key = Hash01(keySeed, uint32_t(level) * 65536u + uint32_t(j)) * MidpointKeyRange;
+			float noise = LightningNoise::Perlin2D(key, phase, noiseSeed) * MidpointNoiseGain;
+			field[j] = (field[j - half] + field[j + half]) * 0.5f + (isOneSided ? std::fabs(noise) : noise) * scale;
+		}
+		scale *= roughness;
+	}
+}
+
 #if CONTROLLED_FORKS
 bool SameParams(const LightningBoltParams& a, const LightningBoltParams& b)
 {
@@ -400,30 +440,18 @@ void LightningBolt::Build(const LightningBoltParams& params)
 	const float swingScale = swingV.IsZero() ? 1.0f : 1.0f / std::sqrt(1.0f + planeDistTolerance * planeDistTolerance);
 
 	if (look.pathMode == lpMidpoint) {
-		float	step = (look.midpointStep > 1e-4f) ? look.midpointStep : 1e-4f;
-		int32_t	levels = int32_t(std::ceil(std::log2(fullLength / step)));
-		if (levels < MinMidpointLevels)
-			levels = MinMidpointLevels;
-		if (levels > MaxMidpointLevels)
-			levels = MaxMidpointLevels;
-		int32_t	nodeSegments = 1 << levels;
-		float	roughness = (params.fbm.midpointRoughness >= 0.0f) ? params.fbm.midpointRoughness : look.midpointRoughness;
-		float	offset = params.amplitude * (1.0f - roughness) * swingScale;
+		int32_t			levels = MidpointLevels(fullLength);
+		int32_t			nodeSegments = 1 << levels;
+		float			roughness = MidpointRoughness(params.fbm);
+		float			offset = params.amplitude * (1.0f - roughness) * swingScale;
+		AutoArray<float>	fieldU;
+		AutoArray<float>	fieldV;
+		MidpointField(params.seed ^ 0x51ed270bu, params.seed, params.time, levels, roughness, false, fieldU);
+		MidpointField(params.seed ^ 0x51ed270bu, params.seed ^ 0x68bc21ebu, params.time, levels, roughness, bOutward, fieldV);
 		m_nodes.Resize(nodeSegments + 1);
-		m_nodes[0].position = params.start;
-		m_nodes[nodeSegments].position = params.start + fullDelta;
-		for (int32_t level = 0; level < levels; level++) {
-			int32_t	span = nodeSegments >> level;
-			int32_t	half = span >> 1;
-			float	phase = params.time * (1.0f + float(level));
-			for (int32_t j = half; j < nodeSegments; j += span) {
-				float		key = Hash01(params.seed ^ 0x51ed270bu, uint32_t(level) * 65536u + uint32_t(j)) * MidpointKeyRange;
-				float		nu = LightningNoise::Perlin2D(key, phase, params.seed) * MidpointNoiseGain;
-				float		nv = LightningNoise::Perlin2D(key, phase, params.seed ^ 0x68bc21ebu) * MidpointNoiseGain;
-				Vector3f	disp = swingU * nu + swingV * ((bOutward ? std::fabs(nv) : nv) * planeDistTolerance);
-				m_nodes[j].position = (m_nodes[j - half].position + m_nodes[j + half].position) * 0.5f + disp * offset;
-			}
-			offset *= roughness;
+		for (int32_t i = 0; i <= nodeSegments; i++) {
+			Vector3f disp = swingU * fieldU[i] + swingV * (fieldV[i] * planeDistTolerance);
+			m_nodes[i].position = params.start + fullDelta * (float(i) / float(nodeSegments)) + disp * offset;
 		}
 		int32_t visibleSegments = int32_t(float(nodeSegments) / extent + 0.5f);
 		if (visibleSegments < 1)
@@ -506,7 +534,9 @@ void LightningBolt::BuildOnPath(const LightningBoltParams& params, const AutoArr
 			pathDirs[k] = pathDirs[k + 1];
 	}
 
-	int32_t segments = params.segments;
+	const bool	isMidpoint = (look.pathMode == lpMidpoint);
+	int32_t		levels = isMidpoint ? MidpointLevels(length) : 0;
+	int32_t		segments = isMidpoint ? (1 << levels) : params.segments;
 	if (segments < 1)
 		segments = 1;
 	if (segments > MaxSegments)
@@ -544,6 +574,14 @@ void LightningBolt::BuildOnPath(const LightningBoltParams& params, const AutoArr
 	const float		kinkScale = stepLength * std::pow(lacunarity, float(kinkOctaves - 1));
 	const float		planeDistTolerance = (params.fbm.planeDistTolerance >= 0.0f) ? params.fbm.planeDistTolerance : look.planeDistTolerance;
 	const float		swingScale = 1.0f / std::sqrt(1.0f + planeDistTolerance * planeDistTolerance);
+	const float		roughness = MidpointRoughness(params.fbm);
+	const float		midpointOffset = params.amplitude * (1.0f - roughness) * swingScale;
+	AutoArray<float>	fieldU;
+	AutoArray<float>	fieldV;
+	if (isMidpoint) {
+		MidpointField(params.seed ^ 0x51ed270bu, params.seed, params.time, levels, roughness, false, fieldU);
+		MidpointField(params.seed ^ 0x51ed270bu, params.seed ^ 0x68bc21ebu, params.time, levels, roughness, true, fieldV);
+	}
 
 	m_nodes.Reserve(segments + 1);
 	if (guide != nullptr)
@@ -567,15 +605,20 @@ void LightningBolt::BuildOnPath(const LightningBoltParams& params, const AutoArr
 		Vector3f	swingV = normal - tangent * normal.Dot(tangent);
 		float		vl = swingV.Length();
 		swingV = (vl > 1e-4f) ? swingV * (1.0f / vl) : Vector3f::ZERO;
-		float		window = std::sin(Pi * t);
-		float		x = t * float(params.waveCount);
-		float		du = LightningNoise::Fbm2D(x, params.time, params.seed, octaves, gain, lacunarity);
-		float		dv = LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity);
-		Vector3f	disp = (swingU * du + swingV * (std::fabs(dv) * planeDistTolerance)) * (params.amplitude * window * swingScale);
-		float		s = arc / ((kinkScale > 1e-5f) ? kinkScale : 1e-5f);
-		float		ku = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
-		float		kv = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity);
-		disp += (swingU * ku + swingV * (std::fabs(kv) * planeDistTolerance)) * (kinkAmplitude * window * swingScale);
+		Vector3f disp;
+		if (isMidpoint)
+			disp = (swingU * fieldU[i] + swingV * (fieldV[i] * planeDistTolerance)) * midpointOffset;
+		else {
+			float	window = std::sin(Pi * t);
+			float	x = t * float(params.waveCount);
+			float	du = LightningNoise::Fbm2D(x, params.time, params.seed, octaves, gain, lacunarity);
+			float	dv = LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity);
+			disp = (swingU * du + swingV * (std::fabs(dv) * planeDistTolerance)) * (params.amplitude * window * swingScale);
+			float	s = arc / ((kinkScale > 1e-5f) ? kinkScale : 1e-5f);
+			float	ku = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
+			float	kv = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity);
+			disp += (swingU * ku + swingV * (std::fabs(kv) * planeDistTolerance)) * (kinkAmplitude * window * swingScale);
+		}
 		LightningNode* node = m_nodes.Append();
 		node->position = base + offset + disp;
 		node->width = params.startWidth + (params.endWidth - params.startWidth) * t;
@@ -980,10 +1023,12 @@ void LightningStrike::AddSurfaceBolt(const AutoArray<LightningPathNode>& path, L
 
 	LightningBolt					refBolt;
 	AutoArray<LightningGuideNode>	guide;
-	refBolt.BuildOnPath(SurfaceBoltParams(*surfaceBolt, seed, m_timeOffset), path, Vector3f::ZERO, &guide);
+	LightningBoltParams surfaceParams = SurfaceBoltParams(*surfaceBolt, seed, m_timeOffset);
+	refBolt.BuildOnPath(surfaceParams, path, Vector3f::ZERO, &guide);
 	int32_t nodeCount = refBolt.m_nodes.Length();
 	if (nodeCount < 3)
 		return;
+	float chanceScale = float(surfaceParams.segments) / float(nodeCount - 1);
 
 	float kinks[MaxSegments + 1];
 	float kinkSum = 0.0f;
@@ -1010,14 +1055,14 @@ void LightningStrike::AddSurfaceBolt(const AutoArray<LightningPathNode>& path, L
 		float branchLength = remaining * (BranchLengthFactor() + float(int32_t(Hash01(seed ^ 0x9e3779b9u, uint32_t(i)) * 4.0f)) * 0.1f);
 		if (branchLength < look.minBranchLength)
 			continue;
-		accumChance += m_branchChance * (kinks[i] / meanKink);
+		accumChance += m_branchChance * chanceScale * (kinks[i] / meanKink);
 		if (--skipBranchTests > 0)
 			continue;
 		skipBranchTests = 0;
 		if (Hash01(seed, uint32_t(i) * 3u) >= accumChance)
 			continue;
 		accumChance -= 1.0f;
-		skipBranchTests = int32_t(Hash01(seed, uint32_t(i) * 3u + 1u) * float(m_maxBranchTestSkips)) + 1;
+		skipBranchTests = int32_t(float(int32_t(Hash01(seed, uint32_t(i) * 3u + 1u) * float(m_maxBranchTestSkips)) + 1) / chanceScale + 0.5f);
 
 		Vector3f normal = guideNode.location.normal;
 		Vector3f tangent = refBolt.m_nodes[i + 1].position - refBolt.m_nodes[i - 1].position;
