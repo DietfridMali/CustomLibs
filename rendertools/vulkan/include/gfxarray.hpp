@@ -440,6 +440,49 @@ public:
 		return CopyFromStaging(m_uploadBuffer[fi], dstOffset, dstOffset, bytes, ordered);
 	}
 
+	bool UploadRanges(const GfxTypes::Range* ranges, int count, bool ordered = true)
+	{
+		if ((m_buffer == VK_NULL_HANDLE) or m_data.IsEmpty() or (ranges == nullptr) or (count <= 0))
+			return false;
+
+		VkDeviceSize elemSize = VkDeviceSize(sizeof(DATA_T));
+		int end = 0;
+		for (int i = 0; i < count; ++i) {
+			if ((ranges[i].count <= 0) or (ranges[i].first < end))
+				return false;
+			end = ranges[i].first + ranges[i].count;
+		}
+		VkDeviceSize spanOffset = VkDeviceSize(ranges[0].first) * elemSize;
+		VkDeviceSize spanBytes = VkDeviceSize(end) * elemSize - spanOffset;
+		if (spanOffset + spanBytes > m_bufferSize)
+			return false;
+
+		VmaAllocator allocator = vkContext.Allocator();
+		if (allocator == VK_NULL_HANDLE)
+			return false;
+
+		uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
+		if (not AcquireStaging(fi, spanOffset, spanBytes, ordered))
+			return false;
+
+		void* mapped = nullptr;
+		if (vmaMapMemory(allocator, m_uploadAlloc[fi], &mapped) != VK_SUCCESS)
+			return false;
+		AutoArray<VkBufferCopy> regions;
+		regions.Resize(count);
+		for (int i = 0; i < count; ++i) {
+			VkDeviceSize offset = VkDeviceSize(ranges[i].first) * elemSize;
+			VkDeviceSize bytes = VkDeviceSize(ranges[i].count) * elemSize;
+			std::memcpy(static_cast<uint8_t*>(mapped) + offset, m_data.Data() + ranges[i].first, size_t(bytes));
+			regions[i].srcOffset = offset;
+			regions[i].dstOffset = offset;
+			regions[i].size = bytes;
+		}
+		vmaUnmapMemory(allocator, m_uploadAlloc[fi]);
+
+		return CopyFromStaging(m_uploadBuffer[fi], regions.Data(), uint32_t(count), spanOffset, spanBytes, ordered);
+	}
+
 	bool UploadImmediate(void)
 	{
 		if (m_buffer == VK_NULL_HANDLE or m_data.IsEmpty())
@@ -587,7 +630,11 @@ private:
 		region.srcOffset = srcOffset;
 		region.dstOffset = dstOffset;
 		region.size = bytes;
+		return CopyFromStaging(staging, &region, 1, dstOffset, bytes, ordered);
+	}
 
+	bool CopyFromStaging(VkBuffer staging, const VkBufferCopy* regions, uint32_t regionCount, VkDeviceSize dstOffset, VkDeviceSize bytes, bool ordered)
+	{
 		CommandList* copyList = nullptr;
 		if (ordered and commandListHandler.UsesOrderedCopyList()) {
 			if (not (copyList = commandListHandler.OpenOrderedCopyList()))
@@ -645,7 +692,7 @@ private:
 			// covers everything submitted to the queue before it, so this is what keeps the copy from
 			// overwriting what the last frame is still drawing with (the light buffer is rewritten every frame).
 			BufferBarrier(shaderStage, shaderAccess, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
-			vkCmdCopyBuffer(frameCB, staging, m_buffer, 1, &region);
+			vkCmdCopyBuffer(frameCB, staging, m_buffer, regionCount, regions);
 			// AFTER it: the copy has to land before the shaders of this frame read it.
 			BufferBarrier(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, shaderStage, shaderAccess);
 			commandListHandler.ResumeRendering(scope);
@@ -657,7 +704,7 @@ private:
 		OneShotCommandBuffer once;
 		if (not BeginSingleTimeCommands(once))
 			return false;
-		vkCmdCopyBuffer(once.cb, staging, m_buffer, 1, &region);
+		vkCmdCopyBuffer(once.cb, staging, m_buffer, regionCount, regions);
 		EndSingleTimeCommands(once);
 		return true;
 	}

@@ -58,6 +58,7 @@ public:
 	bool		m_acquireWaitPending{ false };
 	bool		m_swapchainIsOutOfDate{ false };
 	bool		m_hasImage{ false };
+	bool		m_isInFrame{ false };
 
 	bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
 				uint32_t graphicsFamily, uint32_t presentFamily,
@@ -135,6 +136,11 @@ public:
 	noexcept
 	{
 		return m_frameNumber;
+	}
+	inline bool IsInFrame(void) const
+	noexcept
+	{
+		return m_isInFrame;
 	}
 	inline uint32_t ImageIndex(void) const
 	noexcept

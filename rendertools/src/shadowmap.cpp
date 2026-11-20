@@ -1,6 +1,7 @@
 ﻿#include <new>
 #include "shadowmap.h"
 #include "loghandler.h"
+#include "tracy_wrapper.h"
 
 #define APPLY_POLYGON_OFFSET 1
 
@@ -106,6 +107,7 @@ noexcept
 bool ShadowMap::StartRender(bool dynamicCasters)
 noexcept
 {
+	ZoneScoped;
 	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
@@ -127,6 +129,7 @@ noexcept
 bool ShadowMap::StopRender(void)
 noexcept
 {
+	ZoneScoped;
 	if (not IsReady())
 		return false;
 	DeactivateCamera();
@@ -428,6 +431,7 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 
 bool ShadowMap::Update(Vector3f center, Vector3f viewDirection, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax)
 {
+	ZoneScoped;
 	if (m_status < 0)
 		return false;
 	Vector3f				worldSize = Vector3f::Abs(worldMax - worldMin);

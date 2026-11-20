@@ -6,6 +6,7 @@
 #include "base_shaderhandler.h"
 #include "shader.h"
 #include "texture.h"
+#include "tracy_wrapper.h"
 #ifndef OPENGL
 #include "compute_shader.h"
 #include "gpuzone.h"
@@ -208,6 +209,22 @@ bool LineRenderer::AddFaced(const Vector3f& p0, const Vector3f& p1, float width,
 }
 
 
+bool LineRenderer::UpdateFaced(int index, const Vector3f& p0, const Vector3f& p1, const Vector3f& n0, const Vector3f& n1)
+{
+	if (not m_hasFaces or (index < 0) or (index >= m_count))
+		return false;
+
+	Line&	line = m_lines[index];
+	Faces&	faces = m_faces[index];
+
+	line.p0 = p0;
+	line.p1 = p1;
+	faces.n0 = n0;
+	faces.n1 = n1;
+	return true;
+}
+
+
 float LineRenderer::MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other)
 {
 	const float* m = baseRenderer.ModelView().AsArray();
@@ -322,8 +339,31 @@ bool LineRenderer::Upload(void)
 }
 
 
+#ifndef OPENGL
+bool LineRenderer::UploadRanges(const GfxTypes::Range* ranges, int count, bool ordered)
+{
+	ZoneScoped;
+	if (not (m_isAvailable and m_isResident) or (ranges == nullptr) or (count <= 0))
+		return false;
+	for (int i = 0; i < count; ++i) {
+		const GfxTypes::Range& range = ranges[i];
+
+		if ((range.first < 0) or (range.count <= 0) or (range.first + range.count > m_count))
+			return false;
+		std::memcpy(m_buffer.m_data.Data() + range.first, m_lines.Data() + range.first, size_t(range.count) * sizeof(Line));
+		if (m_hasFaces)
+			std::memcpy(m_faceBuffer.m_data.Data() + range.first, m_faces.Data() + range.first, size_t(range.count) * sizeof(Faces));
+	}
+	if (not m_buffer.UploadRanges(ranges, count, ordered))
+		return false;
+	return not m_hasFaces or m_faceBuffer.UploadRanges(ranges, count, ordered);
+}
+#endif
+
+
 bool LineRenderer::Render(void)
 {
+	ZoneScoped;
 	if (not m_isAvailable or (m_count <= 0))
 		return false;
 
@@ -355,6 +395,7 @@ bool LineRenderer::Render(void)
 #ifndef OPENGL
 bool LineRenderer::RenderRanges(const Range* ranges, int count)
 {
+	ZoneScoped;
 	if (not (m_isAvailable and m_isResident and m_hasFaces) or (count <= 0))
 		return false;
 	if (not ReserveCommands(m_commandBuffer.AppendBase() + count))
@@ -398,6 +439,7 @@ bool LineRenderer::RenderCulled(int count, RenderTarget* const* depthLevels, int
 {
 	static constexpr int cCullGroupSize = 256;
 
+	ZoneScoped;
 	if (count > m_count)
 		count = m_count;
 	if (not (m_isAvailable and m_isResident and m_hasFaces) or (count <= 0))

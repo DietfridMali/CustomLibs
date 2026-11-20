@@ -7,6 +7,8 @@
 #include "shader_loading.h"
 #include "loghandler.h"
 #include "log_frame_metrics.h"
+#include "vkupload.h"
+#include "timer.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -401,6 +403,7 @@ noexcept
 {
 	++m_frameNumber;
 	m_hasImage = false;
+	m_isInFrame = true;
 #if VK_STALL_DIAG
 	VkStallEndFrame(m_frameNumber);
 	// VMA refreshes what it knows of the driver's heap budgets when the frame index changes
@@ -471,6 +474,8 @@ noexcept
 	if (m_hasImage)
 		Present();
 	m_hasImage = false;
+	m_isInFrame = false;
+	LogFrameOneShots();
 	m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
 #if VK_STALL_DIAG
 	VkGpuPassAdvance(m_frameIndex);
@@ -2003,7 +2008,9 @@ noexcept
 #ifdef _DEBUG
 	CheckDeviceRemoved("Flush");
 #endif
+	int64_t waitStart = HiresTimer::GetHiresTime();
 	commandListHandler.CmdQueue().WaitIdle();
+	CountFrameOneShot(waitStart);
 	DisposeResources();
 #if VK_STALL_DIAG
 	String name = GetName();

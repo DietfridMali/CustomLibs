@@ -20,10 +20,32 @@
 #include "tracy_wrapper.h"
 #include "loghandler.h"
 #include "log_frame_metrics.h"
+#include "timer.hpp"
 
 // base_displayhandler.cpp - ends the program with a message when the device has been removed.
 extern void HandleDeviceLost(const char* where)
 noexcept;
+
+static constexpr int64_t	cFlushLogInterval = 5000000;
+static int64_t				frameFlushCount = 0;
+static int64_t				frameFlushWait = 0;
+static int64_t				frameFlushLogTime = 0;
+
+
+static void LogFrameFlushes(void)
+noexcept
+{
+	if (frameFlushCount == 0)
+		return;
+	int64_t now = HiresTimer::GetHiresTime();
+	if (now - frameFlushLogTime < cFlushLogInterval)
+		return;
+	logHandler.Print("%lld command list flushes with queue wait idle during frames since the last report, %.2f ms waiting\n",
+					 static_cast<long long>(frameFlushCount), double(frameFlushWait) * 0.001);
+	frameFlushCount = 0;
+	frameFlushWait = 0;
+	frameFlushLogTime = now;
+}
 
 #if LOG_FRAME_METRICS
 
@@ -364,7 +386,12 @@ noexcept
 #if DBG_DIRECTX
 	CheckDeviceRemoved("Flush");
 #endif
+	int64_t waitStart = HiresTimer::GetHiresTime();
 	commandListHandler.CmdQueue().WaitIdle();
+	if (commandListHandler.IsInFrame()) {
+		++frameFlushCount;
+		frameFlushWait += HiresTimer::GetHiresTime() - waitStart;
+	}
 	DisposeResources();
 #if 0
     // Reset allocator + list so the debug layer releases resource refs; leave closed.
@@ -921,6 +948,7 @@ noexcept
 {
 	ZoneScoped;
 	++m_frameNumber;
+	m_isInFrame = true;
 	if (frameIndex >= 0)
 		SetFrameIndex(frameIndex);
 	else
@@ -959,6 +987,8 @@ noexcept
 	ZoneScoped;
 	m_cmdQueue.Signal(m_frameIndex);
 	CloseProfilerQueries(false);
+	m_isInFrame = false;
+	LogFrameFlushes();
 }
 
 

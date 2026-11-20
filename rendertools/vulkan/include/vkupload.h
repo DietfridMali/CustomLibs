@@ -56,6 +56,12 @@ noexcept;
 bool EndSingleTimeCommands(OneShotCommandBuffer& cmd)
 noexcept;
 
+void CountFrameOneShot(int64_t waitStart)
+noexcept;
+
+void LogFrameOneShots(void)
+noexcept;
+
 // =================================================================================================
 // Low-level: into an already-open command buffer, transition the image to TRANSFER_DST, record a
 // vkCmdCopyBufferToImage from a freshly-allocated staging buffer, optionally transition to

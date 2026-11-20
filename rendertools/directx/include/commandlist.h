@@ -262,6 +262,7 @@ public:
 	int							m_frameIndex{ 0 };
 	int							m_frameCount{ CommandQueue::FRAME_COUNT };
 	uint64_t					m_frameNumber{ 0 }; // monotonic; ++ per BeginFrame — reliable frame-boundary signal
+	bool						m_isInFrame{ false };
 	TracyD3D12Ctx				m_gpuProfilerCtx{ nullptr }; // Tracy D3D12 GPU-timestamp context; nullptr when USE_TRACY=0
 	TracyD3D12Ctx				m_listProfilerCtx{ nullptr };
 	uint64_t					m_closedQueryCount{ 0 };
@@ -388,6 +389,12 @@ public:
 	noexcept
 	{
 		return m_frameNumber;
+	}
+
+	inline bool IsInFrame(void) const
+	noexcept
+	{
+		return m_isInFrame;
 	}
 
 	inline void SetFrameIndex(int frameIndex)

@@ -22,6 +22,11 @@ struct UavTexture {};
 struct StructuredBuffer {};
 struct InstanceBuffer {};
 struct IndirectBuffer {};
+
+struct Range {
+	int32_t	first;
+	int32_t	count;
+};
 }
 
 // =================================================================================================

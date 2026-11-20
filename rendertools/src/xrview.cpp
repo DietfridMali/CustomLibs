@@ -15,6 +15,7 @@
 #include "projector.h"
 #include "mesh.h"
 #include "loghandler.h"
+#include "tracy_wrapper.h"
 
 // =================================================================================================
 
@@ -370,6 +371,7 @@ bool XRView::BuildVisibilityMask(void)
 
 void XRView::RenderVisibilityMask(void)
 {
+	ZoneScoped;
 	if (not (IsActive() and xrHandler.HasVisibilityMask() and BuildVisibilityMask()))
 		return;
 	gfxStates.ColorMask(0, 0, 0, 0);

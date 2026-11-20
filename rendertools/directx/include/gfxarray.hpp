@@ -422,6 +422,14 @@ public:
 			return false;
 	}
 
+	bool UploadRanges(const GfxTypes::Range* ranges, int count, bool /*ordered*/ = true)
+	{
+		if constexpr (isBuffer)
+			return UploadBufferRanges(ranges, count);
+		else
+			return false;
+	}
+
 private:
 	CommandList* OpenCopyList(bool& close, bool& flush, bool immediate)
 	{
@@ -796,6 +804,61 @@ private:
 			return false;
 		SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
 		list->CopyBufferRegion(m_resource.Get(), offset, upload.Get(), offset, bytes);
+		SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		CloseCopyList(copyList, closeCopyList, flushCopyList);
+		return true;
+	}
+
+	bool UploadBufferRanges(const GfxTypes::Range* ranges, int count)
+	{
+		if (not m_resource or m_data.IsEmpty() or (ranges == nullptr) or (count <= 0))
+			return false;
+		ID3D12Device* device = dx12Context.Device();
+		if (not device)
+			return false;
+
+		size_t elemSize = sizeof(DATA_T);
+		size_t fullSize = size_t(DataSize());
+		int end = 0;
+		for (int i = 0; i < count; ++i) {
+			if ((ranges[i].count <= 0) or (ranges[i].first < end))
+				return false;
+			end = ranges[i].first + ranges[i].count;
+		}
+		size_t spanOffset = size_t(ranges[0].first) * elemSize;
+		size_t spanBytes = size_t(end) * elemSize - spanOffset;
+		if (spanOffset + spanBytes > fullSize)
+			return false;
+
+		ComPtr<ID3D12Resource>& upload = AcquireUpload(spanOffset, spanBytes);
+		if (not upload) {
+			upload = gfxResourceHandler.AcquireUpload(fullSize);
+			if (not upload)
+				return false;
+			NameResource(upload.Get(), "upload");
+		}
+
+		void*		mapped = nullptr;
+		D3D12_RANGE	readRange{ 0, 0 };
+		if (FAILED(upload->Map(0, &readRange, &mapped)))
+			return false;
+		for (int i = 0; i < count; ++i) {
+			size_t offset = size_t(ranges[i].first) * elemSize;
+			std::memcpy(static_cast<uint8_t*>(mapped) + offset, reinterpret_cast<const uint8_t*>(m_data.Data()) + offset, size_t(ranges[i].count) * elemSize);
+		}
+		upload->Unmap(0, nullptr);
+
+		bool			closeCopyList = false;
+		bool			flushCopyList = false;
+		CommandList*	copyList = OpenCopyList(closeCopyList, flushCopyList, false);
+		auto*			list = copyList ? copyList->GfxList() : nullptr;
+		if (not list)
+			return false;
+		SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
+		for (int i = 0; i < count; ++i) {
+			size_t offset = size_t(ranges[i].first) * elemSize;
+			list->CopyBufferRegion(m_resource.Get(), offset, upload.Get(), offset, size_t(ranges[i].count) * elemSize);
+		}
 		SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		CloseCopyList(copyList, closeCopyList, flushCopyList);
 		return true;

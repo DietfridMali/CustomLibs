@@ -127,6 +127,8 @@ public:
 	bool AddFaced(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, const Vector3f& n0, const Vector3f& n1,
 				  float contourWidth, float contourAlpha);
 
+	bool UpdateFaced(int index, const Vector3f& p0, const Vector3f& p1, const Vector3f& n0, const Vector3f& n1);
+
 	static float MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other);
 
 	// A polyline through count points (closed: last back to first), the pattern continuous over the
@@ -141,6 +143,8 @@ public:
 	bool RenderRanges(const Range* ranges, int count);
 
 	bool RenderCulled(int count, RenderTarget* const* depthLevels = nullptr, int depthLevelCount = 0);
+
+	bool UploadRanges(const GfxTypes::Range* ranges, int count, bool ordered = true);
 #endif
 
 	bool Upload(void);

@@ -8,6 +8,7 @@
 #include "resource_handler.h"
 #include "commandlist.h"
 #include "loghandler.h"
+#include "timer.hpp"
 
 #include <cstdarg>
 #include <cstdio>
@@ -44,6 +45,37 @@ noexcept
 	va_end(args);
 }
 #endif
+
+static constexpr int64_t	cOneShotLogInterval = 5000000;
+static int64_t				frameOneShotCount = 0;
+static int64_t				frameOneShotWait = 0;
+static int64_t				frameOneShotLogTime = 0;
+
+
+void CountFrameOneShot(int64_t waitStart)
+noexcept
+{
+	if (not commandListHandler.CmdQueue().IsInFrame())
+		return;
+	++frameOneShotCount;
+	frameOneShotWait += HiresTimer::GetHiresTime() - waitStart;
+}
+
+
+void LogFrameOneShots(void)
+noexcept
+{
+	if (frameOneShotCount == 0)
+		return;
+	int64_t now = HiresTimer::GetHiresTime();
+	if (now - frameOneShotLogTime < cOneShotLogInterval)
+		return;
+	logHandler.Print("%lld blocking submits with queue wait idle during frames since the last report, %.2f ms waiting\n",
+					 static_cast<long long>(frameOneShotCount), double(frameOneShotWait) * 0.001);
+	frameOneShotCount = 0;
+	frameOneShotWait = 0;
+	frameOneShotLogTime = now;
+}
 
 // =================================================================================================
 // VkStagingBuffer
@@ -153,7 +185,9 @@ noexcept
 #if VK_STALL_DIAG
 	double stallStart = VkStallClock();
 #endif
+	int64_t waitStart = HiresTimer::GetHiresTime();
 	res = vkQueueWaitIdle(queue);
+	CountFrameOneShot(waitStart);
 #if VK_STALL_DIAG
 	VkStallEvent("one-shot submit wait idle", stallStart, vkOneShotOrigin[0] ? vkOneShotOrigin : "gfx array (immediate upload, readback or staged copy)");
 	vkOneShotOrigin[0] = '\0';
