@@ -2,6 +2,7 @@
 
 #include "shader.h"
 #include "vector.hpp"
+#include "matrix.hpp"
 #include "gfxrenderer.h"
 
 // =================================================================================================
@@ -24,7 +25,8 @@
 struct BilateralBlurParams {
 	enum eDistanceSource {
 		dsWorldPosition = 0,
-		dsSceneDepth = 1
+		dsSceneDepth = 1,
+		dsPlaneDepth = 2
 	};
 
 	Vector2f	texelSize{ Vector2f(0.0f, 0.0f) }; // of the buffer being FILTERED, not of the frame
@@ -35,6 +37,8 @@ struct BilateralBlurParams {
 	int			distanceSource{ dsWorldPosition };
 	Vector2f	projDepth{ Vector2f(0.0f, 0.0f) }; // (A, B), dsSceneDepth only
 	bool		flipVertically{ false }; // OpenGL only, see the note in the shader
+	const Matrix4f*	invViewProjs{ nullptr }; // per view, dsPlaneDepth only
+	int			viewCount{ 0 };
 };
 
 // Sets everything the shader reads. The caller deploys it and binds the textures itself - the two
@@ -59,6 +63,8 @@ inline void SetupBilateralBlur(Shader* pShader, const BilateralBlurParams& param
 	pShader->SetFloat("posSigma", params.posSigma);
 	pShader->SetInt("distanceSource", params.distanceSource);
 	pShader->SetVector2f("projDepth", params.projDepth);
+	if ((params.distanceSource == BilateralBlurParams::dsPlaneDepth) and (params.invViewProjs != nullptr) and (params.viewCount > 0))
+		pShader->SetMatrix4fArray("invViewProj", params.invViewProjs[0].AsArray(), params.viewCount);
 }
 
 // =================================================================================================

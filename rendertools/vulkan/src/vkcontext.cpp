@@ -480,6 +480,7 @@ noexcept
 	set(GfxFeature::Wireframe, core.fillModeNonSolid);
 	set(GfxFeature::DepthClamp, core.depthClamp);
 	set(GfxFeature::IndependentBlend, core.independentBlend);
+	set(GfxFeature::DualSourceBlend, core.dualSrcBlend);
 	set(GfxFeature::Anisotropy, core.samplerAnisotropy);
 	set(GfxFeature::StorageInVertexStage, core.vertexPipelineStoresAndAtomics);
 	set(GfxFeature::StorageInFragmentStage, core.fragmentStoresAndAtomics);
@@ -764,6 +765,7 @@ noexcept
 	features.fragmentStoresAndAtomics = enable(GfxFeature::StorageInFragmentStage);
 	features.vertexPipelineStoresAndAtomics = enable(GfxFeature::StorageInVertexStage);
 	features.independentBlend = enable(GfxFeature::IndependentBlend);
+	features.dualSrcBlend = enable(GfxFeature::DualSourceBlend);
 	features.fillModeNonSolid =
 		enable(GfxFeature::Wireframe); // VK_POLYGON_MODE_LINE for GfxStates::SetFillMode (Wireframe); universal on desktop
 	features.tessellationShader = enable(GfxFeature::Tessellation);

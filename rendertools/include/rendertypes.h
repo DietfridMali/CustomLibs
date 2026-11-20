@@ -109,6 +109,7 @@ enum class GfxFeature : uint32_t {
 	MultiDrawIndirect,
 	BindlessTextures,
 	Multiview,
+	DualSourceBlend,
 	Count
 };
 
@@ -162,6 +163,8 @@ noexcept
 			return "bindless textures";
 		case GfxFeature::Multiview:
 			return "multiview";
+		case GfxFeature::DualSourceBlend:
+			return "dual source blending";
 		default:
 			return "unknown";
 	}
@@ -175,7 +178,7 @@ struct GfxFeatureRequest {
 		GfxFeatureBit(GfxFeature::Anisotropy) | GfxFeatureBit(GfxFeature::StorageInVertexStage) |
 		GfxFeatureBit(GfxFeature::StorageInFragmentStage) | GfxFeatureBit(GfxFeature::ScalarBlockLayout) |
 		GfxFeatureBit(GfxFeature::RenderingLocalRead) | GfxFeatureBit(GfxFeature::UnusedAttachments) |
-		GfxFeatureBit(GfxFeature::MultiDrawIndirect)
+		GfxFeatureBit(GfxFeature::MultiDrawIndirect) | GfxFeatureBit(GfxFeature::DualSourceBlend)
 	};
 	uint32_t optional{
 		GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary) |
@@ -378,7 +381,11 @@ enum class BlendFactor : uint8_t {
 	DstAlpha,
 	InvDstAlpha,
 	DstColor,
-	InvDstColor
+	InvDstColor,
+	Src1Color,
+	InvSrc1Color,
+	Src1Alpha,
+	InvSrc1Alpha
 };
 
 enum class BlendOp : uint8_t {

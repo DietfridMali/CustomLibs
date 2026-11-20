@@ -2,6 +2,7 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
+#include "bilateralblur.h"
 
 // =================================================================================================
 // HLSL shader strings for the DirectX 12 backend — blur / AA post-process shaders.
@@ -173,7 +174,7 @@ const ShaderSource& GaussBlurShader()
 // attachment by then, is an error even if the branch never samples it. distanceSource stays in the
 // constant buffer so that SetupBilateralBlur () serves both; the shaders do not read it.
 
-static const String& BilateralBlurFS(bool useSceneDepth)
+static const String& BilateralBlurFS(int distanceSource)
 {
 	static const String head(R"(
             cbuffer ShaderConstants : register(b1) {
@@ -184,6 +185,7 @@ static const String& BilateralBlurFS(bool useSceneDepth)
                 float  posSigma;
                 int    distanceSource;
                 float2 projDepth;
+                column_major float4x4 invViewProj [VIEW_COUNT];
             };
             ScreenTexture surface         : register(t0);
             ScreenTexture uWorldNormals   : register(t1);
@@ -225,6 +227,19 @@ static const String& BilateralBlurFS(bool useSceneDepth)
             }
     )");
 
+	static const String planeSource(R"(
+            ScreenTexture uSceneDepth     : register(t3);
+            SamplerState s3 : register(s3);
+            float3 SurfaceKey(float2 uv) {
+                float  depth = uSceneDepth.SampleLevel(s3, SCREEN_UV(uv), 0).r;
+                float4 p = mul(invViewProj [gViewId], float4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0));
+                return p.xyz / p.w;
+            }
+            float SurfaceDistance(float3 keyC, float3 keyS, float3 NC) {
+                return abs(dot(keyS - keyC, NC));
+            }
+    )");
+
 	static const String body(R"(
             float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
                 SET_VIEW_ID
@@ -258,21 +273,29 @@ static const String& BilateralBlurFS(bool useSceneDepth)
 
 	static const String positionShader(head + positionSource + body);
 	static const String depthShader(head + depthSource + body);
+	static const String planeShader(head + planeSource + body);
 
-	return useSceneDepth ? depthShader : positionShader;
+	return (distanceSource == BilateralBlurParams::dsSceneDepth) ? depthShader : (distanceSource == BilateralBlurParams::dsPlaneDepth) ? planeShader : positionShader;
 }
 
 
 const ShaderSource& BilateralBlurShader()
 {
-	static const ShaderSource source("bilateralBlur", Standard2DVS(), BilateralBlurFS(false), ShaderDataLayout(VtxTcAttrs, 2));
+	static const ShaderSource source("bilateralBlur", Standard2DVS(), BilateralBlurFS(BilateralBlurParams::dsWorldPosition), ShaderDataLayout(VtxTcAttrs, 2));
 	return source;
 }
 
 
 const ShaderSource& BilateralBlurDepthShader()
 {
-	static const ShaderSource source("bilateralBlurDepth", Standard2DVS(), BilateralBlurFS(true), ShaderDataLayout(VtxTcAttrs, 2));
+	static const ShaderSource source("bilateralBlurDepth", Standard2DVS(), BilateralBlurFS(BilateralBlurParams::dsSceneDepth), ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
+}
+
+
+const ShaderSource& BilateralBlurPlaneShader()
+{
+	static const ShaderSource source("bilateralBlurPlane", Standard2DVS(), BilateralBlurFS(BilateralBlurParams::dsPlaneDepth), ShaderDataLayout(VtxTcAttrs, 2));
 	return source;
 }
 
