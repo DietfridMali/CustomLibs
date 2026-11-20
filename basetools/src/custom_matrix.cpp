@@ -329,7 +329,7 @@ Matrix4f& Matrix4f::Rotation(Matrix4f& rotation, float angle, float x, float y, 
 Matrix4f Matrix4f::Rotation(float angle, float x, float y, float z)
 {
 	Matrix4f r;
-	return Rotation(r, x, y, z);
+	return Rotation(r, angle, x, y, z);
 }
 
 
