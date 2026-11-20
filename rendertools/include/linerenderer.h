@@ -87,6 +87,8 @@ public:
 	float		m_minWidthScale{ 0.0f };
 	float		m_haloReach{ 0.0f };
 	float		m_haloStrength{ 0.0f };
+	float		m_occluderTolerance{ 0.0f };
+	Texture*	m_sceneDepth{ nullptr };
 	float		m_minLength{ 1.0f };
 	Texture*	m_occluderDepth{ nullptr };
 	Texture*	m_occluderMask{ nullptr };

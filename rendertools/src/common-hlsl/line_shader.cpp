@@ -73,6 +73,7 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
     float  minWidthScale;
     float  haloReach;
     float  haloStrength;
+    float  occluderTolerance;
 #endif
 #ifdef LINE_HIDDEN
     float  occluderMaskLimit;
@@ -96,6 +97,11 @@ struct PSInput {
     float4 color   : TEXCOORD1;
     float4 pattern : TEXCOORD2;   // (style, phase, caps, 0)
     float2 ends    : TEXCOORD3;   // flat end: overhang, miter end: cut slope - PIXELS
+#ifdef LINE_FACES
+    float4 edge       : TEXCOORD4;
+    float4 edgeNear   : TEXCOORD5;
+    float2 edgeAcross : TEXCOORD6;
+#endif
 };
 
 float3 PullToViewer(float3 vp) {
@@ -200,8 +206,14 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float3 node = (column == 0) ? vp0 - side * (startReach / pxSide) : (column == 1) ? vp0 : (column == 2) ? vp1 : vp1 + side * (endReach / pxSide);
     node += perp * across;
 #ifdef LINE_FACES
-    if (perspective > 0.5)
-        node *= 1.0 - min(depthPull * (halfWidth + 1.0) / (pxAcross * max(length(0.5 * (vp0 + vp1)), 1e-4)), 0.5);
+    float3 edgePoint = (column <= 1) ? vp0 : vp1;
+    float3 edgeNear = edgePoint + float3(0.0, 0.0, occluderTolerance);
+    if (perspective > 0.5) {
+        float pullScale = 1.0 - min(depthPull * (halfWidth + 1.0) / (pxAcross * max(length(0.5 * (vp0 + vp1)), 1e-4)), 0.5);
+        node *= pullScale;
+        edgePoint *= pullScale;
+        edgeNear.z = min(edgeNear.z, -1e-4);
+    }
 #endif
 
     PSInput o;
@@ -209,6 +221,9 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
 #ifdef LINE_FACES
     if (drawn < 0.5)
         o.pos = float4(0.0, 0.0, -2.0, 1.0);
+    o.edge = mul(mViewport, mul(VIEW_PROJECTION, float4(edgePoint, 1.0)));
+    o.edgeNear = mul(mViewport, mul(VIEW_PROJECTION, float4(edgeNear, 1.0)));
+    o.edgeAcross = float2(dPerpNdc.x * pxScale.x, -dPerpNdc.y * pxScale.y) / pxAcross;
 #endif
     o.cap = float4(along, across * pxAcross, segPx, halfWidth);
     o.color = lineColor;
@@ -225,6 +240,11 @@ struct PSInput {
     float4 color   : TEXCOORD1;
     float4 pattern : TEXCOORD2;
     float2 ends    : TEXCOORD3;
+#ifdef LINE_FACES
+    float4 edge       : TEXCOORD4;
+    float4 edgeNear   : TEXCOORD5;
+    float2 edgeAcross : TEXCOORD6;
+#endif
 };
 
 cbuffer ShaderConstants : register(b1) {
@@ -244,6 +264,7 @@ cbuffer ShaderConstants : register(b1) {
     float  minWidthScale;
     float  haloReach;
     float  haloStrength;
+    float  occluderTolerance;
 #endif
 #ifdef LINE_HIDDEN
     float  occluderMaskLimit;
@@ -266,6 +287,27 @@ float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
         discard;
     if (occluderMask.Load(SCREEN_TEXEL(pixel)).a > occluderMaskLimit)
         discard;
+#elif defined(LINE_FACES)
+ScreenTexture sceneDepth : register(t2);
+
+float SceneDepthAt(float2 pixel, int2 limit) {
+    return sceneDepth.Load(SCREEN_TEXEL(clamp(int2(pixel), int2(0, 0), limit))).r;
+}
+
+float4 PSMain(PSInput i VIEW_ID_PARAM) : SV_Target {
+    SET_VIEW_ID
+    float ownDepth = sceneDepth.Load(SCREEN_TEXEL(int2(i.pos.xy))).r;
+    if (i.pos.z > ownDepth) {
+        if (i.edgeNear.z / i.edgeNear.w > ownDepth)
+            discard;
+        float2 edgeNdc = i.edge.xy / i.edge.w;
+        float2 targetSize = 1.0 / texelSize;
+        int2 limit = int2(targetSize + 0.5) - 1;
+        float2 edgePixel = float2(edgeNdc.x * 0.5 + 0.5, 0.5 - edgeNdc.y * 0.5) * targetSize;
+        float farthest = max(SceneDepthAt(edgePixel, limit), max(SceneDepthAt(edgePixel + i.edgeAcross, limit), SceneDepthAt(edgePixel - i.edgeAcross, limit)));
+        if (i.edge.z / i.edge.w > farthest)
+            discard;
+    }
 #else
 float4 PSMain(PSInput i) : SV_Target {
 #endif

@@ -582,7 +582,9 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states, bool isCulled
 		shader->SetFloat("minWidthScale", m_minWidthScale);
 		shader->SetFloat("haloReach", m_haloReach);
 		shader->SetFloat("haloStrength", m_haloStrength);
+		shader->SetFloat("occluderTolerance", m_occluderTolerance);
 		m_faceBuffer.BindReadOnly(1);
+		m_sceneDepth->Activate(2);
 #ifndef OPENGL
 		if (isCulled)
 			m_visibleBuffer.BindInstanceStream("Uint", 0);
@@ -601,6 +603,7 @@ void LineRenderer::EndDraw(const DrawStates& states, bool isBound)
 #ifndef OPENGL
 			m_slotBuffer.ReleaseInstanceStream("Uint", 0);
 #endif
+			m_sceneDepth->Deactivate();
 			m_faceBuffer.ReleaseReadOnly(1);
 		}
 		if (UsesOccluderDepth()) {
