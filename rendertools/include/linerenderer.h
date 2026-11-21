@@ -93,6 +93,10 @@ public:
 	Texture*	m_occluderDepth{ nullptr };
 	Texture*	m_occluderMask{ nullptr };
 	float		m_occluderMaskLimit{ 1e30f };
+#ifndef OPENGL
+	GfxArray<Vector4f, GfxTypes::StructuredBuffer>*	m_transformBuffer{ nullptr };
+	int												m_transformStride{ 4 };
+#endif
 
 	LineRenderer() = default;
 	~LineRenderer() {
@@ -120,6 +124,9 @@ public:
 		m_count = 0;
 		m_isResident = false;
 		m_hasFaces = false;
+#ifndef OPENGL
+		m_hasTransformSlots = false;
+#endif
 	}
 
 	bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid,
@@ -147,6 +154,10 @@ public:
 	bool RenderCulled(int count, RenderTarget* const* depthLevels = nullptr, int depthLevelCount = 0);
 
 	bool UploadRanges(const GfxTypes::Range* ranges, int count, bool ordered = true);
+
+	bool SetTransformSlots(int first, int count, uint32_t slot);
+
+	bool UploadTransformSlots(void);
 #endif
 
 	bool Upload(void);
@@ -166,9 +177,12 @@ private:
 	GfxArray<uint32_t, GfxTypes::InstanceBuffer>	m_slotBuffer;
 	GfxArray<uint32_t, GfxTypes::InstanceBuffer>	m_visibleBuffer;
 	GfxDrawCommandBuffer							m_commandBuffer;
+	GfxArray<uint32_t, GfxTypes::StructuredBuffer>	m_transformSlotBuffer;
 	int												m_slotCapacity{ 0 };
 	int												m_visibleCapacity{ 0 };
 	int												m_commandCapacity{ 0 };
+	int												m_transformSlotCapacity{ 0 };
+	bool											m_hasTransformSlots{ false };
 #endif
 	AutoArray<Line>									m_lines;
 	AutoArray<Faces>								m_faces;
@@ -196,6 +210,13 @@ private:
 	{
 		return (m_occluderDepth != nullptr) and not m_hasFaces;
 	}
+#ifndef OPENGL
+	inline bool UsesTransforms(void) const
+	noexcept
+	{
+		return (m_transformBuffer != nullptr) and m_hasTransformSlots and m_hasFaces;
+	}
+#endif
 	void SetupQuad(void);
 	Vector2f TargetTexelSize(void);
 	Shader* BeginDraw(int firstLine, DrawStates& states, bool isCulled = false);

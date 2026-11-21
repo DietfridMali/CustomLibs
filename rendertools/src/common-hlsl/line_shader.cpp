@@ -30,6 +30,25 @@ static const ShaderDataAttributes LineFacesQuadAttrs[] = {
 	{ "Uint", 0, ShaderDataAttributes::Uint1, true },
 };
 
+static const String LineTransformCode = String(R"(
+#ifdef LINE_TRANSFORM
+StructuredBuffer<float4> lineTransforms     : register(t2, space1);
+StructuredBuffer<uint>   lineTransformSlots : register(t3, space1);
+
+void TransformLine(uint lineIndex, inout LineInstance l, inout LineFaces f) {
+    uint first = lineTransformSlots[lineIndex] * uint(transformStride);
+    float3 c0 = lineTransforms[first].xyz;
+    float3 c1 = lineTransforms[first + 1].xyz;
+    float3 c2 = lineTransforms[first + 2].xyz;
+    float3 c3 = lineTransforms[first + 3].xyz;
+    l.p0 = c0 * l.p0.x + c1 * l.p0.y + c2 * l.p0.z + c3;
+    l.p1 = c0 * l.p1.x + c1 * l.p1.y + c2 * l.p1.z + c3;
+    f.n0 = c0 * f.n0.x + c1 * f.n0.y + c2 * f.n0.z;
+    f.n1 = c0 * f.n1.x + c1 * f.n1.y + c2 * f.n1.z;
+}
+#endif
+)");
+
 static const String LineDrawVS = String(R"(
 struct LineInstance {
     float3 p0;    float width;   // width in target pixels
@@ -78,8 +97,11 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
 #ifdef LINE_HIDDEN
     float  occluderMaskLimit;
 #endif
+#ifdef LINE_TRANSFORM
+    int    transformStride;
+#endif
 };
-
+)") + LineTransformCode + String(R"(
 static const float minWorldHalfWidth = 0.375;
 
 struct VSInput {
@@ -125,6 +147,9 @@ PSInput VSMain(VSInput v VIEW_ID_PARAM) {
     float4 lineColor = l.color;
 #ifdef LINE_FACES
     LineFaces f = lineFaces[lineIndex];
+#ifdef LINE_TRANSFORM
+    TransformLine(lineIndex, l, f);
+#endif
     float3 vMid = mul(mModelView, float4(0.5 * (l.p0 + l.p1), 1.0)).xyz;
     float front0 = (dot(mul(mModelView, float4(f.n0, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
     float front1 = (dot(mul(mModelView, float4(f.n1, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
@@ -269,6 +294,9 @@ cbuffer ShaderConstants : register(b1) {
 #ifdef LINE_HIDDEN
     float  occluderMaskLimit;
 #endif
+#ifdef LINE_TRANSFORM
+    int    transformStride;
+#endif
 };
 
 // distance of t to the interval [s, e] along the line, 0 inside
@@ -408,6 +436,18 @@ const ShaderSource& LineDrawFacesShader()
 }
 
 
+const ShaderSource& LineDrawFacesTransformShader()
+{
+	static const ShaderSource source(
+		"lineDrawFacesTransform",
+		LineDrawVS,
+		LineDrawFS,
+		ShaderDataLayout(LineFacesQuadAttrs, 3),
+		{ ShaderMacro{ String("LINE_FACES"), String("1") }, ShaderMacro{ String("LINE_TRANSFORM"), String("1") } });
+	return source;
+}
+
+
 static const String LineCullCS = String(R"(
 struct LineInstance {
     float3 p0;    float width;
@@ -451,7 +491,11 @@ cbuffer ShaderConstants : register(b1) {
     uint   depthLevelCount;
     int    screenWidth;
     int    screenHeight;
+#ifdef LINE_TRANSFORM
+    int    transformStride;
+#endif
 };
+)") + LineTransformCode + String(R"(
 
 float4x4 EyeProjection(uint eye) {
 #if VIEW_COUNT > 1
@@ -577,6 +621,9 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
         return;
     LineInstance l = lines[index];
     LineFaces f = lineFaces[index];
+#ifdef LINE_TRANSFORM
+    TransformLine(index, l, f);
+#endif
     float3 vMid = mul(mModelView, float4(0.5 * (l.p0 + l.p1), 1.0)).xyz;
     float front0 = (dot(mul(mModelView, float4(f.n0, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
     float front1 = (dot(mul(mModelView, float4(f.n1, 0.0)).xyz, vMid) < 0.0) ? 1.0 : 0.0;
@@ -599,7 +646,7 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
 )");
 
 
-static AutoArray<ComputeBindingDesc> MakeLineCullBindings(int depthLevels)
+static AutoArray<ComputeBindingDesc> MakeLineCullBindings(int depthLevels, bool hasTransforms = false)
 {
 	AutoArray<ComputeBindingDesc> b;
 	b.SetAutoFit(true);
@@ -612,6 +659,10 @@ static AutoArray<ComputeBindingDesc> MakeLineCullBindings(int depthLevels)
 	*b.Append() = { .binding = 37, .kind = Kind::StorageBuffer, .count = 1 };
 	*b.Append() = { .binding = 42, .kind = Kind::ReadOnlyBuffer, .count = 1 };
 	*b.Append() = { .binding = 43, .kind = Kind::ReadOnlyBuffer, .count = 1 };
+	if (hasTransforms) {
+		*b.Append() = { .binding = 44, .kind = Kind::ReadOnlyBuffer, .count = 1 };
+		*b.Append() = { .binding = 45, .kind = Kind::ReadOnlyBuffer, .count = 1 };
+	}
 	return b;
 }
 
@@ -633,6 +684,28 @@ const ShaderSource& LineCullDepthShader()
 	static const ShaderSource				source(
 		   "lineCullDepth",
 		   { .cs = String("#define LINE_DEPTH 1\n") + LineCullCS,
+					 .computeBindings = bindings });
+	return source;
+}
+
+
+const ShaderSource& LineCullTransformShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeLineCullBindings(0, true);
+	static const ShaderSource				source(
+		   "lineCullTransform",
+		   { .cs = String("#define LINE_TRANSFORM 1\n") + LineCullCS,
+					 .computeBindings = bindings });
+	return source;
+}
+
+
+const ShaderSource& LineCullDepthTransformShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeLineCullBindings(LineRenderer::cMaxDepthLevels, true);
+	static const ShaderSource				source(
+		   "lineCullDepthTransform",
+		   { .cs = String("#define LINE_DEPTH 1\n#define LINE_TRANSFORM 1\n") + LineCullCS,
 					 .computeBindings = bindings });
 	return source;
 }

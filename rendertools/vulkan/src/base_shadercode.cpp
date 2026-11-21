@@ -45,6 +45,9 @@ const ShaderSource& LineDrawHiddenShader();
 const ShaderSource& LineDrawFacesShader();
 const ShaderSource& LineCullShader();
 const ShaderSource& LineCullDepthShader();
+const ShaderSource& LineDrawFacesTransformShader();
+const ShaderSource& LineCullTransformShader();
+const ShaderSource& LineCullDepthTransformShader();
 const ShaderSource& SkyboxShader();
 const ShaderSource& BlackholeShader();
 const ShaderSource& KuwaharaTensorShader();
@@ -112,6 +115,9 @@ BaseShaderCode::BaseShaderCode()
 		&LineDrawFacesShader(),
 		&LineCullShader(),
 		&LineCullDepthShader(),
+		&LineDrawFacesTransformShader(),
+		&LineCullTransformShader(),
+		&LineCullDepthTransformShader(),
 		&SkyboxShader(),
 		&BlackholeShader(),
 		&KuwaharaTensorShader(),

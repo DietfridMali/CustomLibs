@@ -39,9 +39,12 @@ void LineRenderer::Destroy(void)
 	m_slotBuffer.Destroy();
 	m_visibleBuffer.Destroy();
 	m_commandBuffer.Destroy();
+	m_transformSlotBuffer.Destroy();
 	m_slotCapacity = 0;
 	m_visibleCapacity = 0;
 	m_commandCapacity = 0;
+	m_transformSlotCapacity = 0;
+	m_hasTransformSlots = false;
 #endif
 	m_lines.Reset();
 	m_faces.Reset();
@@ -358,6 +361,37 @@ bool LineRenderer::UploadRanges(const GfxTypes::Range* ranges, int count, bool o
 		return false;
 	return not m_hasFaces or m_faceBuffer.UploadRanges(ranges, count, ordered);
 }
+
+
+bool LineRenderer::SetTransformSlots(int first, int count, uint32_t slot)
+{
+	if (not m_isAvailable or (first < 0) or (count <= 0) or (first + count > m_capacity))
+		return false;
+	if (m_transformSlotCapacity < m_capacity) {
+		m_transformSlotCapacity = 0;
+		if (not m_transformSlotBuffer.Create(m_capacity))
+			return false;
+		m_transformSlotCapacity = m_capacity;
+	}
+
+	uint32_t* slots = m_transformSlotBuffer.m_data.DataPtr(first);
+
+	for (int i = 0; i < count; ++i)
+		slots[i] = slot;
+	return true;
+}
+
+
+bool LineRenderer::UploadTransformSlots(void)
+{
+	m_hasTransformSlots = false;
+	if (not (m_isAvailable and m_isResident) or (m_count <= 0) or (m_transformSlotCapacity < m_count))
+		return false;
+	if (not m_transformSlotBuffer.UploadRange(0, m_count, false))
+		return false;
+	m_hasTransformSlots = true;
+	return true;
+}
 #endif
 
 
@@ -448,7 +482,8 @@ bool LineRenderer::RenderCulled(int count, RenderTarget* const* depthLevels, int
 		depthLevelCount = 0;
 	if (depthLevelCount > cMaxDepthLevels)
 		depthLevelCount = cMaxDepthLevels;
-	ComputeShader* cull = baseShaderHandler.SetupComputeShader((depthLevelCount > 0) ? "lineCullDepth" : "lineCull");
+	bool			hasTransforms = UsesTransforms();
+	ComputeShader*	cull = baseShaderHandler.SetupComputeShader(hasTransforms ? ((depthLevelCount > 0) ? "lineCullDepthTransform" : "lineCullTransform") : ((depthLevelCount > 0) ? "lineCullDepth" : "lineCull"));
 	if ((cull == nullptr) or not cull->IsValid())
 		return false;
 	if (not (ReserveVisibleBuffer() and ReserveCommands(m_commandBuffer.AppendBase() + 1)))
@@ -484,6 +519,11 @@ bool LineRenderer::RenderCulled(int count, RenderTarget* const* depthLevels, int
 		for (int i = 0; i < cMaxDepthLevels; ++i)
 			cull->BindSampledImage(uint32_t(4 + i), depthLevels[(i < depthLevelCount) ? i : depthLevelCount - 1], 0);
 	}
+	if (hasTransforms) {
+		cull->SetInt("transformStride", m_transformStride);
+		m_transformBuffer->BindReadOnly(2);
+		m_transformSlotBuffer.BindReadOnly(3);
+	}
 	m_buffer.BindReadOnly(0);
 	m_faceBuffer.BindReadOnly(1);
 	m_visibleBuffer.Bind(0);
@@ -499,6 +539,10 @@ bool LineRenderer::RenderCulled(int count, RenderTarget* const* depthLevels, int
 	m_visibleBuffer.Release(0);
 	m_faceBuffer.ReleaseReadOnly(1);
 	m_buffer.ReleaseReadOnly(0);
+	if (hasTransforms) {
+		m_transformSlotBuffer.ReleaseReadOnly(3);
+		m_transformBuffer->ReleaseReadOnly(2);
+	}
 	m_visibleBuffer.ComputeAccessBarrier();
 	m_commandBuffer.ComputeAccessBarrier();
 	if (not isCulled)
@@ -538,7 +582,12 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states, bool isCulled
 		return nullptr;
 #endif
 
-	Shader* shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? "lineDrawFaces" : (m_occluderDepth != nullptr) ? "lineDrawHidden" : "lineDraw");
+#ifndef OPENGL
+	bool hasTransforms = UsesTransforms();
+#else
+	bool hasTransforms = false;
+#endif
+	Shader* shader = baseShaderHandler.SetupRenderShader(m_hasFaces ? (hasTransforms ? "lineDrawFacesTransform" : "lineDrawFaces") : (m_occluderDepth != nullptr) ? "lineDrawHidden" : "lineDraw");
 
 	if (shader == nullptr)
 		return nullptr;
@@ -590,6 +639,11 @@ Shader* LineRenderer::BeginDraw(int firstLine, DrawStates& states, bool isCulled
 			m_visibleBuffer.BindInstanceStream("Uint", 0);
 		else
 			m_slotBuffer.BindInstanceStream("Uint", 0);
+		if (hasTransforms) {
+			shader->SetInt("transformStride", m_transformStride);
+			m_transformBuffer->BindReadOnly(2);
+			m_transformSlotBuffer.BindReadOnly(3);
+		}
 #endif
 	}
 	return shader;
@@ -601,6 +655,10 @@ void LineRenderer::EndDraw(const DrawStates& states, bool isBound)
 	if (isBound) {
 		if (m_hasFaces) {
 #ifndef OPENGL
+			if (UsesTransforms()) {
+				m_transformSlotBuffer.ReleaseReadOnly(3);
+				m_transformBuffer->ReleaseReadOnly(2);
+			}
 			m_slotBuffer.ReleaseInstanceStream("Uint", 0);
 #endif
 			m_sceneDepth->Deactivate();
