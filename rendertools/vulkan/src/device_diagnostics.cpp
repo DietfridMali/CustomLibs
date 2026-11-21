@@ -107,6 +107,8 @@ noexcept
 
 } // namespace
 
+static_assert(DeviceDiagnostics::kFrameSlots == CommandQueue::FRAME_COUNT, "draw statistics keep one query block per frame slot");
+
 // =================================================================================================
 
 void DeviceDiagnostics::Select(VkPhysicalDevice physicalDevice, bool hasFaultExtension, bool hasCheckpointExtension, bool hasBufferMarkerExtension)
@@ -116,20 +118,39 @@ noexcept
 	m_faultFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
 	m_hasFault = false;
 	m_hasFaultBinary = false;
+	VkPhysicalDeviceFaultFeaturesEXT supportedFault{};
+	supportedFault.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
+	VkPhysicalDeviceVulkan12Features supported12{};
+	supported12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	if (hasFaultExtension)
+		supported12.pNext = &supportedFault;
+	VkPhysicalDeviceFeatures2 features{};
+	features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	features.pNext = &supported12;
+	vkGetPhysicalDeviceFeatures2(physicalDevice, &features);
 	if (hasFaultExtension) {
-		VkPhysicalDeviceFaultFeaturesEXT supported{};
-		supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
-		VkPhysicalDeviceFeatures2 features{};
-		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-		features.pNext = &supported;
-		vkGetPhysicalDeviceFeatures2(physicalDevice, &features);
-		m_hasFault = supported.deviceFault == VK_TRUE;
-		m_hasFaultBinary = m_hasFault and (supported.deviceFaultVendorBinary == VK_TRUE);
+		m_hasFault = supportedFault.deviceFault == VK_TRUE;
+		m_hasFaultBinary = m_hasFault and (supportedFault.deviceFaultVendorBinary == VK_TRUE);
 		m_faultFeatures.deviceFault = m_hasFault ? VK_TRUE : VK_FALSE;
 		m_faultFeatures.deviceFaultVendorBinary = m_hasFaultBinary ? VK_TRUE : VK_FALSE;
 	}
 	m_hasCheckpoints = hasCheckpointExtension;
 	m_hasBufferMarker = hasBufferMarkerExtension;
+	m_hasStatistics = features.features.pipelineStatisticsQuery == VK_TRUE;
+	m_hasHostQueryReset = supported12.hostQueryReset == VK_TRUE;
+
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+	m_timestampPeriod = properties.limits.timestampPeriod;
+	uint32_t familyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, nullptr);
+	std::vector<VkQueueFamilyProperties> families(familyCount);
+	if (familyCount > 0)
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, families.data());
+	uint32_t family = vkContext.GraphicsFamily();
+	uint32_t validBits = (family < familyCount) ? families[family].timestampValidBits : 0;
+	m_hasTimestamps = (validBits > 0) and (m_timestampPeriod > 0.0f);
+	m_timestampMask = (validBits >= 64) ? ~uint64_t(0) : ((uint64_t(1) << validBits) - 1);
 }
 
 
@@ -149,15 +170,156 @@ noexcept
 		m_pfnCmdWriteBufferMarker = reinterpret_cast<PFN_vkCmdWriteBufferMarkerAMD>(vkGetDeviceProcAddr(device, "vkCmdWriteBufferMarkerAMD"));
 		m_hasBufferMarker = m_pfnCmdWriteBufferMarker != nullptr;
 	}
-	logHandler.Print("Vulkan device lost diagnostics: fault info %s%s, checkpoints %s, buffer markers %s\n", m_hasFault ? "on" : "off",
-					 m_hasFaultBinary ? " (with vendor binary)" : "", m_hasCheckpoints ? "on" : "off", m_hasBufferMarker ? "on" : "off");
+	logHandler.Print("Vulkan device lost diagnostics: fault info %s%s, checkpoints %s, buffer markers %s, draw statistics %s, timestamps %s\n",
+					 m_hasFault ? "on" : "off", m_hasFaultBinary ? " (with vendor binary)" : "", m_hasCheckpoints ? "on" : "off",
+					 m_hasBufferMarker ? "on" : "off", (m_hasStatistics and m_hasHostQueryReset) ? "on" : "off", m_hasTimestamps ? "on" : "off");
 	return true;
+}
+
+
+void DeviceDiagnostics::CreateStatisticsPools(void)
+noexcept
+{
+	if (not (m_hasStatistics and m_hasHostQueryReset))
+		return;
+	VkDevice				device = vkContext.Device();
+	VkQueryPoolCreateInfo	statsInfo{};
+	statsInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	statsInfo.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
+	statsInfo.queryCount = kFrameSlots * kStatQueries;
+	statsInfo.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT | VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT | VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT | VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+	VkResult res = vkCreateQueryPool(device, &statsInfo, nullptr, &m_statsPool);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("DeviceDiagnostics::CreateStatisticsPools: statistics pool failed (%d)\n", int(res));
+		m_statsPool = VK_NULL_HANDLE;
+		return;
+	}
+	vkResetQueryPool(device, m_statsPool, 0, statsInfo.queryCount);
+	if (not m_hasTimestamps)
+		return;
+	VkQueryPoolCreateInfo timeInfo{};
+	timeInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	timeInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+	timeInfo.queryCount = 2 * kFrameSlots * kStatQueries;
+	res = vkCreateQueryPool(device, &timeInfo, nullptr, &m_timePool);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("DeviceDiagnostics::CreateStatisticsPools: timestamp pool failed (%d)\n", int(res));
+		m_timePool = VK_NULL_HANDLE;
+		return;
+	}
+	vkResetQueryPool(device, m_timePool, 0, timeInfo.queryCount);
+}
+
+
+void DeviceDiagnostics::SetDrawStatistics(bool enable)
+noexcept
+{
+	m_statsEnabled = enable;
+}
+
+
+int32_t DeviceDiagnostics::BeginDrawStatistics(VkCommandBuffer cb, const char* label)
+noexcept
+{
+	if (not m_statsEnabled or (m_statsPool == VK_NULL_HANDLE) or (cb == VK_NULL_HANDLE))
+		return -1;
+	uint32_t slot = commandListHandler.CmdQueue().FrameIndex();
+	if ((slot >= kFrameSlots) or (m_statCount[slot] >= kStatQueries))
+		return -1;
+	uint32_t n = m_statCount[slot]++;
+	uint32_t query = slot * kStatQueries + n;
+	snprintf(m_statLabels[slot][n], kNameSize, "%s", label ? label : "");
+	m_statEnded[slot][n] = false;
+	m_statFrame[slot] = commandListHandler.CmdQueue().FrameNumber();
+	if (m_timePool != VK_NULL_HANDLE)
+		vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_timePool, 2 * query);
+	vkCmdBeginQuery(cb, m_statsPool, query, 0);
+	return int32_t(query);
+}
+
+
+void DeviceDiagnostics::EndDrawStatistics(VkCommandBuffer cb, int32_t handle)
+noexcept
+{
+	if ((handle < 0) or (cb == VK_NULL_HANDLE) or (m_statsPool == VK_NULL_HANDLE))
+		return;
+	uint32_t query = uint32_t(handle);
+	vkCmdEndQuery(cb, m_statsPool, query);
+	if (m_timePool != VK_NULL_HANDLE)
+		vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_timePool, 2 * query + 1);
+	m_statEnded[query / kStatQueries][query % kStatQueries] = true;
+}
+
+
+void DeviceDiagnostics::ResolveDrawStatistics(uint32_t frameIndex)
+noexcept
+{
+	if ((m_statsPool == VK_NULL_HANDLE) or (frameIndex >= kFrameSlots))
+		return;
+	uint32_t count = m_statCount[frameIndex];
+	if (count == 0)
+		return;
+	VkDevice device = vkContext.Device();
+	for (uint32_t n = 0; n < count; ++n) {
+		if (not m_statEnded[frameIndex][n])
+			continue;
+		uint32_t	query = frameIndex * kStatQueries + n;
+		uint64_t	values[kStatValues + 1]{};
+		VkResult	res = vkGetQueryPoolResults(device, m_statsPool, query, 1, sizeof(values), values, sizeof(values),
+												VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+		if ((res != VK_SUCCESS) or (values[kStatValues] == 0))
+			continue;
+		DrawStats& stats = m_lastStats[m_lastStatCount % kLastStats];
+		++m_lastStatCount;
+		stats.frame = m_statFrame[frameIndex];
+		for (uint32_t i = 0; i < kStatValues; ++i)
+			stats.values[i] = values[i];
+		snprintf(stats.label, kNameSize, "%s", m_statLabels[frameIndex][n]);
+		stats.gpuMs = -1.0;
+		if (m_timePool != VK_NULL_HANDLE) {
+			uint64_t times[4]{};
+			res = vkGetQueryPoolResults(device, m_timePool, 2 * query, 2, sizeof(times), times, 2 * sizeof(uint64_t),
+										VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+			if ((res == VK_SUCCESS) and (times[1] != 0) and (times[3] != 0))
+				stats.gpuMs = double((times[2] - times[0]) & m_timestampMask) * double(m_timestampPeriod) * 1.0e-6;
+		}
+		if (m_statsEnabled)
+			LogDrawStats("draw stats", stats);
+	}
+	vkResetQueryPool(device, m_statsPool, frameIndex * kStatQueries, count);
+	if (m_timePool != VK_NULL_HANDLE)
+		vkResetQueryPool(device, m_timePool, 2 * frameIndex * kStatQueries, 2 * count);
+	m_statCount[frameIndex] = 0;
+}
+
+
+void DeviceDiagnostics::LogDrawStats(const char* prefix, const DrawStats& stats) const
+noexcept
+{
+	logHandler.Print("%s frame %llu: '%s': vertices %llu, primitives %llu, VS %llu, clip in %llu, clip out %llu, FS %llu, gpu %.3f ms\n", prefix,
+					 static_cast<unsigned long long>(stats.frame), stats.label, static_cast<unsigned long long>(stats.values[0]),
+					 static_cast<unsigned long long>(stats.values[1]), static_cast<unsigned long long>(stats.values[2]),
+					 static_cast<unsigned long long>(stats.values[3]), static_cast<unsigned long long>(stats.values[4]),
+					 static_cast<unsigned long long>(stats.values[5]), stats.gpuMs);
+}
+
+
+void DeviceDiagnostics::ReportLastStats(void)
+noexcept
+{
+	uint32_t count = (m_lastStatCount < kLastStats) ? m_lastStatCount : kLastStats;
+	logHandler.Print("  last %u resolved draw statistics:\n", count);
+	for (uint32_t i = m_lastStatCount - count; i < m_lastStatCount; ++i)
+		LogDrawStats("   ", m_lastStats[i % kLastStats]);
 }
 
 
 bool DeviceDiagnostics::Create(VmaAllocator allocator)
 noexcept
 {
+	CreateStatisticsPools();
 	if (not m_hasBufferMarker)
 		return true;
 	VkBufferCreateInfo bufferInfo{};
@@ -190,6 +352,16 @@ noexcept
 void DeviceDiagnostics::Destroy(VmaAllocator allocator)
 noexcept
 {
+	VkDevice device = vkContext.Device();
+	if ((m_statsPool != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
+		vkDestroyQueryPool(device, m_statsPool, nullptr);
+	if ((m_timePool != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
+		vkDestroyQueryPool(device, m_timePool, nullptr);
+	m_statsPool = VK_NULL_HANDLE;
+	m_timePool = VK_NULL_HANDLE;
+	m_statsEnabled = false;
+	for (uint32_t slot = 0; slot < kFrameSlots; ++slot)
+		m_statCount[slot] = 0;
 	if ((m_markerBuffer != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE))
 		vmaDestroyBuffer(allocator, m_markerBuffer, m_markerAllocation);
 	m_markerBuffer = VK_NULL_HANDLE;
@@ -284,6 +456,7 @@ noexcept
 	ReportBufferMarkers();
 	ReportGpuWindow();
 	ReportRecentMarks();
+	ReportLastStats();
 	gfxStates.LogMemoryUsage("device lost");
 }
 

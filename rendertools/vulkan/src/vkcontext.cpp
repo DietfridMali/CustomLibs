@@ -802,6 +802,10 @@ noexcept
 			deviceExtensions[deviceExtensionCount++] = VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME;
 		if (deviceDiagnostics.HasBufferMarker())
 			deviceExtensions[deviceExtensionCount++] = VK_AMD_BUFFER_MARKER_EXTENSION_NAME;
+		if (deviceDiagnostics.HasPipelineStatistics())
+			features.pipelineStatisticsQuery = VK_TRUE;
+		if (deviceDiagnostics.HasHostQueryReset())
+			feats12.hostQueryReset = VK_TRUE;
 	}
 
 	VkDeviceCreateInfo info{};

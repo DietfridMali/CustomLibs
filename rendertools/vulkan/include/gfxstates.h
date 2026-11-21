@@ -362,6 +362,12 @@ public:
 
 	void DiagnosticMark(const char* text);
 
+	void SetDrawStatistics(bool enable);
+
+	int32_t BeginDrawStatistics(const char* label);
+
+	void EndDrawStatistics(int32_t handle);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxImageDimension2D, bit_floor(sqrt(maxAlloc / bpp))).

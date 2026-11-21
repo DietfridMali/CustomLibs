@@ -458,6 +458,25 @@ void GfxStates::DiagnosticMark(const char* text)
 }
 
 
+void GfxStates::SetDrawStatistics(bool enable)
+{
+	(void)enable;
+}
+
+
+int32_t GfxStates::BeginDrawStatistics(const char* label)
+{
+	(void)label;
+	return -1;
+}
+
+
+void GfxStates::EndDrawStatistics(int32_t handle)
+{
+	(void)handle;
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT support{ .Format = ToDXGIFormat(format) };

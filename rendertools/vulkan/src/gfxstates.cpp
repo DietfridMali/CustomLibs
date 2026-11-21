@@ -700,6 +700,26 @@ void GfxStates::DiagnosticMark(const char* text)
 }
 
 
+void GfxStates::SetDrawStatistics(bool enable)
+{
+	deviceDiagnostics.SetDrawStatistics(enable);
+}
+
+
+int32_t GfxStates::BeginDrawStatistics(const char* label)
+{
+	CommandList* list = commandListHandler.CurrentCmdList();
+	return list ? deviceDiagnostics.BeginDrawStatistics(list->GfxList(), label) : -1;
+}
+
+
+void GfxStates::EndDrawStatistics(int32_t handle)
+{
+	if (CommandList* list = commandListHandler.CurrentCmdList())
+		deviceDiagnostics.EndDrawStatistics(list->GfxList(), handle);
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	VkFormatProperties props{};

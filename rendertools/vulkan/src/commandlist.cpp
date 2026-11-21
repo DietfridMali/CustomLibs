@@ -429,6 +429,7 @@ noexcept
 		logHandler.Print("CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
 		return false;
 	}
+	deviceDiagnostics.ResolveDrawStatistics(m_frameIndex);
 	// The slot's resources hang on its fence alone, so they are reset before the image is acquired -
 	// a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
 #if LOG_FRAME_METRICS
