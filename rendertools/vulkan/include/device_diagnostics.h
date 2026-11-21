@@ -18,12 +18,16 @@ public:
 		Pipeline,
 		Compute,
 		OneShotBegin,
-		OneShotEnd
+		OneShotEnd,
+		Draw
 	};
 
 	static constexpr uint32_t	kRingSize = 32768;
-	static constexpr size_t		kNameSize = 48;
+	static constexpr size_t		kNameSize = 96;
+	static constexpr size_t		kTextSize = 256;
 	static constexpr uint32_t	kRecentMarks = 32;
+	static constexpr uint32_t	kWindowContext = 8;
+	static constexpr uint32_t	kWindowMax = 256;
 
 	struct Record {
 		uint32_t	serial{ 0 };
@@ -89,9 +93,17 @@ private:
 	volatile uint32_t*					m_markerData{ nullptr };
 	std::atomic<uint32_t>				m_serial{ 0 };
 	std::atomic<bool>					m_isReported{ false };
+	uint32_t							m_gpuLow{ 0 };
+	uint32_t							m_gpuHigh{ 0 };
 	Record								m_records[kRingSize];
 
 	void FormatMark(uint32_t serial, char* text, size_t size) const
+	noexcept;
+
+	void NoteGpuMark(uint32_t serial)
+	noexcept;
+
+	void ReportGpuWindow(void)
 	noexcept;
 
 	void ReportFault(void)

@@ -13,6 +13,7 @@
 #include "descriptor_pool_handler.h"
 #include "resource_handler.h"
 #include "cbv_allocator.h"
+#include "device_diagnostics.h"
 #include "loghandler.h"
 
 #include <cstdio>
@@ -689,6 +690,13 @@ void GfxStates::LogMemoryUsage(const char* tag)
 					 cbvAllocator.Capacity(0) >> 10, cbvAllocator.Capacity(1) >> 10, static_cast<unsigned long long>(commandListHandler.m_cmdListId - 1),
 					 commandListHandler.m_recycledLists.Length(), commandListHandler.m_pendingLists.Length(), gfxResourceHandler.m_cleanupCallbacks[0].Length(),
 					 gfxResourceHandler.m_cleanupCallbacks[1].Length());
+}
+
+
+void GfxStates::DiagnosticMark(const char* text)
+{
+	if (CommandList* list = commandListHandler.CurrentCmdList())
+		deviceDiagnostics.Mark(list->GfxList(), DeviceDiagnostics::MarkKind::Draw, text);
 }
 
 

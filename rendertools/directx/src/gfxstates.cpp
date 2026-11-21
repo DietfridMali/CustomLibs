@@ -452,6 +452,12 @@ void GfxStates::LogMemoryUsage(const char* tag)
 }
 
 
+void GfxStates::DiagnosticMark(const char* text)
+{
+	(void)text;
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT support{ .Format = ToDXGIFormat(format) };

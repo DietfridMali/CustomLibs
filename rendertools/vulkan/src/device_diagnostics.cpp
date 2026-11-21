@@ -31,6 +31,8 @@ noexcept
 			return "one-shot begin";
 		case DeviceDiagnostics::MarkKind::OneShotEnd:
 			return "one-shot end";
+		case DeviceDiagnostics::MarkKind::Draw:
+			return "draw";
 	}
 	return "?";
 }
@@ -236,6 +238,39 @@ noexcept
 }
 
 
+void DeviceDiagnostics::NoteGpuMark(uint32_t serial)
+noexcept
+{
+	if (serial == 0)
+		return;
+	if ((m_gpuLow == 0) or (serial < m_gpuLow))
+		m_gpuLow = serial;
+	if (serial > m_gpuHigh)
+		m_gpuHigh = serial;
+}
+
+
+void DeviceDiagnostics::ReportGpuWindow(void)
+noexcept
+{
+	if (m_gpuHigh == 0) {
+		logHandler.Print("  marks around the GPU position: no GPU position known\n");
+		return;
+	}
+	uint32_t last = m_serial.load();
+	uint32_t first = (m_gpuLow > kWindowContext) ? m_gpuLow - kWindowContext : 1;
+	uint32_t end = ((last - m_gpuHigh) > kWindowContext) ? m_gpuHigh + kWindowContext : last;
+	if (end - first + 1 > kWindowMax)
+		end = first + kWindowMax - 1;
+	logHandler.Print("  marks around the GPU position (%u..%u, '>' = between last finished and last started):\n", first, end);
+	for (uint32_t serial = first; serial <= end; ++serial) {
+		char text[kTextSize];
+		FormatMark(serial, text, sizeof(text));
+		logHandler.Print("  %c %s\n", ((serial >= m_gpuLow) and (serial <= m_gpuHigh)) ? '>' : ' ', text);
+	}
+}
+
+
 void DeviceDiagnostics::Report(void)
 noexcept
 {
@@ -247,6 +282,7 @@ noexcept
 	ReportFault();
 	ReportCheckpoints();
 	ReportBufferMarkers();
+	ReportGpuWindow();
 	ReportRecentMarks();
 	gfxStates.LogMemoryUsage("device lost");
 }
@@ -341,9 +377,10 @@ noexcept
 		m_pfnGetQueueCheckpointData(queue, &count, data.data());
 	logHandler.Print("  checkpoints: %u (last mark the GPU reached per pipeline stage)\n", count);
 	for (uint32_t i = 0; i < count; ++i) {
-		char		text[160];
+		char		text[kTextSize];
 		uint32_t	serial = uint32_t(reinterpret_cast<uintptr_t>(data[i].pCheckpointMarker));
 		const char*	stage = StageText(data[i].stage);
+		NoteGpuMark(serial);
 		FormatMark(serial, text, sizeof(text));
 		if (stage != nullptr)
 			logHandler.Print("    %s: %s\n", stage, text);
@@ -360,8 +397,10 @@ noexcept
 		logHandler.Print("  buffer markers: not available on this device\n");
 		return;
 	}
-	char started[160];
-	char finished[160];
+	char started[kTextSize];
+	char finished[kTextSize];
+	NoteGpuMark(m_markerData[0]);
+	NoteGpuMark(m_markerData[1]);
 	FormatMark(m_markerData[0], started, sizeof(started));
 	FormatMark(m_markerData[1], finished, sizeof(finished));
 	logHandler.Print("  buffer markers: last started %s\n", started);
@@ -376,7 +415,7 @@ noexcept
 	uint32_t count = (last < kRecentMarks) ? last : kRecentMarks;
 	logHandler.Print("  last %u marks recorded on the CPU:\n", count);
 	for (uint32_t serial = last - count + 1; (count > 0) and (serial <= last); ++serial) {
-		char text[160];
+		char text[kTextSize];
 		FormatMark(serial, text, sizeof(text));
 		logHandler.Print("    %s\n", text);
 	}

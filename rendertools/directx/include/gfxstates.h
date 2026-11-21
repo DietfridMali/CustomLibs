@@ -351,6 +351,8 @@ public:
 
 	void LogMemoryUsage(const char* tag);
 
+	void DiagnosticMark(const char* text);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
