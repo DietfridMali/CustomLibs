@@ -214,6 +214,7 @@
     <ClInclude Include="..\include\image_layout_tracker.h" />
     <ClInclude Include="..\include\descriptor_pool_handler.h" />
     <ClInclude Include="..\include\vkupload.h" />
+    <ClInclude Include="..\include\device_diagnostics.h" />
     <ClInclude Include="..\include\gfxupload.h" />
     <ClInclude Include="..\include\shader_compiler.h" />
     <ClInclude Include="..\include\compute_shader.h" />
@@ -251,6 +252,7 @@
     <ClCompile Include="..\src\image_layout_tracker.cpp" />
     <ClCompile Include="..\src\descriptor_pool_handler.cpp" />
     <ClCompile Include="..\src\vkupload.cpp" />
+    <ClCompile Include="..\src\device_diagnostics.cpp" />
     <ClCompile Include="..\src\shader_compiler.cpp" />
     <ClCompile Include="..\src\compute_shader.cpp" />
     <ClCompile Include="..\src\gfx_buffer.cpp" />

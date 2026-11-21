@@ -7,10 +7,19 @@
 #include "base_displayhandler.h"
 #include "rendertarget.h"
 #include "base_renderer.h"
+#include "sampler_cache.h"
+#include "pipeline_cache.h"
+#include "bindless_texture_heap.h"
+#include "descriptor_pool_handler.h"
+#include "resource_handler.h"
+#include "cbv_allocator.h"
 #include "loghandler.h"
 
 #include <cstdio>
 #include <vector>
+
+extern bool QueryProcessMemory(uint64_t& privateBytes, uint64_t& workingSet)
+noexcept;
 
 #if VK_STALL_DIAG
 extern double VkStallClock(void)
@@ -628,6 +637,58 @@ bool GfxStates::GetMemoryBudget(uint64_t& usage, uint64_t& budget)
 	usage = uint64_t(budgets[heap].usage);
 	budget = uint64_t(budgets[heap].budget);
 	return true;
+}
+
+
+void GfxStates::LogMemoryUsage(const char* tag)
+{
+	VmaAllocator allocator = vkContext.Allocator();
+
+	if (allocator == VK_NULL_HANDLE)
+		return;
+
+	VkPhysicalDeviceMemoryProperties memory{};
+	vkGetPhysicalDeviceMemoryProperties(vkContext.PhysicalDevice(), &memory);
+
+	VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+	vmaGetHeapBudgets(allocator, budgets);
+
+	uint64_t localUsage = 0;
+	uint64_t hostUsage = 0;
+	uint64_t blockBytes = 0;
+	uint64_t allocationBytes = 0;
+	uint64_t allocationCount = 0;
+	uint64_t blockCount = 0;
+
+	for (uint32_t i = 0; i < memory.memoryHeapCount; ++i) {
+		if (memory.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+			localUsage += uint64_t(budgets[i].usage);
+		else
+			hostUsage += uint64_t(budgets[i].usage);
+		blockBytes += uint64_t(budgets[i].statistics.blockBytes);
+		allocationBytes += uint64_t(budgets[i].statistics.allocationBytes);
+		allocationCount += uint64_t(budgets[i].statistics.allocationCount);
+		blockCount += uint64_t(budgets[i].statistics.blockCount);
+	}
+
+	uint64_t privateBytes = 0;
+	uint64_t workingSet = 0;
+	QueryProcessMemory(privateBytes, workingSet);
+
+	const double toMB = 1.0 / (1024.0 * 1024.0);
+	logHandler.Print("%s: process private %.0f MB, working set %.0f MB | gpu device local %.0f MB, host %.0f MB | vma %llu allocations, %.0f MB in %.0f MB blocks\n",
+					 tag, double(privateBytes) * toMB, double(workingSet) * toMB, double(localUsage) * toMB, double(hostUsage) * toMB,
+					 static_cast<unsigned long long>(allocationCount), double(allocationBytes) * toMB, double(blockBytes) * toMB);
+
+	const VkPhysicalDeviceLimits& limits = vkContext.DeviceProps().limits;
+	logHandler.Print("%s: memory blocks %llu of %u, samplers %d of %u, pipelines %d + %d libraries, texture heap %u of %u, descriptor overflow pools %d + %d, constant chunks %u + %u (%u + %u KB), command lists %llu created %d recycled %d pending, cleanups pending %d + %d\n",
+					 tag, static_cast<unsigned long long>(blockCount), limits.maxMemoryAllocationCount, samplerCache.Count(), limits.maxSamplerAllocationCount,
+					 pipelineCache.m_pipelines.Length(), pipelineCache.m_shaderLibraries.Length() + pipelineCache.m_outputLibraries.Length(),
+					 bindlessTextureHeap.Used(), bindlessTextureHeap.Capacity(), int(descriptorPoolHandler.m_overflowPools[0].size()),
+					 int(descriptorPoolHandler.m_overflowPools[1].size()), cbvAllocator.ChunkCount(0), cbvAllocator.ChunkCount(1),
+					 cbvAllocator.Capacity(0) >> 10, cbvAllocator.Capacity(1) >> 10, static_cast<unsigned long long>(commandListHandler.m_cmdListId - 1),
+					 commandListHandler.m_recycledLists.Length(), commandListHandler.m_pendingLists.Length(), gfxResourceHandler.m_cleanupCallbacks[0].Length(),
+					 gfxResourceHandler.m_cleanupCallbacks[1].Length());
 }
 
 

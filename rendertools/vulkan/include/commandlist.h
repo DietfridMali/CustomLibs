@@ -17,6 +17,7 @@
 #ifdef _DEBUG
 #include <source_location>
 #include <cstdio>
+#include <thread>
 #endif
 
 class Shader;
@@ -59,6 +60,7 @@ public:
 	bool		m_swapchainIsOutOfDate{ false };
 	bool		m_hasImage{ false };
 	bool		m_isInFrame{ false };
+	std::thread::id	m_frameThread{};
 
 	bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
 				uint32_t graphicsFamily, uint32_t presentFamily,
@@ -141,6 +143,11 @@ public:
 	noexcept
 	{
 		return m_isInFrame;
+	}
+	inline std::thread::id FrameThread(void) const
+	noexcept
+	{
+		return m_frameThread;
 	}
 	inline uint32_t ImageIndex(void) const
 	noexcept

@@ -17,6 +17,7 @@
 #include "descriptor_pool_handler.h"
 #include "bindless_texture_heap.h"
 #include "vkupload.h"
+#include "device_diagnostics.h"
 #include "rendertarget.h"
 #include "gfxrenderer.h"
 #include "loghandler.h"
@@ -879,6 +880,7 @@ bool ComputeShader::Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t gr
 		vkUpdateDescriptorSets(device, writeCount, writes, 0, nullptr);
 
 	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
+	deviceDiagnostics.Mark(cb, DeviceDiagnostics::MarkKind::Compute, static_cast<const char*>(m_name));
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, m_usesBindless ? 2 : 1, sets,
 							dynamicOffsetCount, dynamicOffsetCount ? dynamicOffsets : nullptr);
@@ -1045,6 +1047,7 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 		return false;
 
 	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
+	deviceDiagnostics.Mark(once.cb, DeviceDiagnostics::MarkKind::Compute, static_cast<const char*>(m_name));
 	vkCmdBindPipeline(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 	vkCmdBindDescriptorSets(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, m_usesBindless ? 2 : 1, sets,
 							dynamicOffsetCount, dynamicOffsetCount ? &dynamicOffset : nullptr);

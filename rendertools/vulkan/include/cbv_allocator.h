@@ -107,6 +107,18 @@ public:
 	{
 		return m_align;
 	}
+
+	inline uint32_t Capacity(uint32_t frameIndex) const
+	noexcept
+	{
+		return m_frames[frameIndex].capacity;
+	}
+
+	inline uint32_t ChunkCount(uint32_t frameIndex) const
+	noexcept
+	{
+		return uint32_t(m_frames[frameIndex].overflow.size());
+	}
 };
 
 #define cbvAllocator CbvLinearAllocator::Instance()

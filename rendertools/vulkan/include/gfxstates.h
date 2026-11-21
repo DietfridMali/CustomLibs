@@ -358,6 +358,8 @@ public:
 
 	bool GetMemoryBudget(uint64_t& usage, uint64_t& budget);
 
+	void LogMemoryUsage(const char* tag);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxImageDimension2D, bit_floor(sqrt(maxAlloc / bpp))).

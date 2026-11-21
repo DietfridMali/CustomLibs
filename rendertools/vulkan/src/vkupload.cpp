@@ -7,6 +7,7 @@
 #include "texture_mips.h"
 #include "resource_handler.h"
 #include "commandlist.h"
+#include "device_diagnostics.h"
 #include "loghandler.h"
 #include "timer.hpp"
 
@@ -14,6 +15,18 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <mutex>
+#include <thread>
+
+#ifdef _WIN32
+#	ifndef NOMINMAX
+#		define NOMINMAX
+#	endif
+#	include <windows.h>
+#	include <dbghelp.h>
+#	include <psapi.h>
+#	pragma comment(lib, "dbghelp.lib")
+#endif
 
 // commandlist.cpp - ends the program with a message when res is VK_ERROR_DEVICE_LOST.
 extern void HandleDeviceLost(VkResult res, const char* where)
@@ -50,6 +63,110 @@ static constexpr int64_t	cOneShotLogInterval = 5000000;
 static int64_t				frameOneShotCount = 0;
 static int64_t				frameOneShotWait = 0;
 static int64_t				frameOneShotLogTime = 0;
+static constexpr int32_t	cOneShotStackDepth = 24;
+static constexpr int32_t	cOneShotStackKeyFrames = 8;
+static constexpr int32_t	cOneShotStackLogMax = 256;
+static uint32_t				oneShotStackHashes[cOneShotStackLogMax];
+static int32_t				oneShotStackCount = 0;
+static std::mutex			oneShotStackLock;
+
+
+#ifdef _WIN32
+static bool InitStackSymbols(HANDLE process)
+noexcept
+{
+	char path[MAX_PATH] = "";
+	DWORD length = GetModuleFileNameA(nullptr, path, MAX_PATH);
+	while ((length > 0) and (path[length - 1] != '\\') and (path[length - 1] != '/'))
+		--length;
+	path[(length > 0) ? length - 1 : 0] = '\0';
+	SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+	return SymInitialize(process, (path[0] != '\0') ? path : nullptr, TRUE) != FALSE;
+}
+
+
+static void PrintModuleOffset(DWORD64 address)
+noexcept
+{
+	HMODULE module = nullptr;
+	char path[MAX_PATH] = "";
+	if (not GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(address), &module) or
+		(GetModuleFileNameA(module, path, MAX_PATH) == 0)) {
+		logHandler.Print("  0x%llx\n", static_cast<unsigned long long>(address));
+		return;
+	}
+	const char* name = path;
+	for (const char* c = path; *c != '\0'; ++c) {
+		if ((*c == '\\') or (*c == '/'))
+			name = c + 1;
+	}
+	logHandler.Print("  %s+0x%llx\n", name, static_cast<unsigned long long>(address - DWORD64(reinterpret_cast<uintptr_t>(module))));
+}
+#endif
+
+
+static void LogOneShotStack(void)
+noexcept
+{
+#ifdef _WIN32
+	void* frames[cOneShotStackDepth];
+	USHORT count = CaptureStackBackTrace(2, cOneShotStackDepth, frames, nullptr);
+	uint32_t hash = 2166136261u;
+	for (USHORT i = 0; (i < count) and (i < cOneShotStackKeyFrames); ++i) {
+		hash ^= uint32_t(reinterpret_cast<uintptr_t>(frames[i]));
+		hash *= 16777619u;
+	}
+	std::lock_guard<std::mutex> guard(oneShotStackLock);
+	for (int32_t i = 0; i < oneShotStackCount; ++i) {
+		if (oneShotStackHashes[i] == hash)
+			return;
+	}
+	if (oneShotStackCount >= cOneShotStackLogMax)
+		return;
+	oneShotStackHashes[oneShotStackCount++] = hash;
+	HANDLE process = GetCurrentProcess();
+	static bool isSymbolReady = InitStackSymbols(process);
+	bool isFrameThread = std::this_thread::get_id() == commandListHandler.CmdQueue().FrameThread();
+	logHandler.Print("blocking submit during frame %llu (%s thread), call stack:\n", static_cast<unsigned long long>(commandListHandler.CmdQueue().FrameNumber()), isFrameThread ? "frame" : "OTHER");
+	alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 256];
+	SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer);
+	for (USHORT i = 0; i < count; ++i) {
+		DWORD64 address = DWORD64(reinterpret_cast<uintptr_t>(frames[i]));
+		std::memset(buffer, 0, sizeof(buffer));
+		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+		symbol->MaxNameLen = 255;
+		DWORD64 displacement = 0;
+		IMAGEHLP_LINE64 line{};
+		line.SizeOfStruct = sizeof(line);
+		DWORD lineDisplacement = 0;
+		bool hasSymbol = isSymbolReady and (SymFromAddr(process, address, &displacement, symbol) != FALSE);
+		bool hasLine = hasSymbol and (SymGetLineFromAddr64(process, address, &lineDisplacement, &line) != FALSE);
+		if (hasLine)
+			logHandler.Print("  %s (%s:%lu)\n", symbol->Name, line.FileName, static_cast<unsigned long>(line.LineNumber));
+		else if (hasSymbol)
+			logHandler.Print("  %s+0x%llx\n", symbol->Name, static_cast<unsigned long long>(displacement));
+		else
+			PrintModuleOffset(address);
+	}
+#endif
+}
+
+
+bool QueryProcessMemory(uint64_t& privateBytes, uint64_t& workingSet)
+noexcept
+{
+#ifdef _WIN32
+	PROCESS_MEMORY_COUNTERS_EX counters{};
+	counters.cb = sizeof(counters);
+	if (not K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)))
+		return false;
+	privateBytes = uint64_t(counters.PrivateUsage);
+	workingSet = uint64_t(counters.WorkingSetSize);
+	return true;
+#else
+	return false;
+#endif
+}
 
 
 void CountFrameOneShot(int64_t waitStart)
@@ -59,6 +176,7 @@ noexcept
 		return;
 	++frameOneShotCount;
 	frameOneShotWait += HiresTimer::GetHiresTime() - waitStart;
+	LogOneShotStack();
 }
 
 
@@ -144,6 +262,7 @@ noexcept
 		out.cb = VK_NULL_HANDLE;
 		return false;
 	}
+	deviceDiagnostics.Mark(out.cb, DeviceDiagnostics::MarkKind::OneShotBegin, "one-shot");
 	return true;
 }
 
@@ -156,6 +275,7 @@ noexcept
 	if ((device == VK_NULL_HANDLE) or (queue == VK_NULL_HANDLE))
 		return false;
 
+	deviceDiagnostics.Mark(cmd.cb, DeviceDiagnostics::MarkKind::OneShotEnd, "one-shot");
 	VkResult res = vkEndCommandBuffer(cmd.cb);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("vkupload::EndSingleTimeCommands: vkEndCommandBuffer failed (%d)\n", (int)res);

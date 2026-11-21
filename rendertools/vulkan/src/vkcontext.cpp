@@ -13,6 +13,7 @@
 #include "acceleration_structure.h"
 #include "vk13api.h"
 #include "xrhandler.h"
+#include "device_diagnostics.h"
 #include "array.hpp"
 #include "loghandler.h"
 
@@ -160,6 +161,7 @@ noexcept
 		return false;
 	if (not CreateAllocator())
 		return false;
+	deviceDiagnostics.Create(m_allocator);
 	++m_generation;
 	return true;
 }
@@ -173,6 +175,7 @@ noexcept
 		m_pinnedPool = VK_NULL_HANDLE;
 	}
 	m_pinnedPoolFailed = false;
+	deviceDiagnostics.Destroy(m_allocator);
 	if (m_allocator != VK_NULL_HANDLE) {
 		vmaDestroyAllocator(m_allocator);
 		m_allocator = VK_NULL_HANDLE;
@@ -626,7 +629,7 @@ noexcept
 		  chain = &feature.pNext;
 	};
 
-	const char* deviceExtensions[16] = {
+	const char* deviceExtensions[24] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	};
 	uint32_t deviceExtensionCount = 1;
@@ -788,6 +791,17 @@ noexcept
 			HasDeviceExtension(extensions, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 		if (m_hasMemoryBudget)
 			deviceExtensions[deviceExtensionCount++] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
+		deviceDiagnostics.Select(m_physicalDevice, HasDeviceExtension(extensions, VK_EXT_DEVICE_FAULT_EXTENSION_NAME),
+								 HasDeviceExtension(extensions, VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME),
+								 HasDeviceExtension(extensions, VK_AMD_BUFFER_MARKER_EXTENSION_NAME));
+		if (deviceDiagnostics.HasFault()) {
+			append(deviceDiagnostics.FaultFeatures());
+			deviceExtensions[deviceExtensionCount++] = VK_EXT_DEVICE_FAULT_EXTENSION_NAME;
+		}
+		if (deviceDiagnostics.HasCheckpoints())
+			deviceExtensions[deviceExtensionCount++] = VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME;
+		if (deviceDiagnostics.HasBufferMarker())
+			deviceExtensions[deviceExtensionCount++] = VK_AMD_BUFFER_MARKER_EXTENSION_NAME;
 	}
 
 	VkDeviceCreateInfo info{};
@@ -811,6 +825,7 @@ noexcept
 		return false;
 	}
 
+	deviceDiagnostics.Load(m_device);
 	vkGetDeviceQueue(m_device, m_graphicsFamily, 0, &m_graphicsQueue);
 	vkGetDeviceQueue(m_device, m_presentFamily, 0, &m_presentQueue);
 	if (m_hasRayTracing and not RayTracingApi::Load(m_device, m_physicalDevice)) {

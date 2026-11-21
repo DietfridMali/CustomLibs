@@ -37,6 +37,13 @@ public:
 	noexcept;
 
 
+	inline int32_t Count(void) const
+	noexcept
+	{
+		return m_samplers.Length();
+	}
+
+
 private:
 	SamplerMap				m_cache;
 	AutoArray<VkSampler>	m_samplers; // companion list for Destroy iteration
