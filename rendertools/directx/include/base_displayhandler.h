@@ -268,10 +268,10 @@ public:
 	virtual void RequestDisplayChange(int /*displayMode*/, bool /*useFullscreen*/)
 	{}
 
-private:
 	bool BackBufferListIsOpen(void) const
 	noexcept;
 
+private:
 	bool CreateSwapChain(void);
 
 	// Acquires back buffer resources from the swap chain and creates RTVs.

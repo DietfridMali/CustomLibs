@@ -306,17 +306,13 @@ noexcept
 
 	// Open a temporary CL if none is active. vkCmdClearColorImage + layout transitions need a
 	// recording command buffer outside any render-pass scope.
-	void*			opHandle = nullptr;
-	VkCommandBuffer	cb = commandListHandler.CmdQueue().CmdBuffer();
+	void* opHandle = baseRenderer.StartComputeOperation("GfxStates::ClearComputeBuffers");
+	if (opHandle == nullptr)
+		return;
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
 	if (cb == VK_NULL_HANDLE) {
-		opHandle = baseRenderer.StartOperation("GfxStates::ClearComputeBuffers", false);
-		if (opHandle == nullptr)
-			return;
-		cb = commandListHandler.CmdQueue().CmdBuffer();
-		if (cb == VK_NULL_HANDLE) {
-			baseRenderer.FinishOperation(opHandle);
-			return;
-		}
+		baseRenderer.FinishOperation(opHandle);
+		return;
 	}
 
 	CommandListHandler::RenderingScope	scope = commandListHandler.SuspendRendering();
@@ -330,8 +326,7 @@ noexcept
 	}
 	commandListHandler.ResumeRendering(scope);
 
-	if (opHandle != nullptr)
-		baseRenderer.FinishOperation(opHandle);
+	baseRenderer.FinishOperation(opHandle);
 }
 
 

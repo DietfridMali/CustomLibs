@@ -63,6 +63,9 @@ public:
 		return *cl != nullptr;
 	}
 
+	virtual void* StartComputeOperation(String name = "")
+	noexcept override;
+
 	virtual bool FinishOperation(void* cl, bool flush = false)
 	noexcept override;
 

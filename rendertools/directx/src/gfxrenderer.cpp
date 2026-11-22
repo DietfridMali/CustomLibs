@@ -123,6 +123,24 @@ noexcept
 }
 
 
+void* GfxRenderer::StartComputeOperation(String name)
+noexcept
+{
+	CommandList* cl = commandListHandler.CurrentCmdList();
+	if (cl and not baseDisplayHandler.BackBufferListIsOpen()) {
+		if (cl->IsTemporary())
+			++(cl->m_refCounter);
+		return cl;
+	}
+	cl = commandListHandler.CreateCmdList(name, true);
+	if (not cl)
+		return nullptr;
+	if (not cl->Open())
+		return nullptr;
+	return cl;
+}
+
+
 bool GfxRenderer::FinishOperation(void* cl, bool flush)
 noexcept
 {

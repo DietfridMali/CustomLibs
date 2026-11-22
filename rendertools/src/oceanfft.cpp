@@ -204,7 +204,7 @@ bool OceanFFT::Update(float time, float deltaTime)
 {
 	if (not m_isAvailable)
 		return false;
-	void* operation = baseRenderer.StartOperation("OceanFFT::Update", false);
+	void* operation = baseRenderer.StartComputeOperation("OceanFFT::Update");
 	if (operation == nullptr)
 		return false;
 	bool ok = Compute(time, deltaTime);

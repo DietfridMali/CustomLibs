@@ -676,7 +676,7 @@ bool ComputeShader::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_
 	if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
 		return false;
 
-	void* opHandle = baseRenderer.StartOperation(m_name, false);
+	void* opHandle = baseRenderer.StartComputeOperation(m_name);
 	if (opHandle == nullptr)
 		return false;
 	CommandList*	cmdList = commandListHandler.CurrentCmdList();

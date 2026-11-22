@@ -684,6 +684,12 @@ public:
 		return true;
 	}
 
+	virtual void* StartComputeOperation(String name = "")
+	noexcept
+	{
+		return StartOperation(name, false);
+	}
+
 	virtual bool FinishOperation(void* /*cl*/, bool /*flush*/ = false)
 	noexcept
 	{

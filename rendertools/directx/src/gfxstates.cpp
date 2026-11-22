@@ -247,17 +247,13 @@ noexcept
 
 	// Open a temporary CL if none is active. ClearRenderTargetView + ResourceBarrier require a
 	// recording command list.
-	void*			opHandle = nullptr;
-	CommandList*	cmdList = commandListHandler.CurrentCmdList();
+	void* opHandle = baseRenderer.StartComputeOperation("GfxStates::ClearSkyMaps");
+	if (opHandle == nullptr)
+		return;
+	CommandList* cmdList = commandListHandler.CurrentCmdList();
 	if (cmdList == nullptr) {
-		opHandle = baseRenderer.StartOperation("GfxStates::ClearSkyMaps", false);
-		if (opHandle == nullptr)
-			return;
-		cmdList = commandListHandler.CurrentCmdList();
-		if (cmdList == nullptr) {
-			baseRenderer.FinishOperation(opHandle);
-			return;
-		}
+		baseRenderer.FinishOperation(opHandle);
+		return;
 	}
 
 	const FLOAT	zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -269,8 +265,7 @@ noexcept
 		bi.SetState(cmdList, kShaderReadState);
 	}
 
-	if (opHandle != nullptr)
-		baseRenderer.FinishOperation(opHandle);
+	baseRenderer.FinishOperation(opHandle);
 }
 
 

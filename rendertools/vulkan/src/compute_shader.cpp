@@ -908,7 +908,7 @@ bool ComputeShader::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_
 	if (vkContext.Device() == VK_NULL_HANDLE)
 		return false;
 
-	void* opHandle = baseRenderer.StartOperation(m_name, false);
+	void* opHandle = baseRenderer.StartComputeOperation(m_name);
 	if (opHandle == nullptr)
 		return false;
 	VkCommandBuffer						cb = commandListHandler.CurrentGfxList();
