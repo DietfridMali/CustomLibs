@@ -359,6 +359,8 @@ public:
 
 	void EndDrawStatistics(int32_t handle);
 
+	double TakeSlowestDrawTime(void);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).

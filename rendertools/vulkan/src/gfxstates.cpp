@@ -720,6 +720,12 @@ void GfxStates::EndDrawStatistics(int32_t handle)
 }
 
 
+double GfxStates::TakeSlowestDrawTime(void)
+{
+	return deviceDiagnostics.TakeSlowestDrawTime();
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	VkFormatProperties props{};

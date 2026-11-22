@@ -77,6 +77,9 @@ public:
 	void ResolveDrawStatistics(uint32_t frameIndex)
 	noexcept;
 
+	double TakeSlowestDrawTime(void)
+	noexcept;
+
 	inline bool HasPipelineStatistics(void) const
 	noexcept
 	{
@@ -144,6 +147,7 @@ private:
 	char								m_statLabels[kFrameSlots][kStatQueries][kNameSize]{};
 	DrawStats							m_lastStats[kLastStats];
 	uint32_t							m_lastStatCount{ 0 };
+	double								m_slowestMs{ 0.0 };
 	Record								m_records[kRingSize];
 
 	void FormatMark(uint32_t serial, char* text, size_t size) const

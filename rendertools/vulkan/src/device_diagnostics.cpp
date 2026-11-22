@@ -285,6 +285,8 @@ noexcept
 			if ((res == VK_SUCCESS) and (times[1] != 0) and (times[3] != 0))
 				stats.gpuMs = double((times[2] - times[0]) & m_timestampMask) * double(m_timestampPeriod) * 1.0e-6;
 		}
+		if (stats.gpuMs > m_slowestMs)
+			m_slowestMs = stats.gpuMs;
 		if (m_statsEnabled)
 			LogDrawStats("draw stats", stats);
 	}
@@ -292,6 +294,15 @@ noexcept
 	if (m_timePool != VK_NULL_HANDLE)
 		vkResetQueryPool(device, m_timePool, 2 * frameIndex * kStatQueries, 2 * count);
 	m_statCount[frameIndex] = 0;
+}
+
+
+double DeviceDiagnostics::TakeSlowestDrawTime(void)
+noexcept
+{
+	double slowest = m_slowestMs;
+	m_slowestMs = 0.0;
+	return slowest;
 }
 
 

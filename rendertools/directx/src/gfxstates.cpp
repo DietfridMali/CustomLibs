@@ -454,26 +454,32 @@ void GfxStates::LogMemoryUsage(const char* tag)
 
 void GfxStates::DiagnosticMark(const char* text)
 {
-	(void)text;
+	static_cast<void>(text);
 }
 
 
 void GfxStates::SetDrawStatistics(bool enable)
 {
-	(void)enable;
+	static_cast<void>(enable);
 }
 
 
 int32_t GfxStates::BeginDrawStatistics(const char* label)
 {
-	(void)label;
+	static_cast<void>(label);
 	return -1;
 }
 
 
 void GfxStates::EndDrawStatistics(int32_t handle)
 {
-	(void)handle;
+	static_cast<void>(handle);
+}
+
+
+double GfxStates::TakeSlowestDrawTime(void)
+{
+	return 0.0;
 }
 
 
