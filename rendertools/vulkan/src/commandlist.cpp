@@ -405,7 +405,6 @@ noexcept
 	++m_frameNumber;
 	m_hasImage = false;
 	m_isInFrame = true;
-	m_frameThread = std::this_thread::get_id();
 #if VK_STALL_DIAG
 	VkStallEndFrame(m_frameNumber);
 	// VMA refreshes what it knows of the driver's heap budgets when the frame index changes
@@ -429,7 +428,9 @@ noexcept
 		logHandler.Print("CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
 		return false;
 	}
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.ResolveDrawStatistics(m_frameIndex);
+#endif
 	// The slot's resources hang on its fence alone, so they are reset before the image is acquired -
 	// a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
 #if LOG_FRAME_METRICS
@@ -679,7 +680,9 @@ noexcept
 	if (res != VK_ERROR_DEVICE_LOST)
 		return;
 	logHandler.Print("%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating (build %s)\n", where, logHandler.BuildStamp());
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Report();
+#endif
 	// The window goes first - a message box behind a fullscreen window cannot be seen or answered.
 	if (SDL_Window* window = baseDisplayHandler.GetWindow())
 		SDL_HideWindow(window);
@@ -1719,8 +1722,10 @@ noexcept
 void GfxStageMark(const char* name)
 noexcept
 {
+#if DEVICE_DIAGNOSTICS
 	if (CommandList* stageList = commandListHandler.CurrentCmdList())
 		deviceDiagnostics.Mark(stageList->GfxList(), DeviceDiagnostics::MarkKind::Stage, name);
+#endif
 #if LOG_FRAME_METRICS
 	VkGpuFrameStage(commandListHandler.CurrentGfxList(), name);
 #endif
@@ -1892,7 +1897,9 @@ noexcept
 		logHandler.Print("CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
 		return false;
 	}
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Mark(m_cmdBuffers[fi], DeviceDiagnostics::MarkKind::ListBegin, static_cast<const char*>(m_name));
+#endif
 #if VK_STALL_DIAG
 	VkGpuPassBegin(this, static_cast<const char*>(m_name), m_cmdBuffers[fi], fi);
 #endif
@@ -1949,7 +1956,9 @@ noexcept
 #if LOG_FRAME_METRICS
 	VkGpuFrameEnd(this, m_cmdBuffers[fi], fi);
 #endif
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Mark(m_cmdBuffers[fi], DeviceDiagnostics::MarkKind::ListEnd, static_cast<const char*>(m_name));
+#endif
 	VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
 	if (res != VK_SUCCESS)
 		logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
@@ -2278,7 +2287,9 @@ noexcept
 #endif
 		SetActivePipeline(p, shader);
 		if (m_isRecording) {
+#if DEVICE_DIAGNOSTICS
 			deviceDiagnostics.Mark(GfxList(), DeviceDiagnostics::MarkKind::Pipeline, static_cast<const char*>(shader->m_name));
+#endif
 			key.states.SetDynamicStates(GfxList());
 		}
 		m_activeTopology = key.states.topology;

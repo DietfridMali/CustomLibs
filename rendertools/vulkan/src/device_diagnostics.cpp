@@ -9,6 +9,8 @@
 #include <cstring>
 #include <vector>
 
+#if DEVICE_DIAGNOSTICS
+
 // =================================================================================================
 
 namespace {
@@ -468,7 +470,6 @@ noexcept
 	ReportGpuWindow();
 	ReportRecentMarks();
 	ReportLastStats();
-	gfxStates.LogMemoryUsage("device lost");
 }
 
 
@@ -604,5 +605,7 @@ noexcept
 		logHandler.Print("    %s\n", text);
 	}
 }
+
+#endif
 
 // =================================================================================================

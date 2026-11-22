@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef DEVICE_DIAGNOSTICS
+#	define DEVICE_DIAGNOSTICS 0
+#endif
+
 #include "vkframework.h"
 #include "basesingleton.hpp"
 

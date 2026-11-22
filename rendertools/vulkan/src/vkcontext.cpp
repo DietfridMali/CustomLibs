@@ -161,7 +161,9 @@ noexcept
 		return false;
 	if (not CreateAllocator())
 		return false;
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Create(m_allocator);
+#endif
 	++m_generation;
 	return true;
 }
@@ -175,7 +177,9 @@ noexcept
 		m_pinnedPool = VK_NULL_HANDLE;
 	}
 	m_pinnedPoolFailed = false;
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Destroy(m_allocator);
+#endif
 	if (m_allocator != VK_NULL_HANDLE) {
 		vmaDestroyAllocator(m_allocator);
 		m_allocator = VK_NULL_HANDLE;
@@ -791,6 +795,7 @@ noexcept
 			HasDeviceExtension(extensions, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 		if (m_hasMemoryBudget)
 			deviceExtensions[deviceExtensionCount++] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
+#if DEVICE_DIAGNOSTICS
 		deviceDiagnostics.Select(m_physicalDevice, HasDeviceExtension(extensions, VK_EXT_DEVICE_FAULT_EXTENSION_NAME),
 								 HasDeviceExtension(extensions, VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME),
 								 HasDeviceExtension(extensions, VK_AMD_BUFFER_MARKER_EXTENSION_NAME));
@@ -806,6 +811,7 @@ noexcept
 			features.pipelineStatisticsQuery = VK_TRUE;
 		if (deviceDiagnostics.HasHostQueryReset())
 			feats12.hostQueryReset = VK_TRUE;
+#endif
 	}
 
 	VkDeviceCreateInfo info{};
@@ -829,7 +835,9 @@ noexcept
 		return false;
 	}
 
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Load(m_device);
+#endif
 	vkGetDeviceQueue(m_device, m_graphicsFamily, 0, &m_graphicsQueue);
 	vkGetDeviceQueue(m_device, m_presentFamily, 0, &m_presentQueue);
 	if (m_hasRayTracing and not RayTracingApi::Load(m_device, m_physicalDevice)) {

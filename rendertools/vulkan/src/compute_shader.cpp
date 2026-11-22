@@ -270,11 +270,6 @@ static const wchar_t* const kComputeBindArgs[] = {
 	L"39",
 	L"0",
 	L"-fvk-bind-register",
-	L"u4",
-	L"0",
-	L"40",
-	L"0",
-	L"-fvk-bind-register",
 	L"t0",
 	L"1",
 	L"42",
@@ -885,7 +880,9 @@ bool ComputeShader::Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t gr
 		vkUpdateDescriptorSets(device, writeCount, writes, 0, nullptr);
 
 	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Mark(cb, DeviceDiagnostics::MarkKind::Compute, static_cast<const char*>(m_name));
+#endif
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, m_usesBindless ? 2 : 1, sets,
 							dynamicOffsetCount, dynamicOffsetCount ? dynamicOffsets : nullptr);
@@ -1052,7 +1049,9 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 		return false;
 
 	const VkDescriptorSet sets[2] = { set, m_usesBindless ? bindlessTextureHeap.Set() : VkDescriptorSet(VK_NULL_HANDLE) };
+#if DEVICE_DIAGNOSTICS
 	deviceDiagnostics.Mark(once.cb, DeviceDiagnostics::MarkKind::Compute, static_cast<const char*>(m_name));
+#endif
 	vkCmdBindPipeline(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 	vkCmdBindDescriptorSets(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, m_usesBindless ? 2 : 1, sets,
 							dynamicOffsetCount, dynamicOffsetCount ? &dynamicOffset : nullptr);

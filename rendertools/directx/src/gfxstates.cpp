@@ -12,7 +12,6 @@
 #include "loghandler.h"
 
 #include <cstdio>
-#include <psapi.h>
 
 // =================================================================================================
 // TextureSlotInfo
@@ -420,30 +419,6 @@ bool GfxStates::GetMemoryBudget(uint64_t& usage, uint64_t& budget)
 	usage = uint64_t(info.CurrentUsage);
 	budget = uint64_t(info.Budget);
 	return true;
-}
-
-
-void GfxStates::LogMemoryUsage(const char* tag)
-{
-	ComPtr<IDXGIAdapter3> adapter;
-
-	if (not dx12Context.m_adapter or FAILED(dx12Context.m_adapter.As(&adapter)))
-		return;
-
-	DXGI_QUERY_VIDEO_MEMORY_INFO local{};
-	DXGI_QUERY_VIDEO_MEMORY_INFO nonLocal{};
-
-	adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &local);
-	adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &nonLocal);
-
-	PROCESS_MEMORY_COUNTERS_EX counters{};
-	counters.cb = sizeof(counters);
-	K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters));
-
-	const double toMB = 1.0 / (1024.0 * 1024.0);
-	logHandler.Print("%s: process private %.0f MB, working set %.0f MB | gpu local %.0f MB, non-local %.0f MB\n",
-					 tag, double(counters.PrivateUsage) * toMB, double(counters.WorkingSetSize) * toMB,
-					 double(local.CurrentUsage) * toMB, double(nonLocal.CurrentUsage) * toMB);
 }
 
 

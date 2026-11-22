@@ -79,12 +79,6 @@ public:
 		return m_capacity;
 	}
 
-	inline uint32_t Used(void) const
-	noexcept
-	{
-		return m_nextIndex - uint32_t(m_freeIndices.size());
-	}
-
 	uint32_t Allocate(void)
 	noexcept;
 
