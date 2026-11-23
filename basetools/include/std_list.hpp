@@ -276,12 +276,20 @@ public:
 	List& operator=(List&& other)
 	noexcept
 	{ // move von rvalue-Quelle
-		return Move(std::move(other));
+		if (this != &other) {
+			m_list.clear();
+			Move(std::move(other));
+		}
+		return *this;
 	}
 
 	List& operator=(const List& other)
-	{ // optional: copy-append bei const
-		return Copy(other);
+	{
+		if (this != &other) {
+			m_list.clear();
+			Copy(other);
+		}
+		return *this;
 	}
 
 	List(const List& other) {

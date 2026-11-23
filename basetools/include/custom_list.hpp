@@ -602,7 +602,11 @@ public:
 	}
 #endif
 	inline List<ItemType>& operator=(List<ItemType> const& other) {
-		Copy(other);
+		if (this != &other) {
+			Destroy();
+			Init();
+			Copy(other);
+		}
 		return *this;
 	}
 
