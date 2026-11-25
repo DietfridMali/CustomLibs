@@ -14,6 +14,10 @@ static const String& OceanConstants()
             float  gravity;
             float  choppiness;
             float  foamDecay;
+            float  foamRise;
+            float  foamCrestLo;
+            float  foamCrestHi;
+            float  crestSigma;
             int    gridSize;
             int    logSize;
             int    stage;
@@ -177,9 +181,25 @@ static const String OceanAssembleMain = String(R"(
     Texture2D<float4> source0 : register(t0);
     Texture2D<float4> source1 : register(t1);
     Texture2D<float4> source2 : register(t2);
+    Texture2D<float4> source3 : register(t3);
+    Texture2D<float4> source4 : register(t4);
     [[vk::image_format("rgba16f")]] RWTexture2D<float4> target0 : register(u0);
     [[vk::image_format("rgba16f")]] RWTexture2D<float4> target1 : register(u1);
     [[vk::image_format("rgba16f")]] RWTexture2D<float4> target2 : register(u2);
+
+    float CrestHeight(uint2 id, int size) {
+        float tileScale = ((cascade == 1) ? tileSizes.y : tileSizes.z) / tileSizes.x;
+        float2 t = (float2(id) + 0.5) * tileScale - 0.5;
+        float2 cell = floor(t);
+        float2 f = t - cell;
+        int2 c0 = (int2(cell) % size + size) % size;
+        int2 c1 = (c0 + 1) % size;
+        float h00 = source4.Load(int3(c0.x, c0.y, 0)).y;
+        float h10 = source4.Load(int3(c1.x, c0.y, 0)).y;
+        float h01 = source4.Load(int3(c0.x, c1.y, 0)).y;
+        float h11 = source4.Load(int3(c1.x, c1.y, 0)).y;
+        return lerp(lerp(h00, h10, f.x), lerp(h01, h11, f.x), f.y);
+    }
 
     [numthreads(8, 8, 1)]
     void CSMain(uint3 id : SV_DispatchThreadID) {
@@ -196,18 +216,24 @@ static const String OceanAssembleMain = String(R"(
         float minStretch = 1.0 + 0.5 * (dxx + dzz) - 0.5 * sqrt((dxx - dzz) * (dxx - dzz) + 4.0 * dxz * dxz);
         float fold = min(jacobian, minStretch);
         float previous = source2.Load(int3(id.xy, 0)).a;
-        float compression = max(1.0 - fold, previous - foamDecay * deltaTime / max(fold, 0.5));
+        float squeeze = 1.0 - fold;
+        float previousSqueeze = source3.Load(int3(id.xy, 0)).g;
+        float rising = (deltaTime > 0.0) ? foamRise * max(squeeze - previousSqueeze, 0.0) / deltaTime : 0.0;
+        float crest = (cascade == 0) ? a.z : CrestHeight(id.xy, size);
+        float crestWeight = (foamCrestHi > foamCrestLo) ? smoothstep(foamCrestLo, foamCrestHi, crest / crestSigma) : 1.0;
+        float generated = (squeeze + rising) * crestWeight;
+        float compression = max(generated, previous - foamDecay * deltaTime / max(fold, 0.5));
         target0[id.xy] = float4(choppiness * a.x, a.z, choppiness * a.y, compression);
         target1[id.xy] = float4(b.x, b.y, dxx, dzz);
-        float freshness = (compression > 1.0e-3) ? saturate((1.0 - fold) / compression) : 0.0;
-        target2[id.xy] = float4(freshness, 0.0, 0.0, 0.0);
+        float freshness = (compression > 1.0e-3) ? saturate(generated / compression) : 0.0;
+        target2[id.xy] = float4(freshness, squeeze, 0.0, 0.0);
     }
 )");
 
 
 const ShaderSource& OceanAssembleShader()
 {
-	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(3, 3, 0);
+	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(5, 3, 0);
 	static const ShaderSource				source(
 		   "oceanAssemble",
 		   { .cs = OceanConstants() + OceanAssembleMain,

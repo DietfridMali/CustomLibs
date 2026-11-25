@@ -34,6 +34,9 @@ public:
 		float		gravity{ 9.81f };
 		float		choppiness{ 1.4f };
 		float		foamDecay{ 0.08f };
+		float		foamRise{ 0.0f };
+		float		foamCrestLo{ 0.0f };
+		float		foamCrestHi{ 0.0f };
 		uint32_t	seed{ 20261008u };
 	};
 
@@ -91,15 +94,18 @@ private:
 	RenderTarget*	m_work{ nullptr };
 	RenderTarget*	m_displacement[cCascadeCount][2]{};
 	RenderTarget*	m_derivatives[cCascadeCount]{};
-	RenderTarget*	m_foamAge[cCascadeCount]{};
+	RenderTarget*	m_foamAge[cCascadeCount][2]{};
 	int				m_current{ 0 };
+	float			m_lastTime{ 0.0f };
+	float			m_crestSigma{ 1.0f };
+	bool			m_hasHistory{ false };
 	bool			m_isAvailable{ false };
 	bool			m_hasSpectrum{ false };
 	bool			m_isReady{ false };
 
 	RenderTarget* CreateTarget(const char* name, int width, int height, int bufferCount, GfxPixelFormat format);
 
-	void BuildSpectrum(Vector4f* spectrum) const;
+	void BuildSpectrum(Vector4f* spectrum, float& crestSigma) const;
 
 	bool UploadSpectrum(void);
 

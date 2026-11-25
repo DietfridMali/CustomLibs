@@ -59,8 +59,10 @@ bool OceanFFT::Create(const Params& params)
 		m_displacement[c][0] = CreateTarget("oceanDisplacement", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
 		m_displacement[c][1] = CreateTarget("oceanDisplacement", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
 		m_derivatives[c] = CreateTarget("oceanDerivatives", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
-		m_foamAge[c] = CreateTarget("oceanFoamAge", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
-		ok = (m_displacement[c][0] != nullptr) and (m_displacement[c][1] != nullptr) and (m_derivatives[c] != nullptr) and (m_foamAge[c] != nullptr);
+		m_foamAge[c][0] = CreateTarget("oceanFoamAge", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
+		m_foamAge[c][1] = CreateTarget("oceanFoamAge", cGridSize, cGridSize, 1, GfxPixelFormat::RGBA16_SFloat);
+		ok = (m_displacement[c][0] != nullptr) and (m_displacement[c][1] != nullptr) and (m_derivatives[c] != nullptr)
+			 and (m_foamAge[c][0] != nullptr) and (m_foamAge[c][1] != nullptr);
 	}
 	if (not ok) {
 		logHandler.Print("OceanFFT: creating the wave targets failed\n");
@@ -80,20 +82,24 @@ void OceanFFT::Destroy(void)
 		delete m_displacement[c][0];
 		delete m_displacement[c][1];
 		delete m_derivatives[c];
-		delete m_foamAge[c];
+		delete m_foamAge[c][0];
+		delete m_foamAge[c][1];
 		m_displacement[c][0] = nullptr;
 		m_displacement[c][1] = nullptr;
 		m_derivatives[c] = nullptr;
-		m_foamAge[c] = nullptr;
+		m_foamAge[c][0] = nullptr;
+		m_foamAge[c][1] = nullptr;
 	}
 	m_current = 0;
+	m_lastTime = 0.0f;
+	m_hasHistory = false;
 	m_isAvailable = false;
 	m_hasSpectrum = false;
 	m_isReady = false;
 }
 
 
-void OceanFFT::BuildSpectrum(Vector4f* spectrum) const
+void OceanFFT::BuildSpectrum(Vector4f* spectrum, float& crestSigma) const
 {
 	const int size = cGridSize;
 	const int cells = size * size;
@@ -136,6 +142,11 @@ void OceanFFT::BuildSpectrum(Vector4f* spectrum) const
 	float swellScale = (swellSum > 0.0) ? float(double(swellSigma * swellSigma) / (2.0 * swellSum)) : 0.0f;
 	float windScale = (windSum > 0.0) ? float(double(windSigma * windSigma) / (2.0 * windSum)) : 0.0f;
 
+	double crestVariance = 0.0;
+	for (int i = 0; i < cells; ++i)
+		crestVariance += 2.0 * (double(swellScale) * double(swellEnergy[i]) + double(windScale) * double(windEnergy[i]));
+	crestSigma = float(sqrt(crestVariance));
+
 	AutoArray<Vector2f> amplitudes;
 	amplitudes.Resize(cells * cCascadeCount);
 	std::mt19937					generator(m_params.seed);
@@ -167,6 +178,10 @@ void OceanFFT::SetConstants(ComputeShader* shader, float time, float deltaTime) 
 	shader->SetFloat("gravity", m_params.gravity);
 	shader->SetFloat("choppiness", m_params.choppiness);
 	shader->SetFloat("foamDecay", m_params.foamDecay);
+	shader->SetFloat("foamRise", m_params.foamRise);
+	shader->SetFloat("foamCrestLo", m_params.foamCrestLo);
+	shader->SetFloat("foamCrestHi", m_params.foamCrestHi);
+	shader->SetFloat("crestSigma", fmaxf(m_crestSigma, 1.0e-4f));
 	shader->SetInt("gridSize", cGridSize);
 	shader->SetInt("logSize", cLogSize);
 	shader->SetInt("stage", 0);
@@ -184,7 +199,7 @@ bool OceanFFT::UploadSpectrum(void)
 	GfxArray<Vector4f, GfxTypes::StructuredBuffer> spectrum;
 	if (not spectrum.Create(cGridSize * cCascadeCount * cGridSize))
 		return false;
-	BuildSpectrum(spectrum.Data());
+	BuildSpectrum(spectrum.Data(), m_crestSigma);
 	if (not spectrum.UploadImmediate())
 		return false;
 
@@ -258,19 +273,26 @@ bool OceanFFT::Compute(float time, float deltaTime)
 
 	int previous = m_current;
 	int current = 1 - m_current;
+	bool isContinuous = m_hasHistory and (deltaTime > 0.0f) and (fabsf(time - m_lastTime - deltaTime) < 1.0e-4f);
 	for (int c = 0; c < cCascadeCount; ++c) {
 		SetConstants(assemble, time, deltaTime);
+		assemble->SetFloat("foamRise", isContinuous ? m_params.foamRise : 0.0f);
 		assemble->SetInt("cascade", c);
 		assemble->BindSampledImage(4, m_work, base + source);
 		assemble->BindSampledImage(5, m_work, base + source + 1);
 		assemble->BindSampledImage(6, m_displacement[c][previous], m_displacement[c][previous]->m_computeBufferIndex);
+		assemble->BindSampledImage(7, m_foamAge[c][previous], m_foamAge[c][previous]->m_computeBufferIndex);
+		int crestSource = (c == 0) ? previous : current;
+		assemble->BindSampledImage(8, m_displacement[0][crestSource], m_displacement[0][crestSource]->m_computeBufferIndex);
 		assemble->BindStorageImage(36, m_displacement[c][current], m_displacement[c][current]->m_computeBufferIndex);
 		assemble->BindStorageImage(37, m_derivatives[c], m_derivatives[c]->m_computeBufferIndex);
-		assemble->BindStorageImage(38, m_foamAge[c], m_foamAge[c]->m_computeBufferIndex);
+		assemble->BindStorageImage(38, m_foamAge[c][current], m_foamAge[c][current]->m_computeBufferIndex);
 		if (not assemble->Dispatch(gridGroups, gridGroups, 1))
 			return false;
 	}
 	m_current = current;
+	m_lastTime = time;
+	m_hasHistory = true;
 	m_isReady = true;
 	return true;
 }
@@ -301,7 +323,7 @@ Texture* OceanFFT::DerivativeMap(int cascade)
 
 Texture* OceanFFT::FoamAgeMap(int cascade)
 {
-	return MapTexture(m_foamAge[cascade]);
+	return MapTexture(m_foamAge[cascade][m_current]);
 }
 
 // =================================================================================================
