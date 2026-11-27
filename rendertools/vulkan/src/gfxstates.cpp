@@ -13,6 +13,14 @@
 #include <cstdio>
 #include <vector>
 
+#ifdef _WIN32
+#	ifndef NOMINMAX
+#		define NOMINMAX
+#	endif
+#	include <windows.h>
+#	include <psapi.h>
+#endif
+
 #if VK_STALL_DIAG
 extern double VkStallClock(void)
 noexcept;
@@ -624,6 +632,53 @@ bool GfxStates::GetMemoryBudget(uint64_t& usage, uint64_t& budget)
 	usage = uint64_t(budgets[heap].usage);
 	budget = uint64_t(budgets[heap].budget);
 	return true;
+}
+
+
+void GfxStates::LogMemoryUsage(const char* tag)
+{
+	VmaAllocator allocator = vkContext.Allocator();
+
+	if (allocator == VK_NULL_HANDLE)
+		return;
+
+	VkPhysicalDeviceMemoryProperties memory{};
+	vkGetPhysicalDeviceMemoryProperties(vkContext.PhysicalDevice(), &memory);
+
+	VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+	vmaGetHeapBudgets(allocator, budgets);
+
+	uint64_t localUsage = 0;
+	uint64_t hostUsage = 0;
+	uint64_t blockBytes = 0;
+	uint64_t allocationBytes = 0;
+	uint64_t allocationCount = 0;
+
+	for (uint32_t i = 0; i < memory.memoryHeapCount; ++i) {
+		if (memory.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+			localUsage += uint64_t(budgets[i].usage);
+		else
+			hostUsage += uint64_t(budgets[i].usage);
+		blockBytes += uint64_t(budgets[i].statistics.blockBytes);
+		allocationBytes += uint64_t(budgets[i].statistics.allocationBytes);
+		allocationCount += uint64_t(budgets[i].statistics.allocationCount);
+	}
+
+	uint64_t commitBytes = 0;
+	uint64_t privateWorkingSet = 0;
+#ifdef _WIN32
+	PROCESS_MEMORY_COUNTERS_EX2 counters{};
+	counters.cb = sizeof(counters);
+	if (K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters))) {
+		commitBytes = uint64_t(counters.PrivateUsage);
+		privateWorkingSet = uint64_t(counters.PrivateWorkingSetSize);
+	}
+#endif
+
+	const double toMB = 1.0 / (1024.0 * 1024.0);
+	logHandler.Print("%s: process commit %.0f MB, private working set %.0f MB | gpu device local %.0f MB, host %.0f MB | vma %llu allocations, %.0f MB in %.0f MB blocks\n",
+					 tag, double(commitBytes) * toMB, double(privateWorkingSet) * toMB, double(localUsage) * toMB, double(hostUsage) * toMB,
+					 static_cast<unsigned long long>(allocationCount), double(allocationBytes) * toMB, double(blockBytes) * toMB);
 }
 
 

@@ -349,6 +349,8 @@ public:
 
 	bool GetMemoryBudget(uint64_t& usage, uint64_t& budget);
 
+	void LogMemoryUsage(const char* tag);
+
 	void DiagnosticMark(const char* text);
 
 	void SetDrawStatistics(bool enable);
